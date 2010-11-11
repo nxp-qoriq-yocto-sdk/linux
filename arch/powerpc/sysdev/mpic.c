@@ -955,6 +955,7 @@ void mpic_set_destination(unsigned int virq, unsigned int cpuid)
 }
 
 static struct irq_chip mpic_irq_chip = {
+	.irq_disable	= mpic_mask_irq,
 	.irq_mask	= mpic_mask_irq,
 	.irq_unmask	= mpic_unmask_irq,
 	.irq_eoi	= mpic_end_irq,
@@ -962,12 +963,14 @@ static struct irq_chip mpic_irq_chip = {
 };
 
 static struct irq_chip mpic_ipi_chip = {
+	.irq_disable	= mpic_mask_ipi,
 	.irq_mask	= mpic_mask_ipi,
 	.irq_unmask	= mpic_unmask_ipi,
 	.irq_eoi	= mpic_end_ipi,
 };
 
 static struct irq_chip mpic_tm_chip = {
+	.irq_disable	= mpic_mask_tm,
 	.irq_mask	= mpic_mask_tm,
 	.irq_unmask	= mpic_unmask_tm,
 	.irq_eoi	= mpic_end_irq,
@@ -977,6 +980,7 @@ static struct irq_chip mpic_tm_chip = {
 static struct irq_chip mpic_irq_ht_chip = {
 	.irq_startup	= mpic_startup_ht_irq,
 	.irq_shutdown	= mpic_shutdown_ht_irq,
+	.irq_disable	= mpic_mask_irq,
 	.irq_mask	= mpic_mask_irq,
 	.irq_unmask	= mpic_unmask_ht_irq,
 	.irq_eoi	= mpic_end_ht_irq,
