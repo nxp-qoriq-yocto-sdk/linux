@@ -656,7 +656,9 @@ static inline struct mpic * mpic_from_irq_data(struct irq_data *d)
 static inline void mpic_eoi(struct mpic *mpic)
 {
 	mpic_cpu_write(MPIC_INFO(CPU_EOI), 0);
-	(void)mpic_cpu_read(MPIC_INFO(CPU_WHOAMI));
+
+	if (!(mpic->flags & MPIC_NO_READBACK))
+		(void)mpic_cpu_read(MPIC_INFO(CPU_WHOAMI));
 }
 
 /*
@@ -1214,6 +1216,9 @@ struct mpic * __init mpic_alloc(struct device_node *node,
 		mpic->flags |= MPIC_BIG_ENDIAN;
 	if (node && of_device_is_compatible(node, "fsl,mpic"))
 		mpic->flags |= MPIC_FSL;
+
+	if (node && of_get_property(node, "fsl,mpic-no-readback", NULL) != NULL)
+		mpic->flags |= MPIC_NO_READBACK;
 
 	/* Look for protected sources */
 	if (node) {
