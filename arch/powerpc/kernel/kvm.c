@@ -30,6 +30,7 @@
 #include <asm/cacheflush.h>
 #include <asm/disassemble.h>
 #include <asm/ppc-opcode.h>
+#include <asm/machdep.h>
 
 #define KVM_MAGIC_PAGE		(-4096L)
 #define magic_var(x) KVM_MAGIC_PAGE + offsetof(struct kvm_vcpu_arch_shared, x)
@@ -774,6 +775,13 @@ static __init void kvm_free_tmp(void)
 	}
 }
 
+#ifdef CONFIG_E500
+static void kvm_msrwe_idle(void)
+{
+	mtmsr(mfmsr() | MSR_WE | MSR_EE);
+}
+#endif
+
 static int __init kvm_guest_init(void)
 {
 	if (!kvm_para_available())
@@ -789,6 +797,17 @@ static int __init kvm_guest_init(void)
 	/* Enable napping */
 	powersave_nap = 1;
 #endif
+#ifdef CONFIG_E500
+	/*
+	 * Skip the overhead of HID0 accesses that KVM ignores --
+	 * just write MSR[WE].
+	 *
+	 * We don't need _TLF_NAPPING, because under KVM we know
+	 * it will take effect right away.
+	 */
+	if (ppc_md.power_save == e500_idle)
+		ppc_md.power_save = kvm_msrwe_idle;
+#endif
 
 free_tmp:
 	kvm_free_tmp();
@@ -796,4 +815,4 @@ free_tmp:
 	return 0;
 }
 
-postcore_initcall(kvm_guest_init);
+early_initcall(kvm_guest_init);
