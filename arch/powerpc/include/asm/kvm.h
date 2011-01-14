@@ -23,6 +23,9 @@
 
 #include <linux/types.h>
 
+/* Select powerpc specific features in <linux/kvm.h> */
+#define __KVM_HAVE_GUEST_DEBUG
+
 struct kvm_regs {
 	__u64 pc;
 	__u64 cr;
@@ -256,10 +259,29 @@ struct kvm_fpu {
 };
 
 struct kvm_debug_exit_arch {
+	__u32 exception;
+	__u32 pc;
+	__u32 status;
 };
+
+#define KVM_INST_GUESTGDB               0x7C00021C      /* ehpriv OC=0 */
+
+#define KVM_GUESTDBG_USE_SW_BP          0x00010000
+#define KVM_GUESTDBG_USE_HW_BP          0x00020000
+
+#define KVMPPC_DEBUG_NOTYPE             0x0
+#define KVMPPC_DEBUG_BREAKPOINT         (1UL << 1)
+#define KVMPPC_DEBUG_WATCH_WRITE        (1UL << 2)
+#define KVMPPC_DEBUG_WATCH_READ         (1UL << 3)
 
 /* for KVM_SET_GUEST_DEBUG */
 struct kvm_guest_debug_arch {
+	struct {
+		__u64 addr;
+		__u32 type;
+		__u32 pad1;
+		__u64 pad2;
+	} bp[16];
 };
 
 #define KVM_REG_MASK		0x001f

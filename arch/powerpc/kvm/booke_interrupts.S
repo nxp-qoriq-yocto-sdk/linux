@@ -68,6 +68,40 @@ _GLOBAL(kvmppc_handler_\ivor_nr)
 	bctr
 .endm
 
+.macro KVM_DBG_HANDLER ivor_nr
+_GLOBAL(kvmppc_handler_\ivor_nr)
+	/* Get pointer to vcpu and record exit number. */
+	mtspr   SPRN_SPRG_WSCRATCH0, r4
+	mtspr   SPRN_SPRG_WSCRATCH_CRIT, r3
+	mfcr	r3
+	mfspr	r4, SPRN_CSRR1
+	andi.	r4, r4, MSR_PR
+	bne	1f
+	mfspr   r4, SPRN_CSRR1
+	rlwinm  r4, r4, 0, ~MSR_DE
+	mtspr   SPRN_CSRR1, r4
+	lis	r4, 0xffff
+	ori	r4, r4, 0xffff
+	mtspr	SPRN_DBSR, r4
+	mtcr	r3
+	mfspr   r3, SPRN_SPRG_RSCRATCH_CRIT
+	mfspr   r4, SPRN_SPRG_RSCRATCH0
+	rfci
+1:	/* it's a guest debug event */
+	mtcr	r3
+	mfspr   r3, SPRN_SPRG_RSCRATCH_CRIT
+	mfspr	r4, SPRN_SPRG_RVCPU
+	stw	r5, VCPU_GPR(r5)(r4)
+	stw	r6, VCPU_GPR(r6)(r4)
+	mfctr	r5
+	lis	r6, kvmppc_resume_host@h
+	stw	r5, VCPU_CTR(r4)
+	li	r5, \ivor_nr
+	ori	r6, r6, kvmppc_resume_host@l
+	mtctr	r6
+	bctr
+.endm
+
 .macro KVM_HANDLER_ADDR ivor_nr
 	.long	kvmppc_handler_\ivor_nr
 .endm
@@ -88,7 +122,7 @@ KVM_HANDLER BOOKE_INTERRUPT_FIT
 KVM_HANDLER BOOKE_INTERRUPT_WATCHDOG
 KVM_HANDLER BOOKE_INTERRUPT_DTLB_MISS
 KVM_HANDLER BOOKE_INTERRUPT_ITLB_MISS
-KVM_HANDLER BOOKE_INTERRUPT_DEBUG
+KVM_DBG_HANDLER BOOKE_INTERRUPT_DEBUG
 KVM_HANDLER BOOKE_INTERRUPT_SPE_UNAVAIL
 KVM_HANDLER BOOKE_INTERRUPT_SPE_FP_DATA
 KVM_HANDLER BOOKE_INTERRUPT_SPE_FP_ROUND
@@ -171,6 +205,30 @@ _GLOBAL(kvmppc_resume_host)
 	mfspr	r9, SPRN_ESR
 	stw	r9, VCPU_FAULT_ESR(r4)
 ..skip_esr:
+
+	lwz	r6, VCPU_GUEST_DEBUG(r4)
+	cmpwi	r6, 0
+	beq	..skip_load_host_debug
+	li	r9, 0
+	mtspr	SPRN_DBCR0, r9		/* disable all debug event */
+	addi	r7, r4, VCPU_HOST_DBG - 4
+	lwzu	r9, 4(r7)
+	mtspr	SPRN_IAC1, r9
+	lwzu	r9, 4(r7)
+	mtspr	SPRN_IAC2, r9
+#ifndef CONFIG_FSL_BOOKE
+	lwzu	r9, 4(r7)
+	mtspr	SPRN_IAC3, r9
+	lwzu	r9, 4(r7)
+	mtspr	SPRN_IAC4, r9
+#endif
+	lwzu	r9, 4(r7)
+	mtspr	SPRN_DAC1, r9
+	lwzu	r9, 4(r7)
+	mtspr	SPRN_DAC2, r9
+	lwzu	r9, 4(r7)
+	mtspr	SPRN_DBCR0, r9
+..skip_load_host_debug:
 
 	/* Save remaining volatile guest register state to vcpu. */
 	stw	r0, VCPU_GPR(r0)(r4)
@@ -421,6 +479,50 @@ lightweight_exit:
 	mtspr	SPRN_SPRG6W, r3
 	lwz	r3, VCPU_SPRG7(r4)
 	mtspr	SPRN_SPRG7W, r3
+
+	lwz	r6, VCPU_GUEST_DEBUG(r4)
+	cmpwi	r6, 0
+	beq	..skip_load_guest_debug
+	mfmsr	r7
+	rlwinm	r7, r7, 0, ~MSR_DE
+	mtmsr	r7
+	addi	r7, r4, VCPU_HOST_DBG - 4
+	mfspr	r8, SPRN_IAC1
+	stwu	r8, 4(r7)
+	mfspr	r8, SPRN_IAC2
+	stwu	r8, 4(r7)
+#ifndef CONFIG_FSL_BOOKE
+	mfspr	r8, SPRN_IAC3
+	stwu	r8, 4(r7)
+	mfspr	r8, SPRN_IAC4
+	stwu	r8, 4(r7)
+#endif
+	mfspr	r8, SPRN_DAC1
+	stwu	r8, 4(r7)
+	mfspr	r8, SPRN_DAC2
+	stwu	r8, 4(r7)
+	mfspr	r8, SPRN_DBCR0
+	stwu	r8, 4(r7)
+	li	r8, 0
+	mtspr	SPRN_DBCR0, r8		/* disable all debug event */
+	addi	r7, r4, VCPU_SHADOW_DBG - 4
+	lwzu	r8, 4(r7)
+	mtspr	SPRN_IAC1, r8
+	lwzu	r8, 4(r7)
+	mtspr	SPRN_IAC2, r8
+#ifndef CONFIG_FSL_BOOKE
+	lwzu	r8, 4(r7)
+	mtspr	SPRN_IAC3, r8
+	lwzu	r8, 4(r7)
+	mtspr	SPRN_IAC4, r8
+#endif
+	lwzu	r8, 4(r7)
+	mtspr	SPRN_DAC1, r8
+	lwzu	r8, 4(r7)
+	mtspr	SPRN_DAC2, r8
+	lwzu	r8, 4(r7)
+	mtspr	SPRN_DBCR0, r8
+..skip_load_guest_debug:
 
 #ifdef CONFIG_KVM_EXIT_TIMING
 	/* save enter time */

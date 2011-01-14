@@ -175,6 +175,24 @@ struct hpte_cache {
 	struct kvmppc_pte pte;
 };
 
+#ifdef CONFIG_BOOKE
+# ifdef CONFIG_FSL_BOOKE
+#define KVMPPC_IAC_NUM	2
+#define KVMPPC_DAC_NUM	2
+# else
+#define KVMPPC_IAC_NUM	4
+#define KVMPPC_DAC_NUM	2
+# endif
+#endif
+
+struct kvmppc_debug_reg {
+#ifdef CONFIG_BOOKE
+	u32 iac[KVMPPC_IAC_NUM];
+	u32 dac[KVMPPC_DAC_NUM];
+	u32 dbcr0;
+#endif
+};
+
 struct kvm_vcpu_arch {
 	ulong host_stack;
 	u32 host_pid;
@@ -263,6 +281,9 @@ struct kvm_vcpu_arch {
 	u32 dbcr1;
 	u32 dbsr;
 
+	struct kvmppc_debug_reg shadow_dbg_reg; /* shadow debug registers */
+	struct kvmppc_debug_reg host_dbg_reg;	/* host debug regiters*/
+
 #ifdef CONFIG_KVM_EXIT_TIMING
 	struct mutex exit_timing_lock;
 	struct kvmppc_exit_timing timing_exit;
@@ -303,6 +324,7 @@ struct kvm_vcpu_arch {
 	struct kvm_vcpu_arch_shared *shared;
 	unsigned long magic_page_pa; /* phys addr to map the magic page to */
 	unsigned long magic_page_ea; /* effect. addr to map the magic page to */
+	struct kvm_guest_debug_arch dbg; /* debug arg between kvm and qemu */
 
 #ifdef CONFIG_PPC_BOOK3S
 	struct hlist_head hpte_hash_pte[HPTEG_HASH_NUM_PTE];

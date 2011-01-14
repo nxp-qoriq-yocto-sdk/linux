@@ -104,6 +104,9 @@ extern int kvmppc_core_emulate_op(struct kvm_run *run, struct kvm_vcpu *vcpu,
 extern int kvmppc_core_emulate_mtspr(struct kvm_vcpu *vcpu, int sprn, int rs);
 extern int kvmppc_core_emulate_mfspr(struct kvm_vcpu *vcpu, int sprn, int rt);
 
+extern int kvmppc_core_set_guest_debug(struct kvm_vcpu *vcpu,
+                                       struct kvm_guest_debug *dbg);
+
 extern int kvmppc_booke_init(void);
 extern void kvmppc_booke_exit(void);
 
