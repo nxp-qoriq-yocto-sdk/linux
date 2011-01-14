@@ -51,6 +51,7 @@
 #define BOOKE_IRQPRIO_MAX 20
 
 extern unsigned long kvmppc_booke_handlers;
+extern unsigned long kvmppc_booke_handler_addr[];
 
 void kvmppc_set_msr(struct kvm_vcpu *vcpu, u32 new_msr);
 void kvmppc_mmu_msr_notify(struct kvm_vcpu *vcpu, u32 old_msr);
