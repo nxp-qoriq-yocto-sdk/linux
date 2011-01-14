@@ -369,7 +369,7 @@ heavyweight_exit:
  *  r3: kvm_run pointer
  *  r4: vcpu pointer
  */
-_GLOBAL(__kvmppc_vcpu_run)
+_GLOBAL(__kvmppc_vcpu_entry)
 	stwu	r1, -HOST_STACK_SIZE(r1)
 	stw	r1, VCPU_HOST_STACK(r4)	/* Save stack pointer to vcpu. */
 

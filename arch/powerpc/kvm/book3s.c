@@ -1379,7 +1379,6 @@ void kvmppc_core_vcpu_free(struct kvm_vcpu *vcpu)
 	vfree(vcpu_book3s);
 }
 
-extern int __kvmppc_vcpu_entry(struct kvm_run *kvm_run, struct kvm_vcpu *vcpu);
 int __kvmppc_vcpu_run(struct kvm_run *kvm_run, struct kvm_vcpu *vcpu)
 {
 	int ret;

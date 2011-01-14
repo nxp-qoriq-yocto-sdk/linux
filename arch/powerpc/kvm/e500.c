@@ -73,6 +73,11 @@ int kvmppc_core_vcpu_setup(struct kvm_vcpu *vcpu)
 	return 0;
 }
 
+int __kvmppc_vcpu_run(struct kvm_run *kvm_run, struct kvm_vcpu *vcpu)
+{
+	return __kvmppc_vcpu_entry(kvm_run, vcpu);
+}
+
 /* 'linear_address' is actually an encoding of AS|PID|EADDR . */
 int kvmppc_core_vcpu_translate(struct kvm_vcpu *vcpu,
                                struct kvm_translation *tr)
