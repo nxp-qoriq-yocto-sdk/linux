@@ -1403,6 +1403,7 @@ int __init kvmppc_booke_init(void)
 {
 #ifndef CONFIG_KVM_BOOKE_HV
 	unsigned long ivor[16];
+	unsigned long *handler = kvmppc_booke_handler_addr;
 	unsigned long max_ivor = 0;
 	int i;
 
@@ -1436,14 +1437,14 @@ int __init kvmppc_booke_init(void)
 
 	for (i = 0; i < 16; i++) {
 		if (ivor[i] > max_ivor)
-			max_ivor = ivor[i];
+			max_ivor = i;
 
 		memcpy((void *)kvmppc_booke_handlers + ivor[i],
-		       kvmppc_handlers_start + i * kvmppc_handler_len,
-		       kvmppc_handler_len);
+		       (void *)handler[i], handler[i + 1] - handler[i]);
 	}
 	flush_icache_range(kvmppc_booke_handlers,
-	                   kvmppc_booke_handlers + max_ivor + kvmppc_handler_len);
+	                   kvmppc_booke_handlers + ivor[max_ivor] +
+                               handler[max_ivor + 1] - handler[max_ivor]);
 #endif /* !BOOKE_HV */
 	return 0;
 }
