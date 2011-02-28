@@ -42,7 +42,11 @@
 #include "iodev.h"
 #include "irq.h"
 
+#ifdef CONFIG_KVM_E500MC
+#define GUEST_CCSRBAR 0xffe000000ULL
+#else
 #define GUEST_CCSRBAR 0xe0000000
+#endif
 #define MPIC_START (GUEST_CCSRBAR + 0x40000)
 #define MPIC_SIZE 0x30000
 
