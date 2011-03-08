@@ -213,17 +213,16 @@ static void kvmppc_e500mc_shadow_release(struct kvmppc_vcpu_e500mc *vcpu_e500mc,
 		int tlbsel, int esel)
 {
 	struct tlbe *stlbe = &vcpu_e500mc->shadow_tlb[tlbsel][esel];
-	struct page *page = vcpu_e500mc->shadow_pages[tlbsel][esel];
+	unsigned long pfn;
 
-	if (page) {
-		vcpu_e500mc->shadow_pages[tlbsel][esel] = NULL;
+	pfn = stlbe->mas3 >> PAGE_SHIFT;
+	pfn |= stlbe->mas7 << (32 - PAGE_SHIFT);
 
-		if (get_tlb_v(stlbe)) {
-			if (tlbe_is_writable(stlbe))
-				kvm_release_page_dirty(page);
-			else
-				kvm_release_page_clean(page);
-		}
+	if (get_tlb_v(stlbe)) {
+		if (tlbe_is_writable(stlbe))
+			kvm_release_pfn_dirty(pfn);
+		else
+			kvm_release_pfn_clean(pfn);
 	}
 }
 
@@ -302,38 +301,128 @@ static inline void kvmppc_e500mc_shadow_map(
 	struct kvmppc_vcpu_e500mc *vcpu_e500mc,
 	u64 gvaddr, gfn_t gfn, struct tlbe *gtlbe, int tlbsel, int esel)
 {
-	struct page *new_page;
 	struct tlbe *stlbe;
-	hpa_t hpaddr;
+	struct kvm_memory_slot *slot;
+	unsigned long pfn, hva;
+	int pfnmap = 0;
+	int tsize = BOOK3E_PAGESZ_4K;
 
 	stlbe = &vcpu_e500mc->shadow_tlb[tlbsel][esel];
 
-	/* Get reference to new page. */
-	new_page = gfn_to_page(vcpu_e500mc->vcpu.kvm, gfn);
-	if (is_error_page(new_page)) {
-		printk(KERN_ERR "Couldn't get guest page for gfn %lx!\n",
-				(long)gfn);
-		kvm_release_page_clean(new_page);
-		return;
+	/*
+	 * Translate guest physical to true physical, acquiring
+	 * a page reference if it is normal, non-reserved memory.
+	 *
+	 * gfn_to_memslot() must succeed because otherwise we wouldn't
+	 * have gotten this far.  Eventually we should just pass the slot
+	 * pointer through from the first lookup.
+	 */
+	slot = gfn_to_memslot(vcpu_e500mc->vcpu.kvm, gfn);
+	hva = gfn_to_hva_memslot(slot, gfn);
+
+	if (tlbsel == 1) {
+		struct vm_area_struct *vma;
+		down_read(&current->mm->mmap_sem);
+
+		vma = find_vma(current->mm, hva);
+		if (vma && hva >= vma->vm_start &&
+		    (vma->vm_flags & VM_PFNMAP)) {
+			/*
+			 * This VMA is a physically contiguous region (e.g.
+			 * /dev/mem) that bypasses normal Linux page
+			 * management.  Find the overlap between the
+			 * vma and the memslot.
+			 */
+
+			unsigned long start, end;
+			unsigned long slot_start, slot_end;
+
+			pfnmap = 1;
+
+			start = vma->vm_pgoff;
+			end = start +
+			      ((vma->vm_end - vma->vm_start) >> PAGE_SHIFT);
+
+			pfn = start + ((hva - vma->vm_start) >> PAGE_SHIFT);
+
+			slot_start = pfn - (gfn - slot->base_gfn);
+			slot_end = slot_start + slot->npages;
+
+			if (start < slot_start)
+				start = slot_start;
+			if (end > slot_end)
+				end = slot_end;
+
+			tsize = (gtlbe->mas1 & MAS1_TSIZE_MASK) >>
+				MAS1_TSIZE_SHIFT;
+
+			/*
+			 * e500 doesn't implement the lowest tsize bit,
+			 * or 1K pages.
+			 */
+			tsize = max(BOOK3E_PAGESZ_4K, tsize & ~1);
+
+			/*
+			 * Now find the largest tsize (up to what the guest
+			 * requested) that will cover gfn, stay within the
+			 * range, and for which gfn and pfn are mutually
+			 * aligned.
+			 */
+
+			for (; tsize > BOOK3E_PAGESZ_4K; tsize -= 2) {
+				unsigned long gfn_start, gfn_end, tsize_pages;
+				tsize_pages = 1 << (tsize - 2);
+
+				gfn_start = gfn & ~(tsize_pages - 1);
+				gfn_end = gfn_start + tsize_pages;
+
+				if (gfn_start + pfn - gfn < start)
+					continue;
+				if (gfn_end + pfn - gfn > end)
+					continue;
+				if ((gfn & (tsize_pages - 1)) !=
+				    (pfn & (tsize_pages - 1)))
+					continue;
+
+				gvaddr &= ~((tsize_pages << PAGE_SHIFT) - 1);
+				pfn &= ~(tsize_pages - 1);
+				break;
+			}
+		}
+
+		up_read(&current->mm->mmap_sem);
 	}
-	hpaddr = page_to_phys(new_page);
+
+	if (likely(!pfnmap)) {
+		pfn = gfn_to_pfn_memslot(vcpu_e500mc->vcpu.kvm, slot, gfn);
+		if (is_error_pfn(pfn)) {
+			printk(KERN_ERR "Couldn't get real page for gfn %lx!\n",
+					(long)gfn);
+			kvm_release_pfn_clean(pfn);
+			return;
+		}
+	}
 
 	/* Drop reference to old page. */
 	kvmppc_e500mc_shadow_release(vcpu_e500mc, tlbsel, esel);
 
-	vcpu_e500mc->shadow_pages[tlbsel][esel] = new_page;
-
-	/* Force GS=1 IPROT=0 TSIZE=4KB for all guest mappings. */
-	stlbe->mas1 = MAS1_TSIZE(BOOK3E_PAGESZ_4K)
+	/* Force GS=1 IPROT=0 for all guest mappings. */
+	stlbe->mas1 = MAS1_TSIZE(tsize)
 		| MAS1_TID(get_tlb_tid(gtlbe)) | (gtlbe->mas1 & MAS1_TS) | MAS1_VALID;
 	stlbe->mas2 = (gvaddr & MAS2_EPN)
 		| e500mc_shadow_mas2_attrib(gtlbe->mas2,
 				vcpu_e500mc->vcpu.arch.shared->msr & MSR_PR);
-	stlbe->mas3 = (hpaddr & MAS3_RPN)
+	stlbe->mas3 = ((pfn << PAGE_SHIFT) & MAS3_RPN)
 		| e500mc_shadow_mas3_attrib(gtlbe->mas3,
 				vcpu_e500mc->vcpu.arch.shared->msr & MSR_PR);
-	stlbe->mas7 = (hpaddr >> 32) & MAS7_RPN;
+	stlbe->mas7 = (pfn >> (32 - PAGE_SHIFT)) & MAS7_RPN;
 	stlbe->mas8 = MAS8_TGS | vcpu_e500mc->lpid;
+
+	if (unlikely(pfnmap)) {
+		gtlbe->mas3 = stlbe->mas3;
+		gtlbe->mas7 = stlbe->mas7;
+		gtlbe->mas2 = stlbe->mas2;
+	}
 
 	trace_kvm_stlb_write(index_of(tlbsel, esel), stlbe->mas1, stlbe->mas2,
 			     stlbe->mas3, stlbe->mas7);
@@ -706,6 +795,7 @@ void kvmppc_mmu_map(struct kvm_vcpu *vcpu, u64 eaddr, gpa_t gpaddr,
 		BUG();
 		break;
 	}
+
 	write_host_tlbe(vcpu_e500mc, stlbsel, sesel);
 }
 
@@ -720,7 +810,7 @@ void kvmppc_e500mc_tlb_setup(struct kvmppc_vcpu_e500mc *vcpu_e500mc)
 
 	/* Insert large initial mapping for guest. */
 	tlbe = &vcpu_e500mc->guest_tlb[1][0];
-	tlbe->mas1 = MAS1_VALID | MAS1_TSIZE(BOOK3E_PAGESZ_256M);
+	tlbe->mas1 = MAS1_VALID | MAS1_TSIZE(BOOK3E_PAGESZ_2GB);
 	tlbe->mas2 = 0;
 	tlbe->mas3 = E500MC_TLB_SUPER_PERM_MASK;
 	tlbe->mas7 = 0;
@@ -763,16 +853,6 @@ int kvmppc_e500mc_tlb_init(struct kvmppc_vcpu_e500mc *vcpu_e500mc)
 	if (vcpu_e500mc->shadow_tlb[1] == NULL)
 		goto err_out_guest1;
 
-	vcpu_e500mc->shadow_pages[0] = (struct page **)
-		kzalloc(sizeof(struct page *) * KVM_E500MC_TLB0_SIZE, GFP_KERNEL);
-	if (vcpu_e500mc->shadow_pages[0] == NULL)
-		goto err_out_shadow1;
-
-	vcpu_e500mc->shadow_pages[1] = (struct page **)
-		kzalloc(sizeof(struct page *) * tlb1_entry_num, GFP_KERNEL);
-	if (vcpu_e500mc->shadow_pages[1] == NULL)
-		goto err_out_page0;
-
 	/* Init TLB configuration register */
 	vcpu_e500mc->tlb0cfg = mfspr(SPRN_TLB0CFG) & ~0xfffUL;
 	vcpu_e500mc->tlb0cfg |= vcpu_e500mc->guest_tlb_size[0];
@@ -781,10 +861,6 @@ int kvmppc_e500mc_tlb_init(struct kvmppc_vcpu_e500mc *vcpu_e500mc)
 
 	return 0;
 
-err_out_page0:
-	kfree(vcpu_e500mc->shadow_pages[0]);
-err_out_shadow1:
-	kfree(vcpu_e500mc->shadow_tlb[1]);
 err_out_guest1:
 	kfree(vcpu_e500mc->guest_tlb[1]);
 err_out_shadow0:
@@ -797,8 +873,6 @@ err_out:
 
 void kvmppc_e500mc_tlb_uninit(struct kvmppc_vcpu_e500mc *vcpu_e500mc)
 {
-	kfree(vcpu_e500mc->shadow_pages[1]);
-	kfree(vcpu_e500mc->shadow_pages[0]);
 	kfree(vcpu_e500mc->shadow_tlb[1]);
 	kfree(vcpu_e500mc->guest_tlb[1]);
 	kfree(vcpu_e500mc->shadow_tlb[0]);
