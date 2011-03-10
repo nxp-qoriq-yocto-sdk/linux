@@ -130,6 +130,16 @@ _GLOBAL(kvmppc_resume_host)
 	PPC_STL	r8, VCPU_GPR(r8)(r4)
 	PPC_STL	r9, VCPU_GPR(r9)(r4)
 
+	/* Since we are here due to a base (i.e. not critical, debug or
+	 * machine check) exception, don't allow guest clearing CE/ME/RI
+	 * impact the hypervisor
+	 */
+	mfmsr	r3
+	oris	r3, r3, MSR_CE@h
+	ori	r3, r3, (MSR_ME | MSR_RI)@l
+	mtmsr	r3
+	isync
+
 	mfsrr1	r3
 	mfsrr0	r7
 	/* r13 has already been saved in the exception handler
