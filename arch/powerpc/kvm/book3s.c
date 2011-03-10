@@ -1471,6 +1471,14 @@ int __kvmppc_vcpu_run(struct kvm_run *kvm_run, struct kvm_vcpu *vcpu)
 	return ret;
 }
 
+void kvmppc_decrementer_func(unsigned long data)
+{
+	struct kvm_vcpu *vcpu = (struct kvm_vcpu *)data;
+
+	kvmppc_core_queue_dec(vcpu);
+	kvmppc_wakeup_vcpu(vcpu);
+}
+
 static int kvmppc_book3s_init(void)
 {
 	int r;

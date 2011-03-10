@@ -13,6 +13,7 @@
  * Foundation, 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  * Copyright IBM Corp. 2007
+ * Copyright 2011 Freescale Semiconductor, Inc.
  *
  * Authors: Hollis Blanchard <hollisb@us.ibm.com>
  */
@@ -69,18 +70,6 @@
 #define OP_STH  44
 #define OP_STHU 45
 
-#ifdef CONFIG_PPC_BOOK3S
-static int kvmppc_dec_enabled(struct kvm_vcpu *vcpu)
-{
-	return 1;
-}
-#else
-static int kvmppc_dec_enabled(struct kvm_vcpu *vcpu)
-{
-	return vcpu->arch.tcr & TCR_DIE;
-}
-#endif
-
 void kvmppc_emulate_dec(struct kvm_vcpu *vcpu)
 {
 	unsigned long dec_nsec;
@@ -97,21 +86,17 @@ void kvmppc_emulate_dec(struct kvm_vcpu *vcpu)
 		return;
 	}
 #endif
-	if (kvmppc_dec_enabled(vcpu)) {
-		/* The decrementer ticks at the same rate as the timebase, so
-		 * that's how we convert the guest DEC value to the number of
-		 * host ticks. */
+	/* The decrementer ticks at the same rate as the timebase, so
+	 * that's how we convert the guest DEC value to the number of
+	 * host ticks. */
 
-		hrtimer_try_to_cancel(&vcpu->arch.dec_timer);
-		dec_nsec = vcpu->arch.dec;
-		dec_nsec *= 1000;
-		dec_nsec /= tb_ticks_per_usec;
-		hrtimer_start(&vcpu->arch.dec_timer, ktime_set(0, dec_nsec),
-			      HRTIMER_MODE_REL);
-		vcpu->arch.dec_jiffies = get_tb();
-	} else {
-		hrtimer_try_to_cancel(&vcpu->arch.dec_timer);
-	}
+	hrtimer_try_to_cancel(&vcpu->arch.dec_timer);
+	dec_nsec = vcpu->arch.dec;
+	dec_nsec *= 1000;
+	dec_nsec /= tb_ticks_per_usec;
+	hrtimer_start(&vcpu->arch.dec_timer, ktime_set(0, dec_nsec),
+		      HRTIMER_MODE_REL);
+	vcpu->arch.dec_jiffies = get_tb();
 }
 
 u32 kvmppc_get_dec(struct kvm_vcpu *vcpu, u64 tb)

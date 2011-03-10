@@ -63,6 +63,7 @@ extern int kvmppc_emulate_instruction(struct kvm_run *run,
 extern int kvmppc_emulate_mmio(struct kvm_run *run, struct kvm_vcpu *vcpu);
 extern void kvmppc_emulate_dec(struct kvm_vcpu *vcpu);
 extern u32 kvmppc_get_dec(struct kvm_vcpu *vcpu, u64 tb);
+extern void kvmppc_decrementer_func(unsigned long data);
 
 /* Core-specific hooks */
 
@@ -171,5 +172,13 @@ int kvm_vcpu_ioctl_dirty_tlb(struct kvm_vcpu *vcpu,
 			     struct kvm_dirty_tlb *cfg);
 
 void kvmppc_core_heavy_exit(struct kvm_vcpu *vcpu);
+
+static inline void kvmppc_wakeup_vcpu(struct kvm_vcpu *vcpu)
+{
+	if (waitqueue_active(&vcpu->wq)) {
+		wake_up_interruptible(&vcpu->wq);
+		vcpu->stat.halt_wakeup++;
+	}
+}
 
 #endif /* __POWERPC_KVM_PPC_H__ */
