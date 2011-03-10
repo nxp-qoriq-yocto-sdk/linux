@@ -58,6 +58,8 @@ struct kvm_stats_debugfs_item debugfs_entries[] = {
 	{ "dec",        VCPU_STAT(dec_exits) },
 	{ "ext_intr",   VCPU_STAT(ext_intr_exits) },
 	{ "halt_wakeup", VCPU_STAT(halt_wakeup) },
+	{ "doorbell", VCPU_STAT(dbell_exits) },
+	{ "guest doorbell", VCPU_STAT(gdbell_exits) },
 	{ NULL }
 };
 
@@ -272,6 +274,7 @@ int kvmppc_handle_exit(struct kvm_run *run, struct kvm_vcpu *vcpu,
 		break;
 
 	case BOOKE_INTERRUPT_DOORBELL:
+		kvmppc_account_exit(vcpu, DBELL_EXITS);
 		kvm_resched(vcpu);
 		r = RESUME_GUEST;
 		break;
@@ -283,6 +286,7 @@ int kvmppc_handle_exit(struct kvm_run *run, struct kvm_vcpu *vcpu,
 		break;
 
 	case BOOKE_HV_GUEST_DBELL:
+		kvmppc_account_exit(vcpu, GDBELL_EXITS);
 		/* we are here because there is a pending guest
 		 * interrupt which could not be delivered as MSR_EE
 		 * was not set. Once we break from here we would again
