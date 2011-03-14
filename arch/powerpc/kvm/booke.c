@@ -953,42 +953,6 @@ int kvmppc_core_set_guest_debug(struct kvm_vcpu *vcpu,
 	return 0;
 }
 
-void kvmppc_set_tcr(struct kvm_vcpu *vcpu, u32 new_tcr)
-{
-	vcpu->arch.tcr = new_tcr;
-
-	/*
-	 * Since TCR changed, we need to check
-	 * if blocked interrupts are deliverable.
-	 */
-	kvmppc_wakeup_vcpu(vcpu);
-}
-
-void kvmppc_set_tsr_bits(struct kvm_vcpu *vcpu, u32 tsr_bits)
-{
-	set_bits(tsr_bits, &vcpu->arch.tsr);
-
-	if (tsr_bits & TSR_DIS) {
-		kvmppc_core_queue_dec(vcpu);
-		kvmppc_wakeup_vcpu(vcpu);
-	}
-}
-
-void kvmppc_clr_tsr_bits(struct kvm_vcpu *vcpu, u32 tsr_bits)
-{
-	if (tsr_bits & TSR_DIS)
-		kvmppc_core_dequeue_dec(vcpu);
-
-	clear_bits(tsr_bits, &vcpu->arch.tsr);
-}
-
-void kvmppc_decrementer_func(unsigned long data)
-{
-	struct kvm_vcpu *vcpu = (struct kvm_vcpu *)data;
-
-	kvmppc_set_tsr_bits(vcpu, TSR_DIS);
-}
-
 int __init kvmppc_booke_init(void)
 {
 	unsigned long ivor[16];

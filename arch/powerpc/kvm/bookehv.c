@@ -144,7 +144,7 @@ void kvmppc_core_dequeue_external(struct kvm_vcpu *vcpu,
 static int kvmppc_bookehv_irqprio_deliver(struct kvm_vcpu *vcpu,
                                         unsigned int priority)
 {
-	int allowed = 0;
+	int allowed = 1;
 	ulong msr_mask;
 	bool update_esr = false, update_dear = false;
 
@@ -168,11 +168,15 @@ static int kvmppc_bookehv_irqprio_deliver(struct kvm_vcpu *vcpu,
 		msr_mask = MSR_GS | MSR_CE | MSR_ME | MSR_DE;
 		break;
 	case BOOKE_IRQPRIO_DECREMENTER:
-	case BOOKE_IRQPRIO_EXTERNAL:
+		allowed = vcpu->arch.tcr & TCR_DIE;
+		/* fall-through */
 	case BOOKE_IRQPRIO_FIT:
-		allowed = vcpu->arch.shared->msr & MSR_EE;
+	case BOOKE_IRQPRIO_EXTERNAL:
+		allowed = allowed && vcpu->arch.shared->msr & MSR_EE;
 		msr_mask = MSR_GS | MSR_CE | MSR_ME | MSR_DE;
 		break;
+	default:
+		allowed = 0;
 	}
 
 	if (allowed) {
@@ -578,25 +582,16 @@ static int set_sregs_base(struct kvm_vcpu *vcpu,
 	vcpu->arch.shared->esr = sregs->u.e.esr;
 	vcpu->arch.shared->dar = sregs->u.e.dear;
 	vcpu->arch.vrsave = sregs->u.e.vrsave;
-	vcpu->arch.tcr = sregs->u.e.tcr;
+	kvmppc_set_tcr(vcpu, sregs->u.e.tcr);
 
-	if (sregs->u.e.update_special & KVM_SREGS_E_UPDATE_DEC)
+	if (sregs->u.e.update_special & KVM_SREGS_E_UPDATE_DEC) {
 		vcpu->arch.dec = sregs->u.e.dec;
-
-	kvmppc_emulate_dec(vcpu);
+		kvmppc_emulate_dec(vcpu);
+	}
 
 	if (sregs->u.e.update_special & KVM_SREGS_E_UPDATE_TSR) {
-		/*
-		 * FIXME: existing KVM timer handling is incomplete.
-		 * TSR cannot be read by the guest, and its value in
-		 * vcpu->arch is always zero.  For now, just handle
-		 * the case where the caller is trying to inject a
-		 * decrementer interrupt.
-		 */
-
-		if ((sregs->u.e.tsr & TSR_DIS) &&
-		    (vcpu->arch.tcr & TCR_DIE))
-			kvmppc_core_queue_dec(vcpu);
+		kvmppc_clr_tsr_bits(vcpu, ~0);
+		kvmppc_set_tsr_bits(vcpu, sregs->u.e.tsr);
 	}
 
 	return 0;
