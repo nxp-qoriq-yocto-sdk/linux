@@ -248,6 +248,9 @@ struct kvm_vcpu *kvmppc_core_vcpu_create(struct kvm *kvm, unsigned int id)
 		goto out;
 	}
 
+	/* Invalid PIR value -- this LPID dosn't have valid state on any cpu */
+	vcpu_e500mc->oldpir = 0xffffffff;
+
 	vcpu = &vcpu_e500mc->vcpu;
 	err = kvm_vcpu_init(vcpu, kvm, id);
 	if (err)
