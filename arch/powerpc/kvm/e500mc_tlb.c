@@ -297,6 +297,29 @@ static inline void kvmppc_e500mc_deliver_tlb_miss(struct kvm_vcpu *vcpu,
 		| (as ? MAS6_SAS : 0);
 }
 
+static inline int kvmppc_e500mc_setup_virt_mmio(
+	struct kvmppc_vcpu_e500mc *vcpu_e500mc, int esel)
+{
+	struct tlbe *gtlbe = &vcpu_e500mc->guest_tlb[0][esel];
+	struct tlbe *stlbe = &vcpu_e500mc->shadow_tlb[0][esel];
+
+	/* Drop reference to old page. */
+	kvmppc_e500mc_shadow_release(vcpu_e500mc, 0, esel);
+
+	/* Force GS=1 IPROT=0, 4K Page size for all virt. mmio mappings. */
+	stlbe->mas1 = MAS1_TSIZE(BOOK3E_PAGESZ_4K) | MAS1_VALID |
+		MAS1_TID(get_tlb_tid(gtlbe)) | (gtlbe->mas1 & MAS1_TS);
+	stlbe->mas2 = (get_tlb_eaddr(gtlbe) & MAS2_EPN)
+		| e500mc_shadow_mas2_attrib(gtlbe->mas2,
+				vcpu_e500mc->vcpu.arch.shared->msr & MSR_PR);
+	stlbe->mas3 = e500mc_shadow_mas3_attrib(gtlbe->mas3,
+				vcpu_e500mc->vcpu.arch.shared->msr & MSR_PR);
+	stlbe->mas7 = 0;
+	stlbe->mas8 = MAS8_TGS | vcpu_e500mc->lpid | MAS8_VF;
+
+	return esel;
+}
+
 static inline void kvmppc_e500mc_shadow_map(
 	struct kvmppc_vcpu_e500mc *vcpu_e500mc,
 	u64 gvaddr, gfn_t gfn, struct tlbe *gtlbe, int tlbsel, int esel)
@@ -708,6 +731,13 @@ int kvmppc_e500mc_emul_tlbwe(struct kvm_vcpu *vcpu)
 			BUG();
 		}
 		write_host_tlbe(vcpu_e500mc, stlbsel, sesel);
+	} else if (tlbsel == 0) {
+		/* MMU emulation support via VF mechanism */
+		gtlbe->mas1 &= ~MAS1_TSIZE(~0);
+		gtlbe->mas1 |= MAS1_TSIZE(BOOK3E_PAGESZ_4K);
+
+		sesel = kvmppc_e500mc_setup_virt_mmio(vcpu_e500mc, esel);
+		write_host_tlbe(vcpu_e500mc, 0, sesel);
 	}
 
 	return EMULATE_DONE;

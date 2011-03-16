@@ -363,6 +363,40 @@ int kvmppc_handle_exit(struct kvm_run *run, struct kvm_vcpu *vcpu,
 		r = RESUME_GUEST;
 		break;
 
+	case BOOKE_INTERRUPT_DATA_STORAGE: {
+		unsigned long eaddr = vcpu->arch.fault_dear;
+		int gtlb_index;
+		gpa_t gpaddr;
+
+		/*
+		 * Guest DSI's are being delivered to the guest directly,
+		 * Hypervisor directed DSI's are for MMIO emulation.
+		 */
+
+		/* Check the guest TLB. */
+		gtlb_index = kvmppc_mmu_dtlb_index(vcpu, eaddr);
+		if (gtlb_index < 0) {
+			/* The guest didn't have a mapping for it. */
+			printk(KERN_CRIT "%s: DSI without gtlb entry for %#lx\n",
+			       __func__, eaddr);
+			run->hw.hardware_exit_reason = eaddr;
+			r = RESUME_HOST;
+			break;
+		}
+
+		gpaddr = kvmppc_mmu_xlate(vcpu, gtlb_index, eaddr);
+
+		er = get_fault_insn(vcpu);
+		if (er) {
+			r = RESUME_GUEST_NV;
+			break;
+		}
+		vcpu->arch.paddr_accessed = gpaddr;
+		r = kvmppc_emulate_mmio(run, vcpu);
+		kvmppc_account_exit(vcpu, MMIO_EXITS);
+		break;
+	}
+
 	case BOOKE_INTERRUPT_DTLB_MISS: {
 		unsigned long eaddr = vcpu->arch.fault_dear;
 		int gtlb_index;

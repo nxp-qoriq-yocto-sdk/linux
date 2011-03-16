@@ -22,6 +22,7 @@
 
 .macro DO_KVM ivor_nr
 	.if (\ivor_nr == BOOKE_INTERRUPT_INST_STORAGE ) || 		\
+	    (\ivor_nr == BOOKE_INTERRUPT_DATA_STORAGE) || 		\
 	    (\ivor_nr == BOOKE_INTERRUPT_ALIGNMENT) || 			\
 	    (\ivor_nr == BOOKE_INTERRUPT_PROGRAM) ||			\
 	    (\ivor_nr == BOOKE_INTERRUPT_EXTERNAL) ||			\
