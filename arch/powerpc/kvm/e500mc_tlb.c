@@ -834,6 +834,11 @@ void kvmppc_set_pid(struct kvm_vcpu *vcpu, u32 pid)
 	vcpu->arch.shadow_pid = pid;
 }
 
+u32 kvmppc_get_mmucfg(struct kvm_vcpu *vcpu)
+{
+	return mfspr(SPRN_MMUCFG) & ~MMUCFG_LPIDSIZE;
+}
+
 void kvmppc_e500mc_tlb_setup(struct kvmppc_vcpu_e500mc *vcpu_e500mc)
 {
 	struct tlbe *tlbe;

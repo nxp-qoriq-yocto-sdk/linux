@@ -154,7 +154,7 @@ int kvmppc_core_emulate_mfspr(struct kvm_vcpu *vcpu, int sprn, int rt)
 		kvmppc_set_gpr(vcpu, rt, 0); break;
 
 	case SPRN_MMUCFG:
-		kvmppc_set_gpr(vcpu, rt, mfspr(SPRN_MMUCFG)); break;
+		kvmppc_set_gpr(vcpu, rt, kvmppc_get_mmucfg(vcpu)); break;
 
 	/* extra exceptions */
 	case SPRN_IVOR32:

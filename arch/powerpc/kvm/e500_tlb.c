@@ -1078,6 +1078,11 @@ void kvmppc_set_pid(struct kvm_vcpu *vcpu, u32 pid)
 	}
 }
 
+u32 kvmppc_get_mmucfg(struct kvm_vcpu *vcpu)
+{
+	return mfspr(SPRN_MMUCFG) & ~MMUCFG_LPIDSIZE;
+}
+
 void kvmppc_e500_tlb_setup(struct kvmppc_vcpu_e500 *vcpu_e500)
 {
 	struct kvm_book3e_206_tlb_entry *tlbe;

@@ -185,7 +185,7 @@ void kvmppc_core_get_sregs(struct kvm_vcpu *vcpu, struct kvm_sregs *sregs)
 	sregs->u.e.mas4 = vcpu->arch.shared->mas4;
 	sregs->u.e.mas6 = vcpu->arch.shared->mas6;
 
-	sregs->u.e.mmucfg = mfspr(SPRN_MMUCFG);
+	sregs->u.e.mmucfg = kvmppc_get_mmucfg(vcpu);
 	sregs->u.e.tlbcfg[0] = vcpu_e500mc->tlb0cfg;
 	sregs->u.e.tlbcfg[1] = vcpu_e500mc->tlb1cfg;
 	sregs->u.e.tlbcfg[2] = 0;

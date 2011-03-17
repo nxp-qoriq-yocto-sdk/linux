@@ -165,6 +165,7 @@ void kvmppc_get_sregs_ivor(struct kvm_vcpu *vcpu, struct kvm_sregs *sregs);
 int kvmppc_set_sregs_ivor(struct kvm_vcpu *vcpu, struct kvm_sregs *sregs);
 
 void kvmppc_set_pid(struct kvm_vcpu *vcpu, u32 pid);
+u32 kvmppc_get_mmucfg(struct kvm_vcpu *vcpu);
 
 int kvm_vcpu_ioctl_config_tlb(struct kvm_vcpu *vcpu,
 			      struct kvm_config_tlb *cfg);
