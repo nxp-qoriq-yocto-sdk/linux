@@ -39,9 +39,15 @@
 
 int kvm_arch_vcpu_runnable(struct kvm_vcpu *v)
 {
-	return !(v->arch.shared->msr & MSR_WE) ||
-	       !!(v->arch.pending_exceptions) ||
-	       v->requests;
+	bool ret = !(v->arch.shared->msr & MSR_WE) ||
+		   !!(v->arch.pending_exceptions) ||
+		   v->requests;
+
+#ifdef CONFIG_BOOKE
+	ret = ret || (v->arch.tsr & TCR_WRC_MASK);
+#endif
+
+	return ret;
 }
 
 int kvmppc_kvm_pv(struct kvm_vcpu *vcpu)
@@ -346,11 +352,18 @@ int kvm_arch_vcpu_init(struct kvm_vcpu *vcpu)
 	mutex_init(&vcpu->arch.exit_timing_lock);
 #endif
 
+#ifdef CONFIG_BOOKE
+	setup_timer(&vcpu->arch.wdt_timer, kvmppc_watchdog_func,
+	            (unsigned long)vcpu);
+#endif
 	return 0;
 }
 
 void kvm_arch_vcpu_uninit(struct kvm_vcpu *vcpu)
 {
+#ifdef CONFIG_BOOKE
+	del_timer(&vcpu->arch.wdt_timer);
+#endif
 	kvmppc_mmu_destroy(vcpu);
 }
 

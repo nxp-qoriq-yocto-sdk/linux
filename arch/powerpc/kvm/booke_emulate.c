@@ -150,7 +150,11 @@ int kvmppc_booke_emulate_mtspr(struct kvm_vcpu *vcpu, int sprn, int rs)
 		kvmppc_clr_tsr_bits(vcpu, spr_val);
 		break;
 	case SPRN_TCR:
-		kvmppc_set_tcr(vcpu, spr_val);
+		/* WRC can only be programmed when WRC=0 */
+		if (TCR_WRC_MASK & vcpu->arch.tcr)
+			spr_val &= ~TCR_WRC_MASK;
+		kvmppc_set_tcr(vcpu,
+		               spr_val | (TCR_WRC_MASK & vcpu->arch.tcr));
 		break;
 
 	/*

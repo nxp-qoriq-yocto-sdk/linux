@@ -440,6 +440,7 @@ struct kvm_vcpu_arch {
 	ulong fault_esr;
 	ulong queued_dear;
 	ulong queued_esr;
+	struct timer_list wdt_timer;
 	u32 tlbcfg[4];
 	u32 mmucfg;
 	u32 epr;
