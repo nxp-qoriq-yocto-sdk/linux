@@ -206,6 +206,16 @@ void kvmppc_core_dequeue_external(struct kvm_vcpu *vcpu,
 	clear_bit(BOOKE_IRQPRIO_EXTERNAL_LEVEL, &vcpu->arch.pending_exceptions);
 }
 
+void kvmppc_core_queue_watchdog(struct kvm_vcpu *vcpu)
+{
+	kvmppc_booke_queue_irqprio(vcpu, BOOKE_IRQPRIO_WATCHDOG);
+}
+
+void kvmppc_core_dequeue_watchdog(struct kvm_vcpu *vcpu)
+{
+	clear_bit(BOOKE_IRQPRIO_WATCHDOG, &vcpu->arch.pending_exceptions);
+}
+
 static void set_guest_srr(struct kvm_vcpu *vcpu, unsigned long srr0, u32 srr1)
 {
 #ifdef CONFIG_KVM_BOOKE_HV
@@ -404,12 +414,97 @@ static int kvmppc_booke_irqprio_deliver(struct kvm_vcpu *vcpu,
 	return allowed;
 }
 
+/*
+ * The timer system can almost deal with LONG_MAX timeouts, except that
+ * when you get very close to LONG_MAX, the slack added can cause overflow.
+ *
+ * LONG_MAX/2 is a conservative threshold, but it should be adequate for
+ * any realistic use.
+ */
+#define MAX_TIMEOUT (LONG_MAX/2)
+
+/*
+ * Return the number of jiffies until the next timeout.  If the timeout is
+ * longer than the kernel timer API supports, we return ULONG_MAX instead.
+ */
+static unsigned long watchdog_next_timeout(struct kvm_vcpu *vcpu)
+{
+	unsigned long long tb, mask, nr_jiffies = 0;
+	u32 period = TCR_GET_FSL_WP(vcpu->arch.tcr);
+
+	mask = 1ULL << (63 - period);
+	tb = get_tb();
+	if (tb & mask)
+		nr_jiffies += mask;
+
+	nr_jiffies += mask - (tb & (mask - 1));
+
+	if (do_div(nr_jiffies, tb_ticks_per_jiffy))
+		nr_jiffies++;
+
+	return min_t(unsigned long long, nr_jiffies, MAX_TIMEOUT);
+}
+
+static void arm_next_watchdog(struct kvm_vcpu *vcpu)
+{
+	unsigned long nr_jiffies;
+
+	nr_jiffies = watchdog_next_timeout(vcpu);
+	if (nr_jiffies < MAX_TIMEOUT)
+		mod_timer(&vcpu->arch.wdt_timer, jiffies + nr_jiffies);
+	else
+		del_timer(&vcpu->arch.wdt_timer);
+}
+
+void kvmppc_watchdog_func(unsigned long data)
+{
+	struct kvm_vcpu *vcpu = (struct kvm_vcpu *)data;
+	u32 tsr, new_tsr;
+	int final;
+
+	do {
+		new_tsr = tsr = vcpu->arch.tsr;
+		final = 0;
+
+		/* Time out event */
+		if (tsr & TSR_ENW) {
+			if (tsr & TSR_WIS) {
+				new_tsr = (tsr & ~TCR_WRC_MASK) |
+					  (vcpu->arch.tcr & TCR_WRC_MASK);
+				final = 1;
+			} else {
+				new_tsr = tsr | TSR_WIS;
+			}
+		} else {
+			new_tsr = tsr | TSR_ENW;
+		}
+	} while (cmpxchg(&vcpu->arch.tsr, tsr, new_tsr) != tsr);
+
+	if (new_tsr & (TSR_WIS | TCR_WRC_MASK)) {
+		smp_wmb();
+		kvm_make_request(KVM_REQ_PENDING_TIMER, vcpu);
+		kvm_vcpu_kick(vcpu);
+	}
+
+	/*
+	 * Avoid getting a storm of timers if the guest sets
+	 * the period very short.  We'll restart it if anything
+	 * changes.
+	 */
+	if (!final)
+		arm_next_watchdog(vcpu);
+}
 static void update_timer_ints(struct kvm_vcpu *vcpu)
 {
 	if ((vcpu->arch.tcr & TCR_DIE) && (vcpu->arch.tsr & TSR_DIS))
 		kvmppc_core_queue_dec(vcpu);
 	else
 		kvmppc_core_dequeue_dec(vcpu);
+
+	if ((vcpu->arch.tcr & TCR_WIE) && (vcpu->arch.tsr & TSR_WIS))
+		kvmppc_core_queue_watchdog(vcpu);
+	else
+		kvmppc_core_dequeue_watchdog(vcpu);
 }
 
 static void kvmppc_core_check_exceptions(struct kvm_vcpu *vcpu)
@@ -512,6 +607,12 @@ int kvmppc_vcpu_run(struct kvm_run *kvm_run, struct kvm_vcpu *vcpu)
 	if (kvmppc_prepare_to_enter(vcpu)) {
 		kvm_run->exit_reason = KVM_EXIT_INTR;
 		ret = -EINTR;
+		goto out;
+	}
+
+	if (vcpu->arch.tsr & TCR_WRC_MASK) {
+		kvm_run->exit_reason = KVM_EXIT_WDT;
+		ret = 0;
 		goto out;
 	}
 
@@ -954,6 +1055,10 @@ int kvmppc_handle_exit(struct kvm_run *run, struct kvm_vcpu *vcpu,
 			kvmppc_account_exit(vcpu, SIGNAL_EXITS);
 		}
 	}
+	if (vcpu->arch.tsr & TCR_WRC_MASK) {
+		run->exit_reason = KVM_EXIT_WDT;
+		r = RESUME_HOST | (r & RESUME_FLAG_NV);
+	}
 
 	return r;
 }
@@ -1083,7 +1188,14 @@ static int set_sregs_base(struct kvm_vcpu *vcpu,
 	}
 
 	if (sregs->u.e.update_special & KVM_SREGS_E_UPDATE_TSR) {
+		u32 old_tsr = vcpu->arch.tsr;
+
 		vcpu->arch.tsr = sregs->u.e.tsr;
+
+		if ((old_tsr ^ vcpu->arch.tsr) &
+		    (TSR_ENW | TSR_WIS | TCR_WRC_MASK))
+			arm_next_watchdog(vcpu);
+
 		update_timer_ints(vcpu);
 	}
 
@@ -1244,6 +1356,7 @@ void kvmppc_core_commit_memory_region(struct kvm *kvm,
 void kvmppc_set_tcr(struct kvm_vcpu *vcpu, u32 new_tcr)
 {
 	vcpu->arch.tcr = new_tcr;
+	arm_next_watchdog(vcpu);
 	update_timer_ints(vcpu);
 }
 
@@ -1258,6 +1371,14 @@ void kvmppc_set_tsr_bits(struct kvm_vcpu *vcpu, u32 tsr_bits)
 void kvmppc_clr_tsr_bits(struct kvm_vcpu *vcpu, u32 tsr_bits)
 {
 	clear_bits(tsr_bits, &vcpu->arch.tsr);
+
+	/*
+	 * We may have stopped the watchdog due to
+	 * being stuck on final expiration.
+	 */
+	if (tsr_bits & (TSR_ENW | TSR_WIS | TCR_WRC_MASK))
+		arm_next_watchdog(vcpu);
+
 	update_timer_ints(vcpu);
 }
 

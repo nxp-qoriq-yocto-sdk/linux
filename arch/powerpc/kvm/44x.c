@@ -27,6 +27,7 @@
 #include <asm/kvm_44x.h>
 #include <asm/kvm_ppc.h>
 
+#include "booke.h"
 #include "44x_tlb.h"
 #include "booke.h"
 
