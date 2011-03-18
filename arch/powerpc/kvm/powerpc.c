@@ -40,7 +40,12 @@
 
 int kvm_arch_vcpu_runnable(struct kvm_vcpu *v)
 {
-	return !(v->arch.shared->msr & MSR_WE) ||
+	bool ret = false;
+
+#ifdef CONFIG_BOOKE
+	ret = ret || v->arch.wdt_want_action;
+#endif
+	return ret || !(v->arch.shared->msr & MSR_WE) ||
 	       !!(v->arch.pending_exceptions);
 }
 
@@ -327,11 +332,18 @@ int kvm_arch_vcpu_init(struct kvm_vcpu *vcpu)
 	mutex_init(&vcpu->arch.exit_timing_lock);
 #endif
 
+#ifdef CONFIG_BOOKE
+	setup_timer(&vcpu->arch.wdt_timer, kvmppc_watchdog_func,
+	            (unsigned long)vcpu);
+#endif
 	return 0;
 }
 
 void kvm_arch_vcpu_uninit(struct kvm_vcpu *vcpu)
 {
+#ifdef CONFIG_BOOKE
+	del_timer(&vcpu->arch.wdt_timer);
+#endif
 	kvmppc_mmu_destroy(vcpu);
 }
 

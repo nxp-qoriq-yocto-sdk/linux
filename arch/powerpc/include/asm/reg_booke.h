@@ -545,6 +545,8 @@
 #define FP_2_21		3		/* 2^21 clocks */
 #define TCR_FIE		0x00800000	/* FIT Interrupt Enable */
 #define TCR_ARE		0x00400000	/* Auto Reload Enable */
+#define TCR_GET_FSL_WP(tcr)  ((((tcr) & 0xC0000000) >> 30) | \
+			      (((tcr) & 0x1E0000) >> 15))
 
 /* Bit definitions for the TSR. */
 #define TSR_ENW		0x80000000	/* Enable Next Watchdog */

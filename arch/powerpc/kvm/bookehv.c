@@ -140,6 +140,16 @@ void kvmppc_core_dequeue_external(struct kvm_vcpu *vcpu,
 	clear_bit(BOOKE_IRQPRIO_EXTERNAL, &vcpu->arch.pending_exceptions);
 }
 
+void kvmppc_core_queue_watchdog(struct kvm_vcpu *vcpu)
+{
+	kvmppc_bookehv_queue_irqprio(vcpu, BOOKE_IRQPRIO_WATCHDOG);
+}
+
+void kvmppc_core_dequeue_watchdog(struct kvm_vcpu *vcpu)
+{
+	clear_bit(BOOKE_IRQPRIO_WATCHDOG, &vcpu->arch.pending_exceptions);
+}
+
 /* Deliver the interrupt of the corresponding priority, if possible. */
 static int kvmppc_bookehv_irqprio_deliver(struct kvm_vcpu *vcpu,
                                         unsigned int priority)
@@ -174,6 +184,13 @@ static int kvmppc_bookehv_irqprio_deliver(struct kvm_vcpu *vcpu,
 	case BOOKE_IRQPRIO_EXTERNAL:
 		allowed = allowed && vcpu->arch.shared->msr & MSR_EE;
 		msr_mask = MSR_GS | MSR_CE | MSR_ME | MSR_DE;
+		break;
+	case BOOKE_IRQPRIO_WATCHDOG:
+		allowed = vcpu->arch.tcr & TCR_WIE;
+		/* fall-through */
+	case BOOKE_IRQPRIO_CRITICAL:
+		allowed = allowed && vcpu->arch.shared->msr & MSR_CE;
+		msr_mask = MSR_GS | MSR_ME;
 		break;
 	default:
 		allowed = 0;
@@ -502,6 +519,11 @@ int kvmppc_handle_exit(struct kvm_run *run, struct kvm_vcpu *vcpu,
 			r = (-EINTR << 2) | RESUME_HOST | (r & RESUME_FLAG_NV);
 			kvmppc_account_exit(vcpu, SIGNAL_EXITS);
 		}
+		if (vcpu->arch.wdt_want_action) {
+			vcpu->arch.wdt_want_action = false;
+			run->exit_reason = KVM_EXIT_WDT;
+			r = RESUME_HOST | (r & RESUME_FLAG_NV);
+		}
 	}
 
 	return r;
@@ -767,6 +789,17 @@ int kvmppc_core_set_guest_debug(struct kvm_vcpu *vcpu,
                                 struct kvm_guest_debug *dbg)
 {
 	return -ENOTSUPP;
+}
+
+int __kvmppc_vcpu_run(struct kvm_run *kvm_run, struct kvm_vcpu *vcpu)
+{
+	int ret;
+
+	kvmppc_wdt_resume(vcpu);
+	ret = __kvmppc_vcpu_entry(kvm_run, vcpu);
+	kvmppc_wdt_pause(vcpu);
+
+	return ret;
 }
 
 int __init kvmppc_bookehv_init(void)

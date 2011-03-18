@@ -405,7 +405,7 @@ call_linux_handler:
  *  r3: kvm_run pointer
  *  r4: vcpu pointer
  */
-_GLOBAL(__kvmppc_vcpu_run)
+_GLOBAL(__kvmppc_vcpu_entry)
 	stwu	r1, -HOST_STACK_SIZE(r1)
 	PPC_STL	r1, VCPU_HOST_STACK(r4)	/* Save stack pointer to vcpu. */
 

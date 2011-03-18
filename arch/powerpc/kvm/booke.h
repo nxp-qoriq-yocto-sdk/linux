@@ -75,5 +75,7 @@ void kvmppc_save_guest_spe(struct kvm_vcpu *vcpu);
 void kvmppc_vcpu_disable_spe(struct kvm_vcpu *vcpu);
 
 u32 kvmppc_mpic_iack(struct kvm *kvm, int vcpu);
+void kvmppc_wdt_pause(struct kvm_vcpu *vcpu);
+void kvmppc_wdt_resume(struct kvm_vcpu *vcpu);
 
 #endif /* __KVM_BOOKE_H__ */

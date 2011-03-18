@@ -64,6 +64,7 @@ extern int kvmppc_emulate_mmio(struct kvm_run *run, struct kvm_vcpu *vcpu);
 extern void kvmppc_emulate_dec(struct kvm_vcpu *vcpu);
 extern u32 kvmppc_get_dec(struct kvm_vcpu *vcpu, u64 tb);
 extern void kvmppc_decrementer_func(unsigned long data);
+extern void kvmppc_watchdog_func(unsigned long data);
 
 /* Core-specific hooks */
 
@@ -100,6 +101,8 @@ extern void kvmppc_core_queue_external(struct kvm_vcpu *vcpu,
                                        struct kvm_interrupt *irq);
 extern void kvmppc_core_dequeue_external(struct kvm_vcpu *vcpu,
                                          struct kvm_interrupt *irq);
+extern void kvmppc_core_queue_watchdog(struct kvm_vcpu *vcpu);
+extern void kvmppc_core_dequeue_watchdog(struct kvm_vcpu *vcpu);
 
 extern int kvmppc_core_emulate_op(struct kvm_run *run, struct kvm_vcpu *vcpu,
                                   unsigned int op, int *advance);
