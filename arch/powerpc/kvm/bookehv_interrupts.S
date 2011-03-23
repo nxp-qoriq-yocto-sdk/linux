@@ -39,7 +39,31 @@
 #define KVMPPC_MSR_MASK (MSR_GS)
 
 #define VCPU_GPR(n)     (VCPU_GPRS + (n * 4))
+#define VCPU_FPR(n)     (VCPU_FPRS + ((n) * 8))
 #define VCPU_GUEST_SPRG(n)     (VCPU_GUEST_SPRGS + (n * 4))
+
+#define KVMPPC_SAVE_FPR(n, base)	stfd	n, VCPU_FPR(n)(base)
+#define KVMPPC_SAVE_2FPRS(n, base)	KVMPPC_SAVE_FPR(n, base); \
+					   KVMPPC_SAVE_FPR(n+1, base)
+#define KVMPPC_SAVE_4FPRS(n, base)	KVMPPC_SAVE_2FPRS(n, base); \
+					   KVMPPC_SAVE_2FPRS(n+2, base)
+#define KVMPPC_SAVE_8FPRS(n, base)	KVMPPC_SAVE_4FPRS(n, base); \
+					   KVMPPC_SAVE_4FPRS(n+4, base)
+#define KVMPPC_SAVE_16FPRS(n, base)	KVMPPC_SAVE_8FPRS(n, base); \
+					   KVMPPC_SAVE_8FPRS(n+8, base)
+#define KVMPPC_SAVE_32FPRS(n, base)	KVMPPC_SAVE_16FPRS(n, base); \
+					   KVMPPC_SAVE_16FPRS(n+16, base)
+#define KVMPPC_REST_FPR(n, base)	lfd	n, VCPU_FPR(n)(base)
+#define KVMPPC_REST_2FPRS(n, base)	KVMPPC_REST_FPR(n, base); \
+					   KVMPPC_REST_FPR(n+1, base)
+#define KVMPPC_REST_4FPRS(n, base)	KVMPPC_REST_2FPRS(n, base); \
+					   KVMPPC_REST_2FPRS(n+2, base)
+#define KVMPPC_REST_8FPRS(n, base)	KVMPPC_REST_4FPRS(n, base); \
+					   KVMPPC_REST_4FPRS(n+4, base)
+#define KVMPPC_REST_16FPRS(n, base)	KVMPPC_REST_8FPRS(n, base); \
+					   KVMPPC_REST_8FPRS(n+8, base)
+#define KVMPPC_REST_32FPRS(n, base)	KVMPPC_REST_16FPRS(n, base); \
+					   KVMPPC_REST_16FPRS(n+16, base)
 
 /* The host stack layout: */
 #define HOST_R1         0 /* Implied by stwu. */
@@ -561,3 +585,21 @@ lightweight_exit:
 	PPC_LL	r3, VCPU_GPR(r3)(r4)
 	PPC_LL	r4, VCPU_GPR(r4)(r4)
 	rfi
+
+_GLOBAL(kvmppc_save_fp_regs)
+	mfmsr	r7
+	ori	r8, r7, MSR_FP
+	mtmsr	r8
+	isync
+	KVMPPC_SAVE_32FPRS(0, r3)
+	mffs	fr0
+	stfd	fr0, VCPU_FPSCR(r3)
+	mtmsr	r7
+	isync
+	blr
+
+_GLOBAL(kvmppc_restore_fp_regs)
+	KVMPPC_REST_32FPRS(0, r3)
+	lfd	fr0, VCPU_FPSCR(r3)
+	MTFSF_L(fr0)
+	blr

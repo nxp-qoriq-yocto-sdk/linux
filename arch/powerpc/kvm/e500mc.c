@@ -97,6 +97,9 @@ void kvmppc_core_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
 
 	mtspr(SPRN_GEPR, vcpu->arch.shared->epr);
 
+	enable_kernel_fp();
+	kvmppc_restore_fp_regs(vcpu);
+
 	kvmppc_e500mc_tlb_load(vcpu, cpu);
 	local_irq_enable();
 }
@@ -112,6 +115,8 @@ void kvmppc_core_vcpu_put(struct kvm_vcpu *vcpu)
 	vcpu->arch.gsrr1 = mfspr(SPRN_GSRR1);
 
 	vcpu->arch.shared->epr = mfspr(SPRN_GEPR);
+
+	kvmppc_save_fp_regs(vcpu);
 
 	kvmppc_e500mc_tlb_put(vcpu);
 }
