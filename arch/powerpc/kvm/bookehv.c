@@ -155,6 +155,7 @@ static int kvmppc_bookehv_irqprio_deliver(struct kvm_vcpu *vcpu,
                                         unsigned int priority)
 {
 	int allowed = 1;
+	int dequeue = 0;
 	ulong msr_mask;
 	bool update_esr = false, update_dear = false;
 
@@ -178,7 +179,10 @@ static int kvmppc_bookehv_irqprio_deliver(struct kvm_vcpu *vcpu,
 		msr_mask = MSR_GS | MSR_CE | MSR_ME | MSR_DE;
 		break;
 	case BOOKE_IRQPRIO_DECREMENTER:
-		allowed = vcpu->arch.tcr & TCR_DIE;
+		if (!(vcpu->arch.tcr & TCR_DIE)) {
+			allowed = 0;
+			dequeue = 1;
+		}
 		/* fall-through */
 	case BOOKE_IRQPRIO_FIT:
 	case BOOKE_IRQPRIO_EXTERNAL:
@@ -186,7 +190,10 @@ static int kvmppc_bookehv_irqprio_deliver(struct kvm_vcpu *vcpu,
 		msr_mask = MSR_GS | MSR_CE | MSR_ME | MSR_DE;
 		break;
 	case BOOKE_IRQPRIO_WATCHDOG:
-		allowed = vcpu->arch.tcr & TCR_WIE;
+		if (!(vcpu->arch.tcr & TCR_WIE)) {
+			allowed = 0;
+			dequeue = 1;
+		}
 		/* fall-through */
 	case BOOKE_IRQPRIO_CRITICAL:
 		allowed = allowed && vcpu->arch.shared->msr & MSR_CE;
@@ -214,6 +221,9 @@ static int kvmppc_bookehv_irqprio_deliver(struct kvm_vcpu *vcpu,
 		clear_bit(priority, &vcpu->arch.pending_exceptions);
 		if (vcpu->arch.pending_exceptions)
 			kvmppc_set_pending_interrupt(vcpu);
+	} else if (dequeue) {
+		/* Should only happen due to races with masking */
+		clear_bit(priority, &vcpu->arch.pending_exceptions);
 	} else {
 		/* Mechanism for delivering a pending interrupt
 		 * to the guest. In case of e500mc we do this

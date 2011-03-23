@@ -82,24 +82,34 @@ void kvmppc_wdt_resume(struct kvm_vcpu *vcpu)
 void kvmppc_set_tcr(struct kvm_vcpu *vcpu, u32 new_tcr)
 {
 	vcpu->arch.tcr = new_tcr;
+	smp_wmb();
+
 	kvmppc_emulate_wdt(vcpu);
 
 	/*
 	 * Since TCR changed, we need to check
 	 * if blocked interrupts are deliverable.
 	 */
-	kvmppc_wakeup_vcpu(vcpu);
+	if ((new_tcr & TCR_DIE) && (vcpu->arch.tsr & TSR_DIS)) {
+		kvmppc_core_queue_dec(vcpu);
+		kvmppc_wakeup_vcpu(vcpu);
+	}
+	if ((new_tcr & TCR_WIE) && (vcpu->arch.tsr & TSR_WIS)) {
+		kvmppc_core_queue_watchdog(vcpu);
+		kvmppc_wakeup_vcpu(vcpu);
+	}
 }
 
 void kvmppc_set_tsr_bits(struct kvm_vcpu *vcpu, u32 tsr_bits)
 {
 	set_bits(tsr_bits, &vcpu->arch.tsr);
+	smp_wmb();
 
-	if (tsr_bits & TSR_DIS) {
+	if ((tsr_bits & TSR_DIS) && (vcpu->arch.tcr & TCR_DIE)) {
 		kvmppc_core_queue_dec(vcpu);
 		kvmppc_wakeup_vcpu(vcpu);
 	}
-	if (tsr_bits & TSR_WIS) {
+	if ((tsr_bits & TSR_WIS) && (vcpu->arch.tcr & TCR_WIE)) {
 		kvmppc_core_queue_watchdog(vcpu);
 		kvmppc_wakeup_vcpu(vcpu);
 	}
@@ -112,6 +122,7 @@ void kvmppc_clr_tsr_bits(struct kvm_vcpu *vcpu, u32 tsr_bits)
 	if (tsr_bits & TSR_WIS)
 		kvmppc_core_dequeue_watchdog(vcpu);
 
+	smp_wmb();
 	clear_bits(tsr_bits, &vcpu->arch.tsr);
 }
 
