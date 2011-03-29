@@ -48,23 +48,14 @@
 #define KVM_RT_30		0x03c00000
 #define KVM_MASK_RB		0x0000f800
 #define KVM_INST_MFMSR		0x7c0000a6
-#define KVM_INST_MFSPR_SPRG0	0x7c1042a6
-#define KVM_INST_MFSPR_SPRG1	0x7c1142a6
-#define KVM_INST_MFSPR_SPRG2	0x7c1242a6
-#define KVM_INST_MFSPR_SPRG3	0x7c1342a6
-#define KVM_INST_MFSPR_SRR0	0x7c1a02a6
-#define KVM_INST_MFSPR_SRR1	0x7c1b02a6
-#define KVM_INST_MFSPR_DAR	0x7c1302a6
-#define KVM_INST_MFSPR_DSISR	0x7c1202a6
 
-#define KVM_INST_MTSPR_SPRG0	0x7c1043a6
-#define KVM_INST_MTSPR_SPRG1	0x7c1143a6
-#define KVM_INST_MTSPR_SPRG2	0x7c1243a6
-#define KVM_INST_MTSPR_SPRG3	0x7c1343a6
-#define KVM_INST_MTSPR_SRR0	0x7c1a03a6
-#define KVM_INST_MTSPR_SRR1	0x7c1b03a6
-#define KVM_INST_MTSPR_DAR	0x7c1303a6
-#define KVM_INST_MTSPR_DSISR	0x7c1203a6
+#define SPR_FROM		0
+#define SPR_TO			0x100
+
+#define KVM_INST_SPR(sprn, moveto) (0x7c0002a6 | \
+				    (((sprn) & 0x1f) << 16) | \
+				    (((sprn) & 0x3e0) << 6) | \
+				    (moveto))
 
 #define KVM_INST_TLBSYNC	0x7c00046c
 #define KVM_INST_MTMSRD_L0	0x7c000164
@@ -440,56 +431,191 @@ static void kvm_check_ins(u32 *inst, u32 features)
 	case KVM_INST_MFMSR:
 		kvm_patch_ins_ld(inst, magic_var(msr), inst_rt);
 		break;
-	case KVM_INST_MFSPR_SPRG0:
+	case KVM_INST_SPR(SPRN_SPRG0, SPR_FROM):
 		kvm_patch_ins_ld(inst, magic_var(sprg0), inst_rt);
 		break;
-	case KVM_INST_MFSPR_SPRG1:
+	case KVM_INST_SPR(SPRN_SPRG1, SPR_FROM):
 		kvm_patch_ins_ld(inst, magic_var(sprg1), inst_rt);
 		break;
-	case KVM_INST_MFSPR_SPRG2:
+	case KVM_INST_SPR(SPRN_SPRG2, SPR_FROM):
 		kvm_patch_ins_ld(inst, magic_var(sprg2), inst_rt);
 		break;
-	case KVM_INST_MFSPR_SPRG3:
+	case KVM_INST_SPR(SPRN_SPRG3, SPR_FROM):
 		kvm_patch_ins_ld(inst, magic_var(sprg3), inst_rt);
 		break;
-	case KVM_INST_MFSPR_SRR0:
+	case KVM_INST_SPR(SPRN_SRR0, SPR_FROM):
 		kvm_patch_ins_ld(inst, magic_var(srr0), inst_rt);
 		break;
-	case KVM_INST_MFSPR_SRR1:
+	case KVM_INST_SPR(SPRN_SRR1, SPR_FROM):
 		kvm_patch_ins_ld(inst, magic_var(srr1), inst_rt);
 		break;
-	case KVM_INST_MFSPR_DAR:
+#ifdef CONFIG_BOOKE
+	case KVM_INST_SPR(SPRN_DEAR, SPR_FROM):
+#else
+	case KVM_INST_SPR(SPRN_DAR, SPR_FROM):
+#endif
 		kvm_patch_ins_ld(inst, magic_var(dar), inst_rt);
 		break;
-	case KVM_INST_MFSPR_DSISR:
+	case KVM_INST_SPR(SPRN_DSISR, SPR_FROM):
 		kvm_patch_ins_lwz(inst, magic_var(dsisr), inst_rt);
 		break;
 
+#ifdef CONFIG_PPC_BOOK3E_MMU
+	case KVM_INST_SPR(SPRN_MAS0, SPR_FROM):
+		if (features & KVM_MAGIC_FEAT_MAS0_TO_SPRG7)
+			kvm_patch_ins_lwz(inst, magic_var(mas0), inst_rt);
+		break;
+	case KVM_INST_SPR(SPRN_MAS1, SPR_FROM):
+		if (features & KVM_MAGIC_FEAT_MAS0_TO_SPRG7)
+			kvm_patch_ins_lwz(inst, magic_var(mas1), inst_rt);
+		break;
+	case KVM_INST_SPR(SPRN_MAS2, SPR_FROM):
+		if (features & KVM_MAGIC_FEAT_MAS0_TO_SPRG7)
+			kvm_patch_ins_ld(inst, magic_var(mas2), inst_rt);
+		break;
+	case KVM_INST_SPR(SPRN_MAS3, SPR_FROM):
+		if (features & KVM_MAGIC_FEAT_MAS0_TO_SPRG7)
+			kvm_patch_ins_lwz(inst, magic_var(mas7_3) + 4, inst_rt);
+		break;
+	case KVM_INST_SPR(SPRN_MAS4, SPR_FROM):
+		if (features & KVM_MAGIC_FEAT_MAS0_TO_SPRG7)
+			kvm_patch_ins_lwz(inst, magic_var(mas4), inst_rt);
+		break;
+	case KVM_INST_SPR(SPRN_MAS6, SPR_FROM):
+		if (features & KVM_MAGIC_FEAT_MAS0_TO_SPRG7)
+			kvm_patch_ins_lwz(inst, magic_var(mas6), inst_rt);
+		break;
+	case KVM_INST_SPR(SPRN_MAS7, SPR_FROM):
+		if (features & KVM_MAGIC_FEAT_MAS0_TO_SPRG7)
+			kvm_patch_ins_lwz(inst, magic_var(mas7_3), inst_rt);
+		break;
+#endif /* CONFIG_PPC_BOOK3E_MMU */
+
+	case KVM_INST_SPR(SPRN_SPRG4, SPR_FROM):
+#ifdef CONFIG_BOOKE
+	case KVM_INST_SPR(SPRN_SPRG4R, SPR_FROM):
+#endif
+		if (features & KVM_MAGIC_FEAT_MAS0_TO_SPRG7)
+			kvm_patch_ins_ld(inst, magic_var(sprg4), inst_rt);
+		break;
+	case KVM_INST_SPR(SPRN_SPRG5, SPR_FROM):
+#ifdef CONFIG_BOOKE
+	case KVM_INST_SPR(SPRN_SPRG5R, SPR_FROM):
+#endif
+		if (features & KVM_MAGIC_FEAT_MAS0_TO_SPRG7)
+			kvm_patch_ins_ld(inst, magic_var(sprg5), inst_rt);
+		break;
+	case KVM_INST_SPR(SPRN_SPRG6, SPR_FROM):
+#ifdef CONFIG_BOOKE
+	case KVM_INST_SPR(SPRN_SPRG6R, SPR_FROM):
+#endif
+		if (features & KVM_MAGIC_FEAT_MAS0_TO_SPRG7)
+			kvm_patch_ins_ld(inst, magic_var(sprg6), inst_rt);
+		break;
+	case KVM_INST_SPR(SPRN_SPRG7, SPR_FROM):
+#ifdef CONFIG_BOOKE
+	case KVM_INST_SPR(SPRN_SPRG7R, SPR_FROM):
+#endif
+		if (features & KVM_MAGIC_FEAT_MAS0_TO_SPRG7)
+			kvm_patch_ins_ld(inst, magic_var(sprg7), inst_rt);
+		break;
+
+#ifdef CONFIG_BOOKE
+	case KVM_INST_SPR(SPRN_ESR, SPR_FROM):
+		if (features & KVM_MAGIC_FEAT_MAS0_TO_SPRG7)
+			kvm_patch_ins_lwz(inst, magic_var(esr), inst_rt);
+		break;
+#endif
+
+	case KVM_INST_SPR(SPRN_PIR, SPR_FROM):
+		if (features & KVM_MAGIC_FEAT_MAS0_TO_SPRG7)
+			kvm_patch_ins_lwz(inst, magic_var(pir), inst_rt);
+		break;
+
+
 	/* Stores */
-	case KVM_INST_MTSPR_SPRG0:
+	case KVM_INST_SPR(SPRN_SPRG0, SPR_TO):
 		kvm_patch_ins_std(inst, magic_var(sprg0), inst_rt);
 		break;
-	case KVM_INST_MTSPR_SPRG1:
+	case KVM_INST_SPR(SPRN_SPRG1, SPR_TO):
 		kvm_patch_ins_std(inst, magic_var(sprg1), inst_rt);
 		break;
-	case KVM_INST_MTSPR_SPRG2:
+	case KVM_INST_SPR(SPRN_SPRG2, SPR_TO):
 		kvm_patch_ins_std(inst, magic_var(sprg2), inst_rt);
 		break;
-	case KVM_INST_MTSPR_SPRG3:
+	case KVM_INST_SPR(SPRN_SPRG3, SPR_TO):
 		kvm_patch_ins_std(inst, magic_var(sprg3), inst_rt);
 		break;
-	case KVM_INST_MTSPR_SRR0:
+	case KVM_INST_SPR(SPRN_SRR0, SPR_TO):
 		kvm_patch_ins_std(inst, magic_var(srr0), inst_rt);
 		break;
-	case KVM_INST_MTSPR_SRR1:
+	case KVM_INST_SPR(SPRN_SRR1, SPR_TO):
 		kvm_patch_ins_std(inst, magic_var(srr1), inst_rt);
 		break;
-	case KVM_INST_MTSPR_DAR:
+#ifdef CONFIG_BOOKE
+	case KVM_INST_SPR(SPRN_DEAR, SPR_TO):
+#else
+	case KVM_INST_SPR(SPRN_DAR, SPR_TO):
+#endif
 		kvm_patch_ins_std(inst, magic_var(dar), inst_rt);
 		break;
-	case KVM_INST_MTSPR_DSISR:
+	case KVM_INST_SPR(SPRN_DSISR, SPR_TO):
 		kvm_patch_ins_stw(inst, magic_var(dsisr), inst_rt);
 		break;
+#ifdef CONFIG_PPC_BOOK3E_MMU
+	case KVM_INST_SPR(SPRN_MAS0, SPR_TO):
+		if (features & KVM_MAGIC_FEAT_MAS0_TO_SPRG7)
+			kvm_patch_ins_stw(inst, magic_var(mas0), inst_rt);
+		break;
+	case KVM_INST_SPR(SPRN_MAS1, SPR_TO):
+		if (features & KVM_MAGIC_FEAT_MAS0_TO_SPRG7)
+			kvm_patch_ins_stw(inst, magic_var(mas1), inst_rt);
+		break;
+	case KVM_INST_SPR(SPRN_MAS2, SPR_TO):
+		if (features & KVM_MAGIC_FEAT_MAS0_TO_SPRG7)
+			kvm_patch_ins_std(inst, magic_var(mas2), inst_rt);
+		break;
+	case KVM_INST_SPR(SPRN_MAS3, SPR_TO):
+		if (features & KVM_MAGIC_FEAT_MAS0_TO_SPRG7)
+			kvm_patch_ins_stw(inst, magic_var(mas7_3) + 4, inst_rt);
+		break;
+	case KVM_INST_SPR(SPRN_MAS4, SPR_TO):
+		if (features & KVM_MAGIC_FEAT_MAS0_TO_SPRG7)
+			kvm_patch_ins_stw(inst, magic_var(mas4), inst_rt);
+		break;
+	case KVM_INST_SPR(SPRN_MAS6, SPR_TO):
+		if (features & KVM_MAGIC_FEAT_MAS0_TO_SPRG7)
+			kvm_patch_ins_stw(inst, magic_var(mas6), inst_rt);
+		break;
+	case KVM_INST_SPR(SPRN_MAS7, SPR_TO):
+		if (features & KVM_MAGIC_FEAT_MAS0_TO_SPRG7)
+			kvm_patch_ins_stw(inst, magic_var(mas7_3), inst_rt);
+		break;
+#endif /* CONFIG_PPC_BOOK3E_MMU */
+
+	case KVM_INST_SPR(SPRN_SPRG4, SPR_TO):
+		if (features & KVM_MAGIC_FEAT_MAS0_TO_SPRG7)
+			kvm_patch_ins_std(inst, magic_var(sprg4), inst_rt);
+		break;
+	case KVM_INST_SPR(SPRN_SPRG5, SPR_TO):
+		if (features & KVM_MAGIC_FEAT_MAS0_TO_SPRG7)
+			kvm_patch_ins_std(inst, magic_var(sprg5), inst_rt);
+		break;
+	case KVM_INST_SPR(SPRN_SPRG6, SPR_TO):
+		if (features & KVM_MAGIC_FEAT_MAS0_TO_SPRG7)
+			kvm_patch_ins_std(inst, magic_var(sprg6), inst_rt);
+		break;
+	case KVM_INST_SPR(SPRN_SPRG7, SPR_TO):
+		if (features & KVM_MAGIC_FEAT_MAS0_TO_SPRG7)
+			kvm_patch_ins_std(inst, magic_var(sprg7), inst_rt);
+		break;
+
+#ifdef CONFIG_BOOKE
+	case KVM_INST_SPR(SPRN_ESR, SPR_TO):
+		if (features & KVM_MAGIC_FEAT_MAS0_TO_SPRG7)
+			kvm_patch_ins_stw(inst, magic_var(esr), inst_rt);
+		break;
+#endif
 
 	/* Nops */
 	case KVM_INST_TLBSYNC:
@@ -556,8 +682,17 @@ static void kvm_use_magic_page(void)
 	start = (void*)_stext;
 	end = (void*)_etext;
 
+	/*
+	 * Being interrupted in the middle of patching would
+	 * be bad for SPRG4-7, which KVM can't keep in sync
+	 * with emulated accesses because reads don't trap.
+	 */
+	local_irq_disable();
+
 	for (p = start; p < end; p++)
 		kvm_check_ins(p, features);
+
+	local_irq_enable();
 
 	printk(KERN_INFO "KVM: Live patching for a fast VM %s\n",
 			 kvm_patching_worked ? "worked" : "failed");
