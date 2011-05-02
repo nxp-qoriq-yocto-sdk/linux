@@ -27,10 +27,37 @@
 
 #include "booke.h"
 
+#define OP_19_XOP_RFCI    51
+
+static void kvmppc_emul_rfci(struct kvm_vcpu *vcpu)
+{
+	vcpu->arch.pc = vcpu->arch.csrr0;
+	vcpu->arch.shared->msr = vcpu->arch.csrr1;
+}
+
 int kvmppc_bookehv_emulate_op(struct kvm_run *run, struct kvm_vcpu *vcpu,
                             unsigned int inst, int *advance)
 {
-	int emulated = EMULATE_FAIL;
+	int emulated = EMULATE_DONE;
+
+	switch (get_op(inst)) {
+	case 19:
+		switch (get_xop(inst)) {
+		case OP_19_XOP_RFCI:
+			kvmppc_emul_rfci(vcpu);
+			kvmppc_set_exit_type(vcpu, EMULATED_RFCI_EXITS);
+			*advance = 0;
+			break;
+
+		default:
+			emulated = EMULATE_FAIL;
+			break;
+		}
+		break;
+
+	default:
+		emulated = EMULATE_FAIL;
+	}
 
 	return emulated;
 }
@@ -41,6 +68,10 @@ int kvmppc_bookehv_emulate_mtspr(struct kvm_vcpu *vcpu, int sprn, int rs)
 	ulong spr_val = kvmppc_get_gpr(vcpu, rs);
 
 	switch (sprn) {
+	case SPRN_CSRR0:
+		vcpu->arch.csrr0 = spr_val; break;
+	case SPRN_CSRR1:
+		vcpu->arch.csrr1 = spr_val; break;
 	case SPRN_DBCR0:
 		vcpu->arch.dbcr0 = spr_val; break;
 	case SPRN_DBCR1:
@@ -48,10 +79,14 @@ int kvmppc_bookehv_emulate_mtspr(struct kvm_vcpu *vcpu, int sprn, int rs)
 	case SPRN_DBSR:
 		vcpu->arch.dbsr &= ~spr_val; break;
 	case SPRN_TSR:
-		vcpu->arch.tsr &= ~spr_val; break;
+		kvmppc_clr_tsr_bits(vcpu, spr_val);
+		break;
 	case SPRN_TCR:
-		vcpu->arch.tcr = spr_val;
-		kvmppc_emulate_dec(vcpu);
+		/* WRC can only be programmed when WRC=0 */
+		if (TCR_WRC_MASK & vcpu->arch.tcr)
+			spr_val &= ~TCR_WRC_MASK;
+		kvmppc_set_tcr(vcpu,
+		               spr_val | (TCR_WRC_MASK & vcpu->arch.tcr));
 		break;
 	case SPRN_IVPR:
 		vcpu->arch.ivpr = spr_val;
@@ -120,6 +155,10 @@ int kvmppc_bookehv_emulate_mfspr(struct kvm_vcpu *vcpu, int sprn, int rt)
 	int emulated = EMULATE_DONE;
 
 	switch (sprn) {
+	case SPRN_CSRR0:
+		kvmppc_set_gpr(vcpu, rt, vcpu->arch.csrr0); break;
+	case SPRN_CSRR1:
+		kvmppc_set_gpr(vcpu, rt, vcpu->arch.csrr1); break;
 	case SPRN_IVPR:
 		kvmppc_set_gpr(vcpu, rt, vcpu->arch.ivpr); break;
 	case SPRN_DBCR0:
@@ -128,7 +167,10 @@ int kvmppc_bookehv_emulate_mfspr(struct kvm_vcpu *vcpu, int sprn, int rt)
 		kvmppc_set_gpr(vcpu, rt, vcpu->arch.dbcr1); break;
 	case SPRN_DBSR:
 		kvmppc_set_gpr(vcpu, rt, vcpu->arch.dbsr); break;
-
+	case SPRN_TSR:
+		kvmppc_set_gpr(vcpu, rt, vcpu->arch.tsr); break;
+	case SPRN_TCR:
+		kvmppc_set_gpr(vcpu, rt, vcpu->arch.tcr); break;
 	case SPRN_IVOR0:
 		kvmppc_set_gpr(vcpu, rt, vcpu->arch.ivor[BOOKE_IRQPRIO_CRITICAL]);
 		break;
