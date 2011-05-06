@@ -29,7 +29,7 @@
 	stw	r11, THREAD_NORMSAVE(0)(r10);				     \
 	stw	r13, THREAD_NORMSAVE(2)(r10);				     \
 	mfcr	r13;			/* save CR in r13 for now	   */\
-	DO_KVM	ivor_nr;						     \
+	DO_KVM	ivor_nr SPRN_SRR1;						     \
 	mfspr	r11,SPRN_SRR1;		/* check whether user or kernel    */\
 	andi.	r11,r11,MSR_PR;						     \
 	mr	r11, r1;						     \
