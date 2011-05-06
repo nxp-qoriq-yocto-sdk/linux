@@ -55,13 +55,27 @@ retry:
 	return 0;
 }
 
-void kvmppc_set_pending_interrupt(struct kvm_vcpu *vcpu)
+void kvmppc_set_pending_interrupt(struct kvm_vcpu *vcpu, enum int_class type)
 {
 	struct kvmppc_vcpu_e500mc *vcpu_e500mc = to_e500mc(vcpu);
+	unsigned long msg_type;
+	unsigned long msg;
 
-	unsigned long msg = MSG_GBELL | (vcpu_e500mc->lpid << 14) |
-				 vcpu_e500mc->gpir;
+	switch (type) {
+	case INT_CLASS_NONCRIT:
+		msg_type = MSG_GBELL;
+		break;
+	case INT_CLASS_CRIT:
+		msg_type = MSG_GBELL_CRIT;
+		break;
+	case INT_CLASS_MC:
+		msg_type = MSG_GBELL_MCHK;
+		break;
+	default:
+		return;
+	}
 
+	msg = msg_type | (vcpu_e500mc->lpid << 14) | vcpu_e500mc->gpir;
 	send_doorbell_msg(msg);
 }
 

@@ -212,12 +212,6 @@ void kvmppc_core_dequeue_watchdog(struct kvm_vcpu *vcpu)
 	clear_bit(BOOKE_IRQPRIO_WATCHDOG, &vcpu->arch.pending_exceptions);
 }
 
-enum int_class {
-	INT_CLASS_NONCRIT,
-	INT_CLASS_CRIT,
-	INT_CLASS_MC,
-};
-
 /* Deliver the interrupt of the corresponding priority, if possible. */
 static int kvmppc_booke_irqprio_deliver(struct kvm_vcpu *vcpu,
                                         unsigned int priority)
@@ -314,6 +308,7 @@ static int kvmppc_booke_irqprio_deliver(struct kvm_vcpu *vcpu,
 			vcpu->arch.shared->srr1 = vcpu->arch.shared->msr;
 			break;
 		case INT_CLASS_CRIT:
+		case INT_CLASS_DBG:
 			vcpu->arch.csrr0 = vcpu->arch.pc;
 			vcpu->arch.csrr1 = vcpu->arch.shared->msr;
 			break;

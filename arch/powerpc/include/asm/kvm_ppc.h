@@ -42,6 +42,13 @@ enum emulation_result {
 	EMULATE_AGAIN,        /* something went wrong. go again */
 };
 
+enum int_class {
+	INT_CLASS_NONCRIT,
+	INT_CLASS_CRIT,
+	INT_CLASS_MC,
+	INT_CLASS_DBG,
+};
+
 extern int __kvmppc_vcpu_entry(struct kvm_run *kvm_run, struct kvm_vcpu *vcpu);
 extern int __kvmppc_vcpu_run(struct kvm_run *kvm_run, struct kvm_vcpu *vcpu);
 extern char kvmppc_handlers_start[];
@@ -121,7 +128,7 @@ extern void kvmppc_map_magic(struct kvm_vcpu *vcpu);
 
 extern int kvmppc_bookehv_init(void);
 extern void kvmppc_bookehv_exit(void);
-extern void kvmppc_set_pending_interrupt(struct kvm_vcpu *vcpu);
+extern void kvmppc_set_pending_interrupt(struct kvm_vcpu *vcpu, enum int_class type);
 
 extern int kvmppc_bookehv_emulate_op(struct kvm_run *run, struct kvm_vcpu *vcpu,
                             unsigned int inst, int *advance);

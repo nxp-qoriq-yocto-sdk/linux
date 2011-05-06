@@ -52,6 +52,17 @@
 #define BOOKE_IRQPRIO_DBELL_CRIT 22
 #define BOOKE_IRQPRIO_MAX 23
 
+#define BOOKE_IRQMASK_EE ((1 << BOOKE_IRQPRIO_EXTERNAL_LEVEL) | \
+			  (1 << BOOKE_IRQPRIO_PERFORMANCE_MONITOR) | \
+			  (1 << BOOKE_IRQPRIO_DBELL) | \
+			  (1 << BOOKE_IRQPRIO_DECREMENTER) | \
+			  (1 << BOOKE_IRQPRIO_FIT) | \
+			  (1 << BOOKE_IRQPRIO_EXTERNAL))
+
+#define BOOKE_IRQMASK_CE ((1 << BOOKE_IRQPRIO_DBELL_CRIT) | \
+			  (1 << BOOKE_IRQPRIO_WATCHDOG) | \
+			  (1 << BOOKE_IRQPRIO_CRITICAL))
+
 extern unsigned long kvmppc_booke_handlers;
 extern unsigned long kvmppc_booke_handler_addr[];
 

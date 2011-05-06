@@ -156,8 +156,9 @@ static int kvmppc_bookehv_irqprio_deliver(struct kvm_vcpu *vcpu,
 {
 	int allowed = 1;
 	int dequeue = 0;
-	ulong msr_mask;
+	ulong msr_mask = 0;
 	bool update_esr = false, update_dear = false;
+	enum int_class int_class = INT_CLASS_DBG;
 
 	switch (priority) {
 	case BOOKE_IRQPRIO_DTLB_MISS:
@@ -177,6 +178,7 @@ static int kvmppc_bookehv_irqprio_deliver(struct kvm_vcpu *vcpu,
 	case BOOKE_IRQPRIO_ALIGNMENT:
 		allowed = 1;
 		msr_mask = MSR_GS | MSR_CE | MSR_ME | MSR_DE;
+		int_class = INT_CLASS_NONCRIT;
 		break;
 	case BOOKE_IRQPRIO_DECREMENTER:
 		if (!(vcpu->arch.tcr & TCR_DIE)) {
@@ -188,6 +190,7 @@ static int kvmppc_bookehv_irqprio_deliver(struct kvm_vcpu *vcpu,
 	case BOOKE_IRQPRIO_EXTERNAL:
 		allowed = allowed && vcpu->arch.shared->msr & MSR_EE;
 		msr_mask = MSR_GS | MSR_CE | MSR_ME | MSR_DE;
+		int_class = INT_CLASS_NONCRIT;
 		break;
 	case BOOKE_IRQPRIO_WATCHDOG:
 		if (!(vcpu->arch.tcr & TCR_WIE)) {
@@ -198,14 +201,30 @@ static int kvmppc_bookehv_irqprio_deliver(struct kvm_vcpu *vcpu,
 	case BOOKE_IRQPRIO_CRITICAL:
 		allowed = allowed && vcpu->arch.shared->msr & MSR_CE;
 		msr_mask = MSR_GS | MSR_ME;
+		int_class = INT_CLASS_CRIT;
 		break;
 	default:
 		allowed = 0;
 	}
 
 	if (allowed) {
-		mtspr(SPRN_GSRR0, vcpu->arch.pc);
-		mtspr(SPRN_GSRR1, (unsigned long)vcpu->arch.shared->msr);
+		switch (int_class) {
+		case INT_CLASS_NONCRIT:
+			mtspr(SPRN_GSRR0, vcpu->arch.pc);
+			mtspr(SPRN_GSRR1, (unsigned long)vcpu->arch.shared->msr);
+			break;
+		case INT_CLASS_CRIT:
+			vcpu->arch.csrr0 = vcpu->arch.pc;
+			vcpu->arch.csrr1 = vcpu->arch.shared->msr;
+			break;
+		/* TBD */
+		case INT_CLASS_MC:
+			break;
+		/* TBD */
+		case INT_CLASS_DBG:
+			break;
+		}
+
 		vcpu->arch.pc = vcpu->arch.ivpr | vcpu->arch.ivor[priority];
 		if (update_esr == true)
 			mtspr(SPRN_GESR, vcpu->arch.queued_esr);
@@ -219,8 +238,13 @@ static int kvmppc_bookehv_irqprio_deliver(struct kvm_vcpu *vcpu,
 			mtspr(SPRN_GEPR, kvmppc_mpic_iack(vcpu->kvm, 0));
 #endif
 		clear_bit(priority, &vcpu->arch.pending_exceptions);
-		if (vcpu->arch.pending_exceptions)
-			kvmppc_set_pending_interrupt(vcpu);
+
+		if (vcpu->arch.pending_exceptions & BOOKE_IRQMASK_EE)
+			kvmppc_set_pending_interrupt(vcpu, INT_CLASS_NONCRIT);
+		if (vcpu->arch.pending_exceptions & BOOKE_IRQMASK_CE)
+			kvmppc_set_pending_interrupt(vcpu, INT_CLASS_CRIT);
+		if (vcpu->arch.pending_exceptions & BOOKE_IRQPRIO_MACHINE_CHECK)
+			kvmppc_set_pending_interrupt(vcpu, INT_CLASS_MC);
 	} else if (dequeue) {
 		/* Should only happen due to races with masking */
 		clear_bit(priority, &vcpu->arch.pending_exceptions);
@@ -229,7 +253,8 @@ static int kvmppc_bookehv_irqprio_deliver(struct kvm_vcpu *vcpu,
 		 * to the guest. In case of e500mc we do this
 		 * via guest doorbell.
 		 */
-		kvmppc_set_pending_interrupt(vcpu);
+		if (int_class != INT_CLASS_DBG)
+			kvmppc_set_pending_interrupt(vcpu, int_class);
 	}
 
 	return allowed;
@@ -313,6 +338,16 @@ int kvmppc_handle_exit(struct kvm_run *run, struct kvm_vcpu *vcpu,
 	case BOOKE_INTERRUPT_PROGRAM:
 		kvmppc_core_queue_program(vcpu, vcpu->arch.fault_esr);
 		kvmppc_account_exit(vcpu, PRG_INT_EXITS);
+		r = RESUME_GUEST;
+		break;
+
+	case BOOKE_INTERRUPT_HV_GS_DBELL_CRIT:
+		kvmppc_account_exit(vcpu, GDBELL_EXITS);
+		/* we are here because there is a pending guest
+		 * interrupt which could not be delivered as MSR_CE
+		 * was not set. Once we break from here we would again
+		 * go to kvmpcc_core_deliver_interrupts
+		 */
 		r = RESUME_GUEST;
 		break;
 
