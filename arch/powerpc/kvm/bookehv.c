@@ -323,8 +323,6 @@ int kvmppc_handle_exit(struct kvm_run *run, struct kvm_vcpu *vcpu,
 		 * was not set. Once we break from here we would again
 		 * go to kvmpcc_core_deliver_interrupts
 		 */
-		vcpu->arch.pc = vcpu->arch.gsrr0;
-		vcpu->arch.shared->msr = vcpu->arch.gsrr1;
 		r = RESUME_GUEST;
 		break;
 	/* TBD */

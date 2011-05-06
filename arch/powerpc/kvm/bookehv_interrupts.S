@@ -98,6 +98,10 @@
 
 #define NEED_GS_REG_SAVE_MASK (1<<(BOOKE_HV_GUEST_DBELL - 32))
 
+#define NEED_CRIT_SAVE_REGS_HIGH (1<<(BOOKE_INTERRUPT_HV_GS_DBELL_CRIT - 32))
+
+#define NEED_DBG_SAVE_REGS (1<<BOOKE_INTERRUPT_DEBUG)
+
 /* Registers:
  *  r10: THREAD_POINTER
  *  r13: guest cr
@@ -113,13 +117,47 @@ _GLOBAL(kvmppc_handler_\ivor_nr)
 	PPC_STL r11, VCPU_GPR(r4)(r4)
 	stw	r13, VCPU_CR(r4)
 	PPC_STL	r5, VCPU_GPR(r5)(r4)
-	PPC_STL	r6, VCPU_GPR(r6)(r4)
 	mfspr	r5, SPRN_SPRG_RSCRATCH0
+	PPC_STL	r6, VCPU_GPR(r6)(r4)
+	PPC_STL	r8, VCPU_GPR(r8)(r4)
+	PPC_STL	r9, VCPU_GPR(r9)(r4)
 	PPC_STL r5, VCPU_GPR(r10)(r4)
 	PPC_LL	r5, THREAD_NORMSAVE(0)(r10)
 	PPC_STL r5, VCPU_GPR(r11)(r4)
 	PPC_LL	r5, THREAD_NORMSAVE(2)(r10)
 	PPC_STL r5, VCPU_GPR(r13)(r4)
+	mfctr	r5
+	PPC_STL	r5, VCPU_CTR(r4)
+	li	r5, \ivor_nr
+	b	kvmppc_resume_host
+.endm
+
+/* Registers:
+ *  r10: THREAD_POINTER
+ *  r9, r10, r11, cr: exception
+ *  stack
+ *  r9: cr
+ *  r8: exceptionstack pointer
+ *  SPRG_SCRATCH_\lvl: r8
+ */
+.macro KVM_LVL_HANDLER ivor_nr scratch
+_GLOBAL(kvmppc_handler_\ivor_nr)
+	mr	r11, r4
+	/* Get pointer to vcpu and record exit number. */
+	GET_SHADOW_VCPU(r4, r10)
+	PPC_STL r11, VCPU_GPR(r4)(r4)
+	stw	r9, VCPU_CR(r4)
+	PPC_STL	r5, VCPU_GPR(r5)(r4)
+	PPC_STL	r6, VCPU_GPR(r6)(r4)
+	PPC_LL	r5, GPR10(r8)
+	PPC_STL	r5, VCPU_GPR(r10)(r4)
+	PPC_STL	r13, VCPU_GPR(r13)(r4)
+	PPC_LL	r5, GPR9(r8)
+	PPC_STL r5, VCPU_GPR(r9)(r4)
+	PPC_LL	r5, GPR11(r8)
+	PPC_STL r5, VCPU_GPR(r11)(r4)
+	mfspr	r5, \scratch
+	PPC_STL r5, VCPU_GPR(r8)(r4)
 	mfctr	r5
 	PPC_STL	r5, VCPU_CTR(r4)
 	li	r5, \ivor_nr
@@ -143,6 +181,8 @@ KVM_HANDLER BOOKE_HV_PRIV
 KVM_HANDLER BOOKE_HV_SYSCALL
 KVM_HANDLER BOOKE_HV_GUEST_DBELL
 KVM_HANDLER BOOKE_INTERRUPT_DOORBELL
+KVM_LVL_HANDLER BOOKE_INTERRUPT_HV_GS_DBELL_CRIT SPRN_SPRG_RSCRATCH_CRIT
+KVM_LVL_HANDLER BOOKE_INTERRUPT_DEBUG SPRN_SPRG_RSCRATCH_DBG
 
 
 /* Registers:
@@ -153,31 +193,6 @@ KVM_HANDLER BOOKE_INTERRUPT_DOORBELL
 _GLOBAL(kvmppc_resume_host)
 	PPC_STL	r3, VCPU_GPR(r3)(r4)
 	PPC_STL	r7, VCPU_GPR(r7)(r4)
-	PPC_STL	r8, VCPU_GPR(r8)(r4)
-	PPC_STL	r9, VCPU_GPR(r9)(r4)
-
-	/* Since we are here due to a base (i.e. not critical, debug or
-	 * machine check) exception, don't allow guest clearing CE/ME/RI
-	 * impact the hypervisor
-	 */
-	mfmsr	r3
-	oris	r3, r3, MSR_CE@h
-	ori	r3, r3, (MSR_ME | MSR_RI)@l
-	mtmsr	r3
-	isync
-
-	mfsrr1	r3
-	mfsrr0	r7
-	/* r13 has already been saved in the exception handler
-	 * use r13 to save the shared pointer
-	 */
-	PPC_LL	r13, VCPU_SHARED(r4)
-#ifndef CONFIG_64BIT
-	stw	r3, (VCPU_SHARED_MSR + 4)(r13)
-#else
-	std	r3, (VCPU_SHARED_MSR)(r13)
-#endif
-	PPC_STL	r7, VCPU_PC(r4)
 
 	mfspr	r3, SPRN_PID
 	stw	r3, VCPU_SHADOW_PID(r4)
@@ -195,6 +210,10 @@ _GLOBAL(kvmppc_resume_host)
 	PPC_STL	r7, VCPU_SPRG5(r4)
 	PPC_STL	r8, VCPU_SPRG6(r4)
 	PPC_STL	r9, VCPU_SPRG7(r4)
+	/* r13 has already been saved in the exception handler
+	 * use r13 to save the shared pointer
+	 */
+	PPC_LL	r13, VCPU_SHARED(r4)
 
 	li	r11, 0
 	li	r6, 1
@@ -217,6 +236,43 @@ _GLOBAL(kvmppc_resume_host)
 	PPC_STL	r8, VCPU_TIMING_EXIT_TBL(r4)
 	PPC_STL	r9, VCPU_TIMING_EXIT_TBU(r4)
 #endif
+	/* Don't allow guest clearing CE/ME/RI impact
+	 * the hypervisor
+	 */
+	mfmsr	r3
+	andi.	r7, r11, NEED_CRIT_SAVE_REGS_HIGH
+	bne	..skip_msr_crit
+	oris	r3, r3, MSR_CE@h
+..skip_msr_crit:
+	ori	r3, r3, (MSR_ME | MSR_RI)@l
+	mtmsr	r3
+
+	mfsrr1	r3
+	mfsrr0	r8
+
+	andi.	r7, r11, NEED_CRIT_SAVE_REGS_HIGH
+	beq	..skip_crit_reg
+	mfspr	r3, SPRN_CSRR1
+	mfspr	r8, SPRN_CSRR0
+..skip_crit_reg:
+	andi.	r7, r6, NEED_DBG_SAVE_REGS
+	beq	..skip_dbg_reg
+	mfspr	r3, SPRN_DSRR1
+	mfspr	r8, SPRN_DSRR0
+..skip_dbg_reg:
+	andi.	r7, r11, NEED_GS_REG_SAVE_MASK
+	beq	..skip_gs_reg_save
+	mfspr	r3, SPRN_GSRR1
+	mfspr	r8, SPRN_GSRR0
+..skip_gs_reg_save:
+
+#ifndef CONFIG_64BIT
+	stw	r3, (VCPU_SHARED_MSR + 4)(r13)
+#else
+	std	r3, (VCPU_SHARED_MSR)(r13)
+#endif
+	PPC_STL	r8, VCPU_PC(r4)
+
 	andi.	r7, r6, NEED_INST_MASK_LOW
 	bne	..save_regs
 	andi.	r7, r11, NEED_INST_MASK_HIGH
@@ -253,17 +309,6 @@ _GLOBAL(kvmppc_resume_host)
 	mfspr	r9, SPRN_ESR
 	PPC_STL	r9, VCPU_FAULT_ESR(r4)
 ..skip_esr:
-
-	/* GSRR0 and GSRR1 would only be used in case of guest
-	 * doorbell.
-	 */
-	andi.	r7, r11, NEED_GS_REG_SAVE_MASK
-	beq	..skip_gs_reg_save
-	mfspr	r8, SPRN_GSRR0
-	mfspr	r9, SPRN_GSRR1
-	PPC_STL	r8, VCPU_GSRR0(r4)
-	stw	r9, VCPU_GSRR1(r4)
-..skip_gs_reg_save:
 
 	/* Save remaining volatile guest register state to vcpu. */
 	PPC_STL	r0, VCPU_GPR(r0)(r4)
