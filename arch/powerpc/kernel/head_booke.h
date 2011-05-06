@@ -109,7 +109,7 @@
  * registers as the normal prolog above. Instead we use a portion of the
  * critical/machine check exception stack at low physical addresses.
  */
-#define EXC_LEVEL_EXCEPTION_PROLOG(exc_level, exc_level_srr0, exc_level_srr1) \
+#define EXC_LEVEL_EXCEPTION_PROLOG(exc_level, ivor_nr, exc_level_srr0, exc_level_srr1) \
 	mtspr	SPRN_SPRG_WSCRATCH_##exc_level,r8;			     \
 	BOOKE_LOAD_EXC_LEVEL_STACK(exc_level);/* r8 points to the exc_level stack*/ \
 	stw	r9,GPR9(r8);		/* save various registers	   */\
@@ -117,11 +117,14 @@
 	stw	r10,GPR10(r8);						     \
 	stw	r11,GPR11(r8);						     \
 	stw	r9,_CCR(r8);		/* save CR on stack		   */\
-	mfspr	r10,exc_level_srr1;	/* check whether user or kernel    */\
-	andi.	r10,r10,MSR_PR;						     \
-	mfspr	r11,SPRN_SPRG_THREAD;	/* if from user, start at top of   */\
+	mfspr	r10, SPRN_SPRG_THREAD;					     \
+	DO_KVM	ivor_nr exc_level_srr1;					     \
+	mr	r11, r10;		/* if from user, start at top of   */\
 	lwz	r11,THREAD_INFO-THREAD(r11); /* this thread's kernel stack */\
 	addi	r11,r11,EXC_LVL_FRAME_OVERHEAD;	/* allocate stack frame    */\
+	EXC_LVL_KVM_BRANCH_IF_GUEST ivor_nr kvm_branch_##ivor_nr##_##exc_level;	     \
+	mfspr	r10,exc_level_srr1;	/* check whether user or kernel    */\
+	andi.	r10,r10,MSR_PR;						     \
 	beq	1f;							     \
 	/* COMING FROM USER MODE */					     \
 	stw	r9,_CCR(r11);		/* save CR			   */\
@@ -133,6 +136,7 @@
 	stw	r10,GPR11(r11);						     \
 	b	2f;							     \
 	/* COMING FROM PRIV MODE */					     \
+	EXC_LVL_KVM_BRANCH_STACK_LABEL ivor_nr kvm_branch_##ivor_nr##_##exc_level;   \
 1:	lwz	r9,TI_FLAGS-EXC_LVL_FRAME_OVERHEAD(r11);		     \
 	lwz	r10,TI_PREEMPT-EXC_LVL_FRAME_OVERHEAD(r11);		     \
 	stw	r9,TI_FLAGS-EXC_LVL_FRAME_OVERHEAD(r8);			     \
@@ -158,12 +162,12 @@
 	SAVE_4GPRS(3, r11);						     \
 	SAVE_2GPRS(7, r11)
 
-#define CRITICAL_EXCEPTION_PROLOG \
-		EXC_LEVEL_EXCEPTION_PROLOG(CRIT, SPRN_CSRR0, SPRN_CSRR1)
+#define CRITICAL_EXCEPTION_PROLOG(ivor_nr) \
+		EXC_LEVEL_EXCEPTION_PROLOG(CRIT, ivor_nr, SPRN_CSRR0, SPRN_CSRR1)
 #define DEBUG_EXCEPTION_PROLOG \
-		EXC_LEVEL_EXCEPTION_PROLOG(DBG, SPRN_DSRR0, SPRN_DSRR1)
+		EXC_LEVEL_EXCEPTION_PROLOG(DBG, BOOKE_INTERRUPT_DEBUG, SPRN_DSRR0, SPRN_DSRR1)
 #define MCHECK_EXCEPTION_PROLOG \
-		EXC_LEVEL_EXCEPTION_PROLOG(MC, SPRN_MCSRR0, SPRN_MCSRR1)
+		EXC_LEVEL_EXCEPTION_PROLOG(MC, BOOKE_INTERRUPT_MACHINE_CHECK, SPRN_MCSRR0, SPRN_MCSRR1)
 
 /*
  * Exception vectors.
@@ -183,10 +187,10 @@ label:
 	addi	r3,r1,STACK_FRAME_OVERHEAD;			\
 	xfer(n, hdlr)
 
-#define CRITICAL_EXCEPTION(n, label, hdlr)			\
-	START_EXCEPTION(label);					\
-	CRITICAL_EXCEPTION_PROLOG;				\
-	addi	r3,r1,STACK_FRAME_OVERHEAD;			\
+#define CRITICAL_EXCEPTION(n, ivor_nr, label, hdlr)			\
+	START_EXCEPTION(label);						\
+	CRITICAL_EXCEPTION_PROLOG(BOOKE_INTERRUPT_##ivor_nr);		\
+	addi	r3,r1,STACK_FRAME_OVERHEAD;				\
 	EXC_XFER_TEMPLATE(hdlr, n+2, (MSR_KERNEL & ~(MSR_ME|MSR_DE|MSR_CE)), \
 			  NOCOPY, crit_transfer_to_handler, \
 			  ret_from_crit_exc)
@@ -298,7 +302,7 @@ label:
 
 #define DEBUG_CRIT_EXCEPTION						      \
 	START_EXCEPTION(DebugCrit);					      \
-	CRITICAL_EXCEPTION_PROLOG;					      \
+	CRITICAL_EXCEPTION_PROLOG(BOOKE_INTERRUPT_DEBUG);					      \
 									      \
 	/*								      \
 	 * If there is a single step or branch-taken exception in an	      \

@@ -301,12 +301,12 @@ _ENTRY(__early_start)
 
 interrupt_base:
 	/* Critical Input Interrupt */
-	CRITICAL_EXCEPTION(0x0100, CriticalInput, unknown_exception)
+	CRITICAL_EXCEPTION(0x0100, CRITICAL, CriticalInput, unknown_exception)
 
 	/* Machine Check Interrupt */
 #ifdef CONFIG_E200
 	/* no RFMCI, MCSRRs on E200 */
-	CRITICAL_EXCEPTION(0x0200, MachineCheck, machine_check_exception)
+	CRITICAL_EXCEPTION(0x0200, MACHINE_CHECK, MachineCheck, machine_check_exception)
 #else
 	MCHECK_EXCEPTION(0x0200, MachineCheck, machine_check_exception)
 #endif
@@ -365,9 +365,9 @@ interrupt_base:
 
 	/* Watchdog Timer Interrupt */
 #ifdef CONFIG_BOOKE_WDT
-	CRITICAL_EXCEPTION(0x3200, WatchdogTimer, WatchdogException)
+	CRITICAL_EXCEPTION(0x3200, WATCHDOG, WatchdogTimer, WatchdogException)
 #else
-	CRITICAL_EXCEPTION(0x3200, WatchdogTimer, unknown_exception)
+	CRITICAL_EXCEPTION(0x3200, WATCHDOG, WatchdogTimer, unknown_exception)
 #endif
 
 	/* Data TLB Error Interrupt */
@@ -564,7 +564,7 @@ interrupt_base:
 
 	EXCEPTION(0x2070, BOOKE_INTERRUPT_DOORBELL, Doorbell, doorbell_exception, EXC_XFER_STD)
 
-	CRITICAL_EXCEPTION(0x2080, CriticalDoorbell, unknown_exception)
+	CRITICAL_EXCEPTION(0x2080, DOORBELL_CRITICAL, CriticalDoorbell, unknown_exception)
 
 	/* Debug Interrupt */
 	DEBUG_DEBUG_EXCEPTION
@@ -574,7 +574,7 @@ interrupt_base:
 	EXCEPTION(0, BOOKE_HV_GUEST_DBELL, GuestDoorBell, unknown_exception, EXC_XFER_EE)
 
 	/* Guest DoorBell Critical -- Not being redirected to KVM currently */
-	CRITICAL_EXCEPTION(0, CriticalGuestDoorBell, unknown_exception)
+	CRITICAL_EXCEPTION(0, HV_GUEST_DBELL_CRITICAL, CriticalGuestDoorBell, unknown_exception)
 
 	/* Hypercall */
 	EXCEPTION(0, BOOKE_HV_SYSCALL, HyperCall, unknown_exception, EXC_XFER_EE)

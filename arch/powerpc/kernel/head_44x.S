@@ -160,10 +160,10 @@ _ENTRY(_start);
 
 interrupt_base:
 	/* Critical Input Interrupt */
-	CRITICAL_EXCEPTION(0x0100, CriticalInput, unknown_exception)
+	CRITICAL_EXCEPTION(0x0100, CRITICAL, CriticalInput, unknown_exception)
 
 	/* Machine Check Interrupt */
-	CRITICAL_EXCEPTION(0x0200, MachineCheck, machine_check_exception)
+	CRITICAL_EXCEPTION(0x0200, MACHINE_CHECK, MachineCheck, machine_check_exception)
 	MCHECK_EXCEPTION(0x0210, MachineCheckA, machine_check_exception)
 
 	/* Data Storage Interrupt */
@@ -208,9 +208,9 @@ interrupt_base:
 	/* Watchdog Timer Interrupt */
 	/* TODO: Add watchdog support */
 #ifdef CONFIG_BOOKE_WDT
-	CRITICAL_EXCEPTION(0x1020, WatchdogTimer, WatchdogException)
+	CRITICAL_EXCEPTION(0x1020, WATCHDOG, WatchdogTimer, WatchdogException)
 #else
-	CRITICAL_EXCEPTION(0x1020, WatchdogTimer, unknown_exception)
+	CRITICAL_EXCEPTION(0x1020, WATCHDOG, WatchdogTimer, unknown_exception)
 #endif
 
 	/* Data TLB Error Interrupt */

@@ -53,7 +53,7 @@
 
 /* booke_hv */
 #define BOOKE_HV_GUEST_DBELL          38
-#define BOOKE_HV_GUEST_DBELL_CRITICAL 39
+#define BOOKE_INTERRUPT_HV_GS_DBELL_CRIT 39
 #define BOOKE_HV_SYSCALL              40
 #define BOOKE_HV_PRIV                 41
 

@@ -28,7 +28,8 @@ kvm-440-objs := \
 	booke_interrupts.o \
 	44x.o \
 	44x_tlb.o \
-	44x_emulate.o
+	44x_emulate.o \
+	booke_common.o
 kvm-objs-$(CONFIG_KVM_440) := $(kvm-440-objs)
 
 kvm-e500-objs := \
