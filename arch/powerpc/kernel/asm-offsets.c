@@ -112,7 +112,7 @@ int main(void)
 	DEFINE(THREAD_USED_SPE, offsetof(struct thread_struct, used_spe));
 #endif /* CONFIG_SPE */
 #endif /* CONFIG_PPC64 */
-#if defined(CONFIG_KVM_BOOK3S_32_HANDLER) || defined(CONFIG_KVM_BOOKE_HV)
+#ifdef CONFIG_KVM
 	DEFINE(THREAD_KVM_SVCPU, offsetof(struct thread_struct, kvm_shadow_vcpu));
 #endif
 

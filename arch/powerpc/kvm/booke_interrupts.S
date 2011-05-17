@@ -52,11 +52,15 @@
                        (1<<BOOKE_INTERRUPT_PROGRAM) | \
                        (1<<BOOKE_INTERRUPT_DTLB_MISS))
 
+#define GET_VCPU_POINT(regd)                 \
+	mfspr   regd, SPRN_SPRG_THREAD;      \
+	lwz	regd, THREAD_KVM_SVCPU(regd)
+
 .macro KVM_HANDLER ivor_nr
 _GLOBAL(kvmppc_handler_\ivor_nr)
 	/* Get pointer to vcpu and record exit number. */
 	mtspr	SPRN_SPRG_WSCRATCH0, r4
-	mfspr	r4, SPRN_SPRG_RVCPU
+	GET_VCPU_POINT(r4)
 	stw	r5, VCPU_GPR(r5)(r4)
 	stw	r6, VCPU_GPR(r6)(r4)
 	mfctr	r5
@@ -71,7 +75,7 @@ _GLOBAL(kvmppc_handler_\ivor_nr)
 .macro KVM_DBG_HANDLER ivor_nr
 _GLOBAL(kvmppc_handler_\ivor_nr)
 	mtspr   SPRN_SPRG_WSCRATCH_CRIT, r4
-	mfspr	r4, SPRN_SPRG_RVCPU
+	GET_VCPU_POINT(r4)
 	stw	r3, VCPU_CRIT_SAVE(r4)
 	mfcr	r3
 	mfspr	r4, SPRN_CSRR1
@@ -84,7 +88,7 @@ _GLOBAL(kvmppc_handler_\ivor_nr)
 	lis	r4, 0xffff
 	ori	r4, r4, 0xffff
 	mtspr	SPRN_DBSR, r4
-	mfspr	r4, SPRN_SPRG_RVCPU
+	GET_VCPU_POINT(r4)
 	mtcr	r3
 	lwz     r3, VCPU_CRIT_SAVE(r4)
 	mfspr   r4, SPRN_SPRG_RSCRATCH_CRIT
@@ -92,7 +96,7 @@ _GLOBAL(kvmppc_handler_\ivor_nr)
 1:	/* debug interrupt happened in guest */
 	mfspr   r4, SPRN_SPRG_RSCRATCH_CRIT
 	mtspr	SPRN_SPRG_WSCRATCH0, r4
-	mfspr	r4, SPRN_SPRG_RVCPU
+	GET_VCPU_POINT(r4)
 	mtcr	r3
 	lwz     r3, VCPU_CRIT_SAVE(r4)
 	stw	r5, VCPU_GPR(r5)(r4)
@@ -106,13 +110,19 @@ _GLOBAL(kvmppc_handler_\ivor_nr)
 	bctr
 .endm
 
+.macro KVM_PASS_HANDLER ivor_nr
+_GLOBAL(kvmppc_handler_\ivor_nr)
+	/* Filled in init */
+	nop
+.endm
+
 .macro KVM_HANDLER_ADDR ivor_nr
 	.long	kvmppc_handler_\ivor_nr
 .endm
 
 _GLOBAL(kvmppc_handlers_start)
-KVM_HANDLER BOOKE_INTERRUPT_CRITICAL
-KVM_HANDLER BOOKE_INTERRUPT_MACHINE_CHECK
+KVM_PASS_HANDLER BOOKE_INTERRUPT_CRITICAL
+KVM_PASS_HANDLER BOOKE_INTERRUPT_MACHINE_CHECK
 KVM_HANDLER BOOKE_INTERRUPT_DATA_STORAGE
 KVM_HANDLER BOOKE_INTERRUPT_INST_STORAGE
 KVM_HANDLER BOOKE_INTERRUPT_EXTERNAL
@@ -123,7 +133,7 @@ KVM_HANDLER BOOKE_INTERRUPT_SYSCALL
 KVM_HANDLER BOOKE_INTERRUPT_AP_UNAVAIL
 KVM_HANDLER BOOKE_INTERRUPT_DECREMENTER
 KVM_HANDLER BOOKE_INTERRUPT_FIT
-KVM_HANDLER BOOKE_INTERRUPT_WATCHDOG
+KVM_PASS_HANDLER BOOKE_INTERRUPT_WATCHDOG
 KVM_HANDLER BOOKE_INTERRUPT_DTLB_MISS
 KVM_HANDLER BOOKE_INTERRUPT_ITLB_MISS
 KVM_DBG_HANDLER BOOKE_INTERRUPT_DEBUG
@@ -466,9 +476,6 @@ lightweight_exit:
 	lis	r8, kvmppc_booke_handlers@ha
 	lwz	r8, kvmppc_booke_handlers@l(r8)
 	mtspr	SPRN_IVPR, r8
-
-	/* Save vcpu pointer for the exception handlers. */
-	mtspr	SPRN_SPRG_WVCPU, r4
 
 	/* Can't switch the stack pointer until after IVPR is switched,
 	 * because host interrupt handlers would get confused. */
