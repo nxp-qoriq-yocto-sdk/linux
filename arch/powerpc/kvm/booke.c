@@ -36,11 +36,10 @@
 #include <asm/dbell.h>
 #include <asm/hw_irq.h>
 #include <asm/irq.h>
+#include <asm/code-patching.h>
 
 #include "timing.h"
 #include "booke.h"
-
-unsigned long kvmppc_booke_handlers;
 
 #define VM_STAT(x) offsetof(struct kvm, stat.x), KVM_STAT_VM
 #define VCPU_STAT(x) offsetof(struct kvm_vcpu, stat.x), KVM_STAT_VCPU
@@ -1399,6 +1398,14 @@ void kvmppc_booke_vcpu_put(struct kvm_vcpu *vcpu)
 	current->thread.kvm_vcpu = NULL;
 }
 
+/*
+ * We install our own exception handlers by hijacking IVPR.
+ * IVPR must be 16-bit aligned.
+ */
+static char kvmppc_booke_vector[PAGE_SIZE * 2]
+		__attribute__ ((aligned(1 << 16)));
+unsigned long kvmppc_booke_handlers = (unsigned long)kvmppc_booke_vector;
+
 int __init kvmppc_booke_init(void)
 {
 #ifndef CONFIG_KVM_BOOKE_HV
@@ -1406,13 +1413,6 @@ int __init kvmppc_booke_init(void)
 	unsigned long *handler = kvmppc_booke_handler_addr;
 	unsigned long max_ivor = 0;
 	int i;
-
-	/* We install our own exception handlers by hijacking IVPR. IVPR must
-	 * be 16-bit aligned, so we need a 64KB allocation. */
-	kvmppc_booke_handlers = __get_free_pages(GFP_KERNEL | __GFP_ZERO,
-	                                         VCPU_SIZE_ORDER);
-	if (!kvmppc_booke_handlers)
-		return -ENOMEM;
 
 	/* XXX make sure our handlers are smaller than Linux's */
 
@@ -1441,7 +1441,26 @@ int __init kvmppc_booke_init(void)
 
 		memcpy((void *)kvmppc_booke_handlers + ivor[i],
 		       (void *)handler[i], handler[i + 1] - handler[i]);
+		switch (i) {
+		case BOOKE_INTERRUPT_CRITICAL:
+		case BOOKE_INTERRUPT_MACHINE_CHECK:
+		case BOOKE_INTERRUPT_WATCHDOG: {
+			unsigned int *p, inst;
+
+			p = (void *)kvmppc_booke_handlers + ivor[i];
+			inst = create_branch((void *)kvmppc_booke_handlers,
+			                     mfspr(SPRN_IVPR), 0);
+			if (inst)
+				*p = inst;
+			else
+				printk("Error: KVM: Host exception may fail\n");
+			break;
+		}
+		default:
+			break;
+		}
 	}
+
 	flush_icache_range(kvmppc_booke_handlers,
 	                   kvmppc_booke_handlers + ivor[max_ivor] +
                                handler[max_ivor + 1] - handler[max_ivor]);
@@ -1451,6 +1470,5 @@ int __init kvmppc_booke_init(void)
 
 void __exit kvmppc_booke_exit(void)
 {
-	free_pages(kvmppc_booke_handlers, VCPU_SIZE_ORDER);
 	kvm_exit();
 }
