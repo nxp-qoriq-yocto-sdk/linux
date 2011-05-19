@@ -128,7 +128,7 @@ void kvmppc_set_msr(struct kvm_vcpu *vcpu, u32 new_msr)
 	u32 old_msr = vcpu->arch.shared->msr;
 
 #ifdef CONFIG_KVM_BOOKE_HV
-	new_msr |= MSR_GS;
+	new_msr |= MSR_GS | MSR_DE;
 #endif
 
 	vcpu->arch.shared->msr = new_msr;
@@ -143,6 +143,7 @@ void kvmppc_set_msr(struct kvm_vcpu *vcpu, u32 new_msr)
 #endif
 
 	kvmppc_vcpu_sync_spe(vcpu);
+	kvmppc_recalc_shadow_dbcr(vcpu);
 }
 
 static void kvmppc_booke_queue_irqprio(struct kvm_vcpu *vcpu,
@@ -237,6 +238,16 @@ void kvmppc_core_queue_watchdog(struct kvm_vcpu *vcpu)
 void kvmppc_core_dequeue_watchdog(struct kvm_vcpu *vcpu)
 {
 	clear_bit(BOOKE_IRQPRIO_WATCHDOG, &vcpu->arch.pending_exceptions);
+}
+
+void kvmppc_core_queue_debug(struct kvm_vcpu *vcpu)
+{
+	kvmppc_booke_queue_irqprio(vcpu, BOOKE_IRQPRIO_DEBUG);
+}
+
+void kvmppc_core_dequeue_debug(struct kvm_vcpu *vcpu)
+{
+	clear_bit(BOOKE_IRQPRIO_DEBUG, &vcpu->arch.pending_exceptions);
 }
 
 static void set_guest_srr(struct kvm_vcpu *vcpu, unsigned long srr0, u32 srr1)
@@ -396,6 +407,7 @@ static int kvmppc_booke_irqprio_deliver(struct kvm_vcpu *vcpu,
 		break;
 	case BOOKE_IRQPRIO_DEBUG:
 		allowed = vcpu->arch.shared->msr & MSR_DE;
+		allowed = allowed && (vcpu->arch.dbg_reg.dbcr0 & DBCR0_IDM);
 		allowed = allowed && !crit;
 		msr_mask = MSR_ME;
 		int_class = INT_CLASS_CRIT;
@@ -707,9 +719,21 @@ out:
 	return ret;
 }
 
-static int emulation_exit(struct kvm_run *run, struct kvm_vcpu *vcpu)
+static int emulation_exit(struct kvm_run *run, struct kvm_vcpu *vcpu,
+			  int exit_nr)
 {
 	enum emulation_result er;
+	int ret;
+
+	if (unlikely(vcpu->guest_debug & KVM_GUESTDBG_USE_SW_BP) &&
+	             (vcpu->arch.last_inst == KVM_INST_GUESTGDB)) {
+		run->exit_reason = KVM_EXIT_DEBUG;
+		run->debug.arch.pc = vcpu->arch.pc;
+		run->debug.arch.exception = exit_nr;
+		run->debug.arch.status = 0;
+		kvmppc_account_exit(vcpu, DEBUG_EXITS);
+		return RESUME_HOST;
+	}
 
 	er = kvmppc_emulate_instruction(run, vcpu);
 	switch (er) {
@@ -718,11 +742,13 @@ static int emulation_exit(struct kvm_run *run, struct kvm_vcpu *vcpu)
 		kvmppc_account_exit_stat(vcpu, EMULATED_INST_EXITS);
 		/* Future optimization: only reload non-volatiles if
 		 * they were actually modified by emulation. */
-		return RESUME_GUEST_NV;
+		ret = RESUME_GUEST_NV;
+		break;
 
 	case EMULATE_DO_DCR:
 		run->exit_reason = KVM_EXIT_DCR;
-		return RESUME_HOST;
+		ret = RESUME_HOST;
+		break;
 
 	case EMULATE_FAIL:
 		printk(KERN_CRIT "%s: emulation at %lx failed (%08x)\n",
@@ -736,6 +762,64 @@ static int emulation_exit(struct kvm_run *run, struct kvm_vcpu *vcpu)
 
 	default:
 		BUG();
+	}
+
+	if (unlikely(vcpu->guest_debug & KVM_GUESTDBG_ENABLE) &&
+	    (vcpu->guest_debug & KVM_GUESTDBG_SINGLESTEP)) {
+		run->exit_reason = KVM_EXIT_DEBUG;
+		return RESUME_HOST;
+	}
+
+	return ret;
+}
+
+static int kvmppc_handle_debug(struct kvm_run *run, struct kvm_vcpu *vcpu)
+{
+#define DBSR_AC		(DBSR_IAC1 | DBSR_IAC2 | DBSR_IAC3 | DBSR_IAC4| \
+			 DBSR_DAC1R | DBSR_DAC1W | DBSR_DAC2R | DBSR_DAC2W)
+	u32 dbsr;
+
+#ifndef CONFIG_KVM_BOOKE_HV
+	if (cpu_has_feature(CPU_FTR_DEBUG_LVL_EXC))
+		vcpu->arch.pc = mfspr(SPRN_DSRR0);
+	else
+		vcpu->arch.pc = mfspr(SPRN_CSRR0);
+#endif
+	dbsr = mfspr(SPRN_DBSR);
+
+	/* Clear events we got in DBSR register */
+	mtspr(SPRN_DBSR, dbsr);
+
+	if (vcpu->guest_debug == 0) {
+		/*
+		 * Event from guest debug facility emulation.
+		 */
+		kvmppc_set_dbsr_bits(vcpu, dbsr);
+
+		/* Inject a program interrupt if trap debug is not allowed */
+		if ((dbsr & DBSR_TIE) && !(vcpu->arch.shared->msr & MSR_DE))
+			kvmppc_core_queue_program(vcpu, ESR_PTR);
+
+		return RESUME_GUEST;
+	} else {
+		/* Event from guest debug */
+		run->debug.arch.pc = vcpu->arch.pc;
+		run->debug.arch.status = 0;
+
+		if (dbsr & (DBSR_IAC1 | DBSR_IAC2 | DBSR_IAC3 | DBSR_IAC4)) {
+			run->debug.arch.status |= KVMPPC_DEBUG_BREAKPOINT;
+		} else {
+			if (dbsr & (DBSR_DAC1W | DBSR_DAC2W))
+				run->debug.arch.status |= KVMPPC_DEBUG_WATCH_WRITE;
+			else if (dbsr & (DBSR_DAC1R | DBSR_DAC2R))
+				run->debug.arch.status |= KVMPPC_DEBUG_WATCH_READ;
+			if (dbsr & (DBSR_DAC1R | DBSR_DAC1W))
+				run->debug.arch.pc = vcpu->arch.shadow_dbg_reg.dac[0];
+			else if (dbsr & (DBSR_DAC2R | DBSR_DAC2W))
+				run->debug.arch.pc = vcpu->arch.shadow_dbg_reg.dac[1];
+		}
+
+		return RESUME_HOST;
 	}
 }
 
@@ -854,7 +938,7 @@ int kvmppc_handle_exit(struct kvm_run *run, struct kvm_vcpu *vcpu,
 		break;
 
 	case BOOKE_INTERRUPT_HV_PRIV:
-		r = emulation_exit(run, vcpu);
+		r = emulation_exit(run, vcpu, exit_nr);
 		break;
 
 	case BOOKE_INTERRUPT_PROGRAM:
@@ -873,25 +957,7 @@ int kvmppc_handle_exit(struct kvm_run *run, struct kvm_vcpu *vcpu,
 			break;
 		}
 
-		if (unlikely(vcpu->guest_debug & KVM_GUESTDBG_USE_SW_BP) &&
-		             (vcpu->arch.last_inst == KVM_INST_GUESTGDB)) {
-			run->exit_reason = KVM_EXIT_DEBUG;
-			run->debug.arch.pc = vcpu->arch.pc;
-			run->debug.arch.exception = exit_nr;
-			run->debug.arch.status = 0;
-			kvmppc_account_exit(vcpu, DEBUG_EXITS);
-			r = RESUME_HOST;
-			break;
-		}
-
-
-		r = emulation_exit(run, vcpu);
-
-		if (unlikely(vcpu->guest_debug & KVM_GUESTDBG_ENABLE) &&
-		    (vcpu->guest_debug & KVM_GUESTDBG_SINGLESTEP)) {
-			run->exit_reason = KVM_EXIT_DEBUG;
-			r = RESUME_HOST;
-		}
+		r = emulation_exit(run, vcpu, exit_nr);
 
 		break;
 
@@ -1086,37 +1152,14 @@ int kvmppc_handle_exit(struct kvm_run *run, struct kvm_vcpu *vcpu,
 		break;
 	}
 
-	case BOOKE_INTERRUPT_DEBUG: {
-		u32 dbsr;
-
-		vcpu->arch.pc = mfspr(SPRN_CSRR0);
-
-		dbsr = mfspr(SPRN_DBSR);
-		run->debug.arch.pc = vcpu->arch.pc;
-		run->debug.arch.status = 0;
-
-		if (dbsr & (DBSR_IAC1 | DBSR_IAC2 | DBSR_IAC3 | DBSR_IAC4)) {
-			run->debug.arch.status |= KVMPPC_DEBUG_BREAKPOINT;
-		} else {
-			if (dbsr & (DBSR_DAC1W | DBSR_DAC2W))
-				run->debug.arch.status |= KVMPPC_DEBUG_WATCH_WRITE;
-			else if (dbsr & (DBSR_DAC1R | DBSR_DAC2R))
-				run->debug.arch.status |= KVMPPC_DEBUG_WATCH_READ;
-			if (dbsr & (DBSR_DAC1R | DBSR_DAC1W))
-				run->debug.arch.pc = vcpu->arch.shadow_dbg_reg.dac[0];
-			else if (dbsr & (DBSR_DAC2R | DBSR_DAC2W))
-				run->debug.arch.pc = vcpu->arch.shadow_dbg_reg.dac[1];
+	case BOOKE_INTERRUPT_DEBUG:
+		r = kvmppc_handle_debug(run, vcpu);
+		if (r == RESUME_HOST) {
+			run->debug.arch.exception = exit_nr;
+			run->exit_reason = KVM_EXIT_DEBUG;
 		}
-
-		/* clear events we got in DBSR register */
-		mtspr(SPRN_DBSR, dbsr);
-
-		run->debug.arch.exception = exit_nr;
-		run->exit_reason = KVM_EXIT_DEBUG;
 		kvmppc_account_exit(vcpu, DEBUG_EXITS);
-		r = RESUME_HOST;
 		break;
-	}
 
 	default:
 		printk(KERN_EMERG "exit_nr %d\n", exit_nr);
@@ -1481,11 +1524,52 @@ void kvmppc_booke_vcpu_put(struct kvm_vcpu *vcpu)
 
 #define BP_NUM	KVMPPC_IAC_NUM
 #define WP_NUM	KVMPPC_DAC_NUM
+void kvmppc_recalc_shadow_ac(struct kvm_vcpu *vcpu)
+{
+	if (vcpu->guest_debug == 0) {
+		struct kvmppc_debug_reg *sreg = &(vcpu->arch.shadow_dbg_reg),
+		                        *greg = &(vcpu->arch.dbg_reg);
+		int i;
+
+		for (i = 0; i < BP_NUM; i++)
+			sreg->iac[i] = greg->iac[i];
+		for (i = 0; i < WP_NUM; i++)
+			sreg->dac[i] = greg->dac[i];
+	}
+}
+
+void kvmppc_recalc_shadow_dbcr(struct kvm_vcpu *vcpu)
+{
+#define MASK_EVENT (DBCR0_IC | DBCR0_BRT)
+	if (vcpu->guest_debug == 0) {
+		struct kvmppc_debug_reg *sreg = &(vcpu->arch.shadow_dbg_reg),
+		                        *greg = &(vcpu->arch.dbg_reg);
+
+		/* We always enable debug event in shadow */
+		sreg->dbcr0 = greg->dbcr0 | DBCR0_IDM;
+
+		/*
+		 * Some event should not occur if MSR[DE] = 0,
+		 * since MSR[DE] is always set in shadow,
+		 * we disable these events in shadow when guest MSR[DE] = 0
+		 */
+		if (!(vcpu->arch.shared->msr & MSR_DE))
+			sreg->dbcr0 = greg->dbcr0 & ~MASK_EVENT;
+
+		/* XXX assume that guest always wants to debug eaddr */
+		sreg->dbcr1 = DBCR1_IAC1US | DBCR1_IAC2US |
+		              DBCR1_IAC3US | DBCR1_IAC4US;
+		sreg->dbcr2 = DBCR2_DAC1US | DBCR2_DAC2US;
+	}
+}
+
 int kvmppc_core_set_guest_debug(struct kvm_vcpu *vcpu,
                                 struct kvm_guest_debug *dbg)
 {
 	if (!(dbg->control & KVM_GUESTDBG_ENABLE)) {
 		vcpu->guest_debug = 0;
+		kvmppc_recalc_shadow_ac(vcpu);
+		kvmppc_recalc_shadow_dbcr(vcpu);
 		return 0;
 	}
 
@@ -1511,30 +1595,56 @@ int kvmppc_core_set_guest_debug(struct kvm_vcpu *vcpu,
 			DBCR0_DAC2R | DBCR0_IDM
 		};
 
-		for (n = 0; n < (BP_NUM + WP_NUM) && dbg->arch.bp[n].type; n++) {
-			if (dbg->arch.bp[n].type & KVMPPC_DEBUG_BREAKPOINT)
-				gdbgr->dbcr0 |= bp_code[b];
-			if (dbg->arch.bp[n].type & KVMPPC_DEBUG_WATCH_READ)
-				gdbgr->dbcr0 |= wp_code[w + 2];
-			if (dbg->arch.bp[n].type & KVMPPC_DEBUG_WATCH_WRITE)
-				gdbgr->dbcr0 |= wp_code[w];
+#ifndef CONFIG_KVM_BOOKE_HV
+		gdbgr->dbcr1 = DBCR1_IAC1US | DBCR1_IAC2US |
+		               DBCR1_IAC3US | DBCR1_IAC4US;
+		gdbgr->dbcr2 = DBCR2_DAC1US | DBCR2_DAC2US;
+#else
+		gdbgr->dbcr1 = 0;
+		gdbgr->dbcr2 = 0;
+#endif
 
-			if (b < BP_NUM && (gdbgr->dbcr0 &
-			                    (DBCR0_IAC1 | DBCR0_IAC2 |
-			                     DBCR0_IAC3 | DBCR0_IAC4))) {
-				gdbgr->iac[b] = dbg->arch.bp[n].addr;
-				b++;
-			}
-			if (w < WP_NUM && (gdbgr->dbcr0 &
-			                    (DBCR0_DAC1W | DBCR0_DAC1R |
-			                     DBCR0_DAC2W | DBCR0_DAC2R))) {
-				gdbgr->dac[w] = dbg->arch.bp[n].addr;
-				w++;
+		for (n = 0; n < (BP_NUM + WP_NUM); n++) {
+			u32 type = dbg->arch.bp[n].type;
+
+			if (!type)
+				break;
+
+			if (type & (KVMPPC_DEBUG_WATCH_READ |
+			            KVMPPC_DEBUG_WATCH_WRITE)) {
+				if (w < WP_NUM) {
+					if (type & KVMPPC_DEBUG_WATCH_READ)
+						gdbgr->dbcr0 |= wp_code[w + 2];
+					if (type & KVMPPC_DEBUG_WATCH_WRITE)
+						gdbgr->dbcr0 |= wp_code[w];
+					gdbgr->dac[w] = dbg->arch.bp[n].addr;
+					w++;
+				}
+			} else if (type & KVMPPC_DEBUG_BREAKPOINT) {
+				if (b < BP_NUM) {
+					gdbgr->dbcr0 |= bp_code[b];
+					gdbgr->iac[b] = dbg->arch.bp[n].addr;
+					b++;
+				}
 			}
 		}
 	}
 
 	return 0;
+}
+
+void kvmppc_set_dbsr_bits(struct kvm_vcpu *vcpu, u32 dbsr_bits)
+{
+	vcpu->arch.dbsr |= dbsr_bits;
+	if (vcpu->arch.dbsr != 0)
+		kvmppc_core_queue_debug(vcpu);
+}
+
+void kvmppc_clr_dbsr_bits(struct kvm_vcpu *vcpu, u32 dbsr_bits)
+{
+	vcpu->arch.dbsr &= ~dbsr_bits;
+	if (vcpu->arch.dbsr == 0)
+		kvmppc_core_dequeue_debug(vcpu);
 }
 
 #ifdef CONFIG_KVM_BOOKE206_PERFMON
