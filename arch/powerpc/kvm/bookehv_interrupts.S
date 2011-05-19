@@ -324,6 +324,34 @@ _GLOBAL(kvmppc_resume_host)
 	mtpmr	PMRN_PMGC0, r9
 skip_pmgc0_save:
 
+	lwz	r6, VCPU_GUEST_DEBUG(r4)
+	cmpwi	r6, 0
+	beq	skip_load_host_debug
+	li	r9, 0
+	mtspr	SPRN_DBCR0, r9		/* disable all debug event */
+	addi	r7, r4, VCPU_HOST_DBG - 4
+	lwzu	r6, 4(r7)
+	lwzu	r9, 4(r7)
+	mtspr	SPRN_DBCR1, r9
+	lwzu	r9, 4(r7)
+	mtspr	SPRN_DBCR2, r9
+	lwzu	r9, 4(r7)
+	mtspr	SPRN_IAC1, r9
+	lwzu	r9, 4(r7)
+	mtspr	SPRN_IAC2, r9
+#ifndef CONFIG_FSL_BOOKE
+	lwzu	r9, 4(r7)
+	mtspr	SPRN_IAC3, r9
+	lwzu	r9, 4(r7)
+	mtspr	SPRN_IAC4, r9
+#endif
+	lwzu	r9, 4(r7)
+	mtspr	SPRN_DAC1, r9
+	lwzu	r9, 4(r7)
+	mtspr	SPRN_DAC2, r9
+	mtspr	SPRN_DBCR0, r6
+skip_load_host_debug:
+
 	/* Save remaining volatile guest register state to vcpu. */
 	mfspr	r3, SPRN_VRSAVE
 	PPC_STL	r0, VCPU_GPR(r0)(r4)
@@ -579,6 +607,58 @@ lightweight_exit:
 	mtpmr	PMRN_PMGC0, r9
 skip_pmgc0_restore:
 
+	lwz	r6, VCPU_GUEST_DEBUG(r4)
+	cmpwi	r6, 0
+	beq	..skip_load_guest_debug
+	mfmsr	r7
+	rlwinm	r7, r7, 0, ~MSR_DE
+	mtmsr	r7
+	addi	r7, r4, VCPU_HOST_DBG - 4
+	mfspr	r8, SPRN_DBCR0
+	stwu	r8, 4(r7)
+	mfspr	r8, SPRN_DBCR1
+	stwu	r8, 4(r7)
+	mfspr	r8, SPRN_DBCR2
+	stwu	r8, 4(r7)
+	mfspr	r8, SPRN_IAC1
+	stwu	r8, 4(r7)
+	mfspr	r8, SPRN_IAC2
+	stwu	r8, 4(r7)
+#ifndef CONFIG_FSL_BOOKE
+	mfspr	r8, SPRN_IAC3
+	stwu	r8, 4(r7)
+	mfspr	r8, SPRN_IAC4
+	stwu	r8, 4(r7)
+#endif
+	mfspr	r8, SPRN_DAC1
+	stwu	r8, 4(r7)
+	mfspr	r8, SPRN_DAC2
+	stwu	r8, 4(r7)
+	li	r8, 0
+	mtspr	SPRN_DBCR0, r8		/* disable all debug event */
+	addi	r7, r4, VCPU_SHADOW_DBG - 4
+	lwzu	r6, 4(r7)
+	lwzu	r8, 4(r7)
+	mtspr	SPRN_DBCR1, r8
+	lwzu	r8, 4(r7)
+	mtspr	SPRN_DBCR2, r8
+	lwzu	r8, 4(r7)
+	mtspr	SPRN_IAC1, r8
+	lwzu	r8, 4(r7)
+	mtspr	SPRN_IAC2, r8
+#ifndef CONFIG_FSL_BOOKE
+	lwzu	r8, 4(r7)
+	mtspr	SPRN_IAC3, r8
+	lwzu	r8, 4(r7)
+	mtspr	SPRN_IAC4, r8
+#endif
+	lwzu	r8, 4(r7)
+	mtspr	SPRN_DAC1, r8
+	lwzu	r8, 4(r7)
+	mtspr	SPRN_DAC2, r8
+	mtspr	SPRN_DBCR0, r6
+..skip_load_guest_debug:
+
 	/* Load some guest volatiles. */
 	PPC_LL	r3, VCPU_LR(r4)
 	PPC_LL	r5, VCPU_XER(r4)
@@ -627,6 +707,13 @@ skip_pmgc0_restore:
 	PPC_LL	r7, VCPU_GPR(r7)(r4)
 	PPC_LL	r8, VCPU_GPR(r8)(r4)
 	PPC_LL	r9, VCPU_GPR(r9)(r4)
+
+	/* Clear any debug events which occured since we disable MSR[DE]
+	 * XXX This gives us a 3-instruction window in which a spurious
+	 * debug exception could be generated in the guest context. */
+	lis	r3, 0xffff
+	ori	r3, r3, 0xffff
+	mtspr	SPRN_DBSR, r3
 
 	PPC_LL	r3, VCPU_GPR(r3)(r4)
 	PPC_LL	r4, VCPU_GPR(r4)(r4)
