@@ -105,6 +105,21 @@ static struct fb_videomode __devinitdata fsl_diu_mode_db[] = {
 		.vmode		= FB_VMODE_NONINTERLACED
 	},
 	{
+		.name		= "1280x720-60",
+		.refresh	= 60,
+		.xres		= 1280,
+		.yres		= 720,
+		.pixclock	= 13426,
+		.left_margin	= 192,
+		.right_margin	= 64,
+		.upper_margin	= 22,
+		.lower_margin	= 1,
+		.hsync_len	= 136,
+		.vsync_len	= 3,
+		.sync		= FB_SYNC_COMP_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,
+		.vmode		= FB_VMODE_NONINTERLACED
+	},
+	{
 		.name		= "1280x1024-60",
 		.refresh	= 60,
 		.xres		= 1280,
@@ -146,6 +161,21 @@ static struct fb_videomode __devinitdata fsl_diu_mode_db[] = {
 		.lower_margin	= 4,
 		.hsync_len	= 60,
 		.vsync_len	= 15,
+		.sync		= FB_SYNC_COMP_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,
+		.vmode		= FB_VMODE_NONINTERLACED
+	},
+	{
+		.name		= "1920x1080-60",
+		.refresh	= 60,
+		.xres		= 1920,
+		.yres		= 1080,
+		.pixclock	= 5787,
+		.left_margin	= 328,
+		.right_margin	= 120,
+		.upper_margin	= 34,
+		.lower_margin	= 1,
+		.hsync_len	= 208,
+		.vsync_len	= 3,
 		.sync		= FB_SYNC_COMP_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT,
 		.vmode		= FB_VMODE_NONINTERLACED
 	},
