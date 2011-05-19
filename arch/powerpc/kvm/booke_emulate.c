@@ -126,12 +126,45 @@ int kvmppc_booke_emulate_mtspr(struct kvm_vcpu *vcpu, int sprn, int rs)
 		vcpu->arch.shared->dar = spr_val; break;
 	case SPRN_ESR:
 		vcpu->arch.shared->esr = spr_val; break;
+	case SPRN_IAC1:
+		vcpu->arch.dbg_reg.iac[0] = spr_val;
+		kvmppc_recalc_shadow_ac(vcpu);
+		break;
+	case SPRN_IAC2:
+		vcpu->arch.dbg_reg.iac[1] = spr_val;
+		kvmppc_recalc_shadow_ac(vcpu);
+		break;
+#ifndef CONFIG_FSL_BOOKE
+	case SPRN_IAC3:
+		vcpu->arch.dbg_reg.iac[2] = spr_val;
+		kvmppc_recalc_shadow_ac(vcpu);
+		break;
+	case SPRN_IAC4:
+		vcpu->arch.dbg_reg.iac[3] = spr_val;
+		kvmppc_recalc_shadow_ac(vcpu);
+		break;
+#endif
+	case SPRN_DAC1:
+		vcpu->arch.dbg_reg.dac[0] = spr_val;
+		kvmppc_recalc_shadow_ac(vcpu);
+		break;
+	case SPRN_DAC2:
+		vcpu->arch.dbg_reg.dac[1] = spr_val;
+		kvmppc_recalc_shadow_ac(vcpu);
+		break;
 	case SPRN_DBCR0:
-		vcpu->arch.dbcr0 = spr_val; break;
+		vcpu->arch.dbg_reg.dbcr0 = spr_val;
+		kvmppc_recalc_shadow_dbcr(vcpu);
+		break;
 	case SPRN_DBCR1:
-		vcpu->arch.dbcr1 = spr_val; break;
+		vcpu->arch.dbg_reg.dbcr1 = spr_val;
+		break;
+	case SPRN_DBCR2:
+		vcpu->arch.dbg_reg.dbcr2 = spr_val;
+		break;
 	case SPRN_DBSR:
-		vcpu->arch.dbsr &= ~spr_val; break;
+		kvmppc_clr_dbsr_bits(vcpu, spr_val);
+		break;
 	case SPRN_TSR:
 		kvmppc_clr_tsr_bits(vcpu, spr_val);
 		break;
@@ -229,10 +262,33 @@ int kvmppc_booke_emulate_mfspr(struct kvm_vcpu *vcpu, int sprn, int rt)
 		kvmppc_set_gpr(vcpu, rt, vcpu->arch.shared->dar); break;
 	case SPRN_ESR:
 		kvmppc_set_gpr(vcpu, rt, vcpu->arch.shared->esr); break;
+	case SPRN_IAC1:
+		kvmppc_set_gpr(vcpu, rt, vcpu->arch.dbg_reg.iac[0]);
+		break;
+	case SPRN_IAC2:
+		kvmppc_set_gpr(vcpu, rt, vcpu->arch.dbg_reg.iac[1]);
+		break;
+#ifndef CONFIG_FSL_BOOKE
+	case SPRN_IAC3:
+		kvmppc_set_gpr(vcpu, rt, vcpu->arch.dbg_reg.iac[2]);
+		break;
+	case SPRN_IAC4:
+		kvmppc_set_gpr(vcpu, rt, vcpu->arch.dbg_reg.iac[3]);
+		break;
+#endif
+	case SPRN_DAC1:
+		kvmppc_set_gpr(vcpu, rt, vcpu->arch.dbg_reg.dac[0]);
+		break;
+	case SPRN_DAC2:
+		kvmppc_set_gpr(vcpu, rt, vcpu->arch.dbg_reg.dac[1]);
+		break;
 	case SPRN_DBCR0:
-		kvmppc_set_gpr(vcpu, rt, vcpu->arch.dbcr0); break;
+		kvmppc_set_gpr(vcpu, rt, vcpu->arch.dbg_reg.dbcr0);
+		break;
 	case SPRN_DBCR1:
-		kvmppc_set_gpr(vcpu, rt, vcpu->arch.dbcr1); break;
+		kvmppc_set_gpr(vcpu, rt, vcpu->arch.dbg_reg.dbcr1); break;
+	case SPRN_DBCR2:
+		kvmppc_set_gpr(vcpu, rt, vcpu->arch.dbg_reg.dbcr2); break;
 	case SPRN_DBSR:
 		kvmppc_set_gpr(vcpu, rt, vcpu->arch.dbsr); break;
 	case SPRN_TSR:

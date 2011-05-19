@@ -150,6 +150,16 @@ void kvmppc_core_dequeue_watchdog(struct kvm_vcpu *vcpu)
 	clear_bit(BOOKE_IRQPRIO_WATCHDOG, &vcpu->arch.pending_exceptions);
 }
 
+void kvmppc_core_queue_debug(struct kvm_vcpu *vcpu)
+{
+	kvmppc_bookehv_queue_irqprio(vcpu, BOOKE_IRQPRIO_DEBUG);
+}
+
+void kvmppc_core_dequeue_debug(struct kvm_vcpu *vcpu)
+{
+	clear_bit(BOOKE_IRQPRIO_DEBUG, &vcpu->arch.pending_exceptions);
+}
+
 /* Deliver the interrupt of the corresponding priority, if possible. */
 static int kvmppc_bookehv_irqprio_deliver(struct kvm_vcpu *vcpu,
                                         unsigned int priority)

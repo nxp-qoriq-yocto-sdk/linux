@@ -312,3 +312,17 @@ void kvmppc_set_hwpmlca_all(struct kvm_vcpu *vcpu)
 		kvmppc_set_hwpmlca(i, vcpu);
 }
 #endif /* CONFIG_KVM_E500 */
+
+void kvmppc_set_dbsr_bits(struct kvm_vcpu *vcpu, u32 dbsr_bits)
+{
+	vcpu->arch.dbsr |= dbsr_bits;
+	if (vcpu->arch.dbsr != 0)
+		kvmppc_core_queue_debug(vcpu);
+}
+
+void kvmppc_clr_dbsr_bits(struct kvm_vcpu *vcpu, u32 dbsr_bits)
+{
+	vcpu->arch.dbsr &= ~dbsr_bits;
+	if (vcpu->arch.dbsr == 0)
+		kvmppc_core_dequeue_debug(vcpu);
+}

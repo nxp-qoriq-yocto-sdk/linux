@@ -72,6 +72,8 @@ void kvmppc_mmu_msr_notify(struct kvm_vcpu *vcpu, u32 old_msr);
 void kvmppc_set_tcr(struct kvm_vcpu *vcpu, u32 new_tcr);
 void kvmppc_set_tsr_bits(struct kvm_vcpu *vcpu, u32 tsr_bits);
 void kvmppc_clr_tsr_bits(struct kvm_vcpu *vcpu, u32 tsr_bits);
+void kvmppc_set_dbsr_bits(struct kvm_vcpu *vcpu, u32 dbsr_bits);
+void kvmppc_clr_dbsr_bits(struct kvm_vcpu *vcpu, u32 dbsr_bits);
 
 int kvmppc_booke_emulate_op(struct kvm_run *run, struct kvm_vcpu *vcpu,
                             unsigned int inst, int *advance);
@@ -88,6 +90,9 @@ void kvmppc_vcpu_disable_spe(struct kvm_vcpu *vcpu);
 u32 kvmppc_mpic_iack(struct kvm *kvm, int vcpu);
 void kvmppc_wdt_pause(struct kvm_vcpu *vcpu);
 void kvmppc_wdt_resume(struct kvm_vcpu *vcpu);
+
+void kvmppc_recalc_shadow_ac(struct kvm_vcpu *vcpu);
+void kvmppc_recalc_shadow_dbcr(struct kvm_vcpu *vcpu);
 
 void kvmppc_set_hwpmlca_all(struct kvm_vcpu *vcpu);
 void kvmppc_set_hwpmlca(unsigned int idx, struct kvm_vcpu *vcpu);

@@ -215,9 +215,11 @@ struct kvmppc_pm_reg {
 
 struct kvmppc_debug_reg {
 #ifdef CONFIG_BOOKE
+	u32 dbcr0;
+	u32 dbcr1;
+	u32 dbcr2;
 	u32 iac[KVMPPC_IAC_NUM];
 	u32 dac[KVMPPC_DAC_NUM];
-	u32 dbcr0;
 #endif
 };
 
@@ -312,13 +314,12 @@ struct kvm_vcpu_arch {
 
 	u32 ccr0;
 	u32 ccr1;
-	u32 dbcr0;
-	u32 dbcr1;
 	u32 dbsr;
 
 	struct kvmppc_pm_reg pm_reg;
 	bool pm_is_reserved;
 
+	struct kvmppc_debug_reg dbg_reg;	/* guest debug regiters*/
 	struct kvmppc_debug_reg shadow_dbg_reg; /* shadow debug registers */
 	struct kvmppc_debug_reg host_dbg_reg;	/* host debug regiters*/
 

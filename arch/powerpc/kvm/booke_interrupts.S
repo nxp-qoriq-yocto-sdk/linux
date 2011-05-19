@@ -39,6 +39,8 @@
 #define HOST_MIN_STACK_SIZE (HOST_NV_GPR(31) + 4)
 #define HOST_STACK_SIZE (((HOST_MIN_STACK_SIZE + 15) / 16) * 16) /* Align. */
 #define HOST_STACK_LR   (HOST_STACK_SIZE + 4) /* In caller stack frame. */
+#define DBCR0_AC_BITS	(DBCR0_IAC1 | DBCR0_IAC2 | DBCR0_IAC3 | DBCR0_IAC4 | \
+			 DBCR0_DAC1R | DBCR0_DAC1W | DBCR0_DAC2R | DBCR0_DAC2W)
 
 #define NEED_INST_MASK ((1<<BOOKE_INTERRUPT_PROGRAM) | \
                         (1<<BOOKE_INTERRUPT_DTLB_MISS) | \
@@ -221,12 +223,17 @@ _GLOBAL(kvmppc_resume_host)
 	stw	r9, VCPU_FAULT_ESR(r4)
 ..skip_esr:
 
-	lwz	r6, VCPU_GUEST_DEBUG(r4)
-	cmpwi	r6, 0
+	addi	r7, r4, VCPU_HOST_DBG
+	mfspr	r9, SPRN_DBCR0
+	lwz	r6, 0(r7)
+	andis.	r9, r9, DBCR0_AC_BITS@h
 	beq	..skip_load_host_debug
 	li	r9, 0
 	mtspr	SPRN_DBCR0, r9		/* disable all debug event */
-	addi	r7, r4, VCPU_HOST_DBG - 4
+	lwzu	r9, 4(r7)
+	mtspr	SPRN_DBCR1, r9
+	lwzu	r9, 4(r7)
+	mtspr	SPRN_DBCR2, r9
 	lwzu	r9, 4(r7)
 	mtspr	SPRN_IAC1, r9
 	lwzu	r9, 4(r7)
@@ -241,9 +248,8 @@ _GLOBAL(kvmppc_resume_host)
 	mtspr	SPRN_DAC1, r9
 	lwzu	r9, 4(r7)
 	mtspr	SPRN_DAC2, r9
-	lwzu	r9, 4(r7)
-	mtspr	SPRN_DBCR0, r9
 ..skip_load_host_debug:
+	mtspr	SPRN_DBCR0, r6
 
 	/* Save remaining volatile guest register state to vcpu. */
 	stw	r0, VCPU_GPR(r0)(r4)
@@ -492,13 +498,20 @@ lightweight_exit:
 	lwz	r3, VCPU_SPRG7(r4)
 	mtspr	SPRN_SPRG7W, r3
 
-	lwz	r6, VCPU_GUEST_DEBUG(r4)
-	cmpwi	r6, 0
-	beq	..skip_load_guest_debug
 	mfmsr	r7
 	rlwinm	r7, r7, 0, ~MSR_DE
 	mtmsr	r7
-	addi	r7, r4, VCPU_HOST_DBG - 4
+	addi	r5, r4, VCPU_SHADOW_DBG
+	addi	r7, r4, VCPU_HOST_DBG
+	lwz	r6, 0(r5)
+	mfspr	r8, SPRN_DBCR0
+	andis.	r3, r6, DBCR0_AC_BITS@h
+	stw	r8, 0(r7)
+	beq	..skip_load_guest_debug
+	mfspr	r8, SPRN_DBCR1
+	stwu	r8, 4(r7)
+	mfspr	r8, SPRN_DBCR2
+	stwu	r8, 4(r7)
 	mfspr	r8, SPRN_IAC1
 	stwu	r8, 4(r7)
 	mfspr	r8, SPRN_IAC2
@@ -513,28 +526,28 @@ lightweight_exit:
 	stwu	r8, 4(r7)
 	mfspr	r8, SPRN_DAC2
 	stwu	r8, 4(r7)
-	mfspr	r8, SPRN_DBCR0
-	stwu	r8, 4(r7)
 	li	r8, 0
 	mtspr	SPRN_DBCR0, r8		/* disable all debug event */
-	addi	r7, r4, VCPU_SHADOW_DBG - 4
-	lwzu	r8, 4(r7)
+	lwzu	r8, 4(r5)
+	mtspr	SPRN_DBCR1, r8
+	lwzu	r8, 4(r5)
+	mtspr	SPRN_DBCR2, r8
+	lwzu	r8, 4(r5)
 	mtspr	SPRN_IAC1, r8
-	lwzu	r8, 4(r7)
+	lwzu	r8, 4(r5)
 	mtspr	SPRN_IAC2, r8
 #ifndef CONFIG_FSL_BOOKE
-	lwzu	r8, 4(r7)
+	lwzu	r8, 4(r5)
 	mtspr	SPRN_IAC3, r8
-	lwzu	r8, 4(r7)
+	lwzu	r8, 4(r5)
 	mtspr	SPRN_IAC4, r8
 #endif
-	lwzu	r8, 4(r7)
+	lwzu	r8, 4(r5)
 	mtspr	SPRN_DAC1, r8
-	lwzu	r8, 4(r7)
+	lwzu	r8, 4(r5)
 	mtspr	SPRN_DAC2, r8
-	lwzu	r8, 4(r7)
-	mtspr	SPRN_DBCR0, r8
 ..skip_load_guest_debug:
+	mtspr	SPRN_DBCR0, r6
 
 #ifdef CONFIG_KVM_EXIT_TIMING
 	/* save enter time */
