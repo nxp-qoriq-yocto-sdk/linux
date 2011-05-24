@@ -379,6 +379,17 @@ int kvmppc_handle_exit(struct kvm_run *run, struct kvm_vcpu *vcpu,
 			break;
 		}
 
+		if ((vcpu->guest_debug & KVM_GUESTDBG_USE_SW_BP) &&
+			(vcpu->arch.last_inst == KVM_INST_GUESTGDB)) {
+			run->exit_reason = KVM_EXIT_DEBUG;
+			run->debug.arch.pc = vcpu->arch.pc;
+			run->debug.arch.exception = exit_nr;
+			run->debug.arch.status = 0;
+			kvmppc_account_exit(vcpu, DEBUG_EXITS);
+			r = RESUME_HOST;
+			break;
+		}
+
 		er = kvmppc_emulate_instruction(run, vcpu);
 		switch (er) {
 		case EMULATE_DONE:
@@ -404,6 +415,13 @@ int kvmppc_handle_exit(struct kvm_run *run, struct kvm_vcpu *vcpu,
 		default:
 			BUG();
 		}
+
+		if ((vcpu->guest_debug & KVM_GUESTDBG_ENABLE) &&
+		    (vcpu->guest_debug & KVM_GUESTDBG_SINGLESTEP)) {
+			run->exit_reason = KVM_EXIT_DEBUG;
+			r = RESUME_HOST;
+		}
+
 		break;
 
 	case BOOKE_INTERRUPT_FP_UNAVAIL:
@@ -551,6 +569,36 @@ int kvmppc_handle_exit(struct kvm_run *run, struct kvm_vcpu *vcpu,
 			kvmppc_bookehv_queue_irqprio(vcpu, BOOKE_IRQPRIO_MACHINE_CHECK);
 		}
 
+		break;
+	}
+
+	case BOOKE_INTERRUPT_DEBUG: {
+		u32 dbsr;
+
+		dbsr = mfspr(SPRN_DBSR);
+		run->debug.arch.pc = vcpu->arch.pc;
+		run->debug.arch.status = 0;
+
+		if (dbsr & (DBSR_IAC1 | DBSR_IAC2)) {
+			run->debug.arch.status |= KVMPPC_DEBUG_BREAKPOINT;
+		} else {
+			if (dbsr & (DBSR_DAC1W | DBSR_DAC2W))
+				run->debug.arch.status |= KVMPPC_DEBUG_WATCH_WRITE;
+			else if (dbsr & (DBSR_DAC1R | DBSR_DAC2R))
+				run->debug.arch.status |= KVMPPC_DEBUG_WATCH_READ;
+			if (dbsr & (DBSR_DAC1R | DBSR_DAC1W))
+				run->debug.arch.pc = vcpu->arch.shadow_dbg_reg.dac[0];
+			else if (dbsr & (DBSR_DAC2R | DBSR_DAC2W))
+				run->debug.arch.pc = vcpu->arch.shadow_dbg_reg.dac[1];
+		}
+
+		/* clear events we got in DBSR register */
+		mtspr(SPRN_DBSR, dbsr);
+
+		run->debug.arch.exception = exit_nr;
+		run->exit_reason = KVM_EXIT_DEBUG;
+		kvmppc_account_exit(vcpu, DEBUG_EXITS);
+		r = RESUME_HOST;
 		break;
 	}
 
@@ -834,12 +882,6 @@ int kvm_arch_vcpu_ioctl_translate(struct kvm_vcpu *vcpu,
 }
 
 int kvm_vm_ioctl_get_dirty_log(struct kvm *kvm, struct kvm_dirty_log *log)
-{
-	return -ENOTSUPP;
-}
-
-int kvmppc_core_set_guest_debug(struct kvm_vcpu *vcpu,
-                                struct kvm_guest_debug *dbg)
 {
 	return -ENOTSUPP;
 }
