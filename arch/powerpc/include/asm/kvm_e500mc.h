@@ -27,6 +27,8 @@
 struct tlbe_priv {
 	pfn_t pfn;
 	unsigned int flags; /* E500MC_TLB_* */
+	/* bitmap of h/w tlbe's mapped by this gtlbe, numbered from lsb */
+	u64 hw_tlbe_bitmap;
 };
 
 struct kvmppc_vcpu_e500mc {
@@ -38,6 +40,14 @@ struct kvmppc_vcpu_e500mc {
 
 	/* KVM internal information associated with each guest TLB entry */
 	struct tlbe_priv *gtlb_priv[E500MC_TLB_NUM];
+
+	/*
+	 * h/w tlbe to gtlbe reverse map - used for tlb1 invalidation.
+	 * This is an array of same size of number of host tlbe's that
+	 * points to an index into the guest tlb, basically used to reverse
+	 * map a h/w tlbe to the gtlbe for which it is being used for.
+	 */
+	unsigned int *rmap_gtlbe;
 
 	unsigned int gtlb_size[E500MC_TLB_NUM];
 	unsigned int gtlb_nv[E500MC_TLB_NUM];
