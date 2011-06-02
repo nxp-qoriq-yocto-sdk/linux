@@ -299,6 +299,7 @@ static int kvmppc_booke_irqprio_deliver(struct kvm_vcpu *vcpu,
 #ifdef CONFIG_KVM_E500
 	case BOOKE_IRQPRIO_PERFORMANCE_MONITOR:
 		allowed = allowed && vcpu->arch.shared->msr & MSR_EE;
+		allowed = allowed && !crit;
 		if ((!(vcpu->arch.pm_reg.pmgc0 & PMGC0_PMIE))) {
 			allowed = 0;
 			dequeue = 1;
@@ -316,11 +317,13 @@ static int kvmppc_booke_irqprio_deliver(struct kvm_vcpu *vcpu,
 		/* fall through */
 	case BOOKE_IRQPRIO_CRITICAL:
 		allowed = allowed && vcpu->arch.shared->msr & MSR_CE;
+		allowed = allowed && !crit;
 		msr_mask = MSR_ME;
 		int_class = INT_CLASS_CRIT;
 		break;
 	case BOOKE_IRQPRIO_MACHINE_CHECK:
 		allowed = vcpu->arch.shared->msr & MSR_ME;
+		allowed = allowed && !crit;
 		msr_mask = 0;
 		int_class = INT_CLASS_MC;
 		break;
@@ -340,6 +343,7 @@ static int kvmppc_booke_irqprio_deliver(struct kvm_vcpu *vcpu,
 	case BOOKE_IRQPRIO_DEBUG:
 		allowed = vcpu->arch.shared->msr & MSR_DE;
 		allowed = allowed && (vcpu->arch.dbg_reg.dbcr0 & DBCR0_IDM);
+		allowed = allowed && !crit;
 		msr_mask = MSR_ME;
 		int_class = INT_CLASS_CRIT;
 		break;
