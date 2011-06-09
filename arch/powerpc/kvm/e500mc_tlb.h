@@ -114,7 +114,7 @@ get_tlb_iprot(const struct kvm_book3e_206_tlb_entry *tlbe)
 
 static inline unsigned int get_cur_pid(struct kvm_vcpu *vcpu)
 {
-	return vcpu->arch.shadow_pid & 0xff;
+	return vcpu->arch.pid & 0xff;
 }
 
 static inline unsigned int get_cur_spid(const struct kvm_vcpu *vcpu)

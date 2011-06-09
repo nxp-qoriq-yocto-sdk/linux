@@ -195,7 +195,7 @@ _GLOBAL(kvmppc_resume_host)
 	PPC_STL	r7, VCPU_GPR(r7)(r4)
 
 	mfspr	r3, SPRN_PID
-	stw	r3, VCPU_SHADOW_PID(r4)
+	stw	r3, VCPU_GUEST_PID(r4)
 	/* Restore Host PID here */
 	lwz	r3, VCPU_HOST_PID(r4)
 	mtspr	SPRN_PID, r3
@@ -557,7 +557,7 @@ lightweight_exit:
 
 	mfspr	r3, SPRN_PID
 	stw	r3, VCPU_HOST_PID(r4)
-	lwz	r3, VCPU_SHADOW_PID(r4)
+	lwz	r3, VCPU_GUEST_PID(r4)
 	mtspr	SPRN_PID, r3
 
 	/* Save vcpu pointer for the exception handlers

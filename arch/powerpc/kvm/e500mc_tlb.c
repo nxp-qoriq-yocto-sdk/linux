@@ -340,7 +340,7 @@ static inline void kvmppc_e500mc_deliver_tlb_miss(struct kvm_vcpu *vcpu,
 	vcpu->arch.shared->mas0 = MAS0_TLBSEL(tlbsel) | MAS0_ESEL(victim)
 		| MAS0_NV(vcpu_e500mc->gtlb_nv[tlbsel]);
 	vcpu->arch.shared->mas1 = MAS1_VALID | (as ? MAS1_TS : 0)
-		| MAS1_TID(vcpu->arch.shadow_pid)
+		| MAS1_TID(vcpu->arch.pid)
 		| MAS1_TSIZE(tsized);
 	vcpu->arch.shared->mas2 = (eaddr & MAS2_EPN)
 		| (vcpu->arch.shared->mas4 & MAS2_ATTRIB_MASK);
@@ -936,7 +936,7 @@ void kvmppc_mmu_map(struct kvm_vcpu *vcpu, u64 eaddr, gpa_t gpaddr,
 
 void kvmppc_set_pid(struct kvm_vcpu *vcpu, u32 pid)
 {
-	vcpu->arch.shadow_pid = pid;
+	vcpu->arch.pid = pid;
 }
 
 u32 kvmppc_get_mmucfg(struct kvm_vcpu *vcpu)

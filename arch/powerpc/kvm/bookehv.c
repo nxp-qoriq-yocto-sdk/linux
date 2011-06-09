@@ -639,7 +639,7 @@ int kvm_arch_vcpu_setup(struct kvm_vcpu *vcpu)
 	vcpu->arch.shared->msr = 0;
 	kvmppc_set_gpr(vcpu, 1, (16<<20) - 8); /* -8 for the callee-save LR slot */
 
-	vcpu->arch.shadow_pid = 0;
+	vcpu->arch.pid = 0;
 
 	/* Eye-catching number so we know if the guest takes an interrupt
 	 * before it's programmed its own IVPR. */
