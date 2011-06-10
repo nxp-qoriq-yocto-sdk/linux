@@ -195,7 +195,4 @@ static inline void kvmppc_wakeup_vcpu(struct kvm_vcpu *vcpu)
 	}
 }
 
-void kvmppc_save_fp_regs(struct kvm_vcpu *vcpu);
-void kvmppc_restore_fp_regs(struct kvm_vcpu *vcpu);
-
 #endif /* __POWERPC_KVM_PPC_H__ */

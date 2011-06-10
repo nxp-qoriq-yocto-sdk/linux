@@ -13,6 +13,7 @@
  * Foundation, 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  * Copyright IBM Corp. 2008
+ * Copyright 2011 Freescale Semiconductor, Inc.
  *
  * Authors: Hollis Blanchard <hollisb@us.ibm.com>
  */
@@ -100,4 +101,35 @@ void kvmppc_core_dequeue_perfmon(struct kvm_vcpu *vcpu);
 int kvmppc_core_pending_perfmon(struct kvm_vcpu *vcpu);
 void kvmppc_core_queue_perfmon(struct kvm_vcpu *vcpu);
 void kvmppc_clear_pending_perfmon(struct kvm_vcpu *vcpu);
+
+/*
+ * Load up guest vcpu FP state if it's needed.
+ * It also set the MSR_FP in thread so that host know
+ * we're holding FPU, and then host can help to save
+ * guest vcpu FP state if other threads require to use FPU.
+ * This simulates an FP unavailable fault.
+ *
+ * It requires to be called with preemption disabled.
+ */
+static inline void kvmppc_load_guest_fp(struct kvm_vcpu *vcpu)
+{
+#ifdef CONFIG_PPC_FPU
+	if (vcpu->fpu_active && !(current->thread.regs->msr & MSR_FP)) {
+		load_up_fpu();
+		current->thread.regs->msr |= MSR_FP;
+	}
+#endif
+}
+
+/*
+ * Save guest vcpu FP state into thread.
+ * It requires to be called with preemption disabled.
+ */
+static inline void kvmppc_save_guest_fp(struct kvm_vcpu *vcpu)
+{
+#ifdef CONFIG_PPC_FPU
+	if (vcpu->fpu_active && (current->thread.regs->msr & MSR_FP))
+		giveup_fpu(current);
+#endif
+}
 #endif /* __KVM_BOOKE_H__ */

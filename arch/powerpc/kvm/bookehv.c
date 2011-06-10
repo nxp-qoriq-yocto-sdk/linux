@@ -889,10 +889,55 @@ int kvm_vm_ioctl_get_dirty_log(struct kvm *kvm, struct kvm_dirty_log *log)
 int __kvmppc_vcpu_run(struct kvm_run *kvm_run, struct kvm_vcpu *vcpu)
 {
 	int ret;
+#ifdef CONFIG_PPC_FPU
+	unsigned int fpscr;
+	int fpexc_mode;
+	u64 fpr[32];
+#endif
+
+#ifdef CONFIG_PPC_FPU
+	/* Save userspace FPU state in stack */
+	enable_kernel_fp();
+	memcpy(fpr, current->thread.fpr, sizeof(current->thread.fpr));
+	fpscr = current->thread.fpscr.val;
+	fpexc_mode = current->thread.fpexc_mode;
+
+	/* Restore guest FPU state to thread */
+	memcpy(current->thread.fpr, vcpu->arch.fpr, sizeof(vcpu->arch.fpr));
+	current->thread.fpscr.val = vcpu->arch.fpscr;
+
+	/*
+	 * Since we can't trap on MSR_FP, we consider
+	 * it always uses FPU in guest.
+	 *
+	 * XXX When fpu_active is set, any kvm code which has to use
+	 * kernel FP would save guest FP state. However, guest FP state
+	 * won't get reload automatically on guest entry, so that
+	 * those code should be followed by a kvmppc_load_guest_fp()
+	 */
+	vcpu->fpu_active = 1;
+
+	kvmppc_load_guest_fp(vcpu);
+#endif
 
 	kvmppc_wdt_resume(vcpu);
 	ret = __kvmppc_vcpu_entry(kvm_run, vcpu);
 	kvmppc_wdt_pause(vcpu);
+
+#ifdef CONFIG_PPC_FPU
+	kvmppc_save_guest_fp(vcpu);
+
+	vcpu->fpu_active = 0;
+
+	/* Save guest FPU state from thread */
+	memcpy(vcpu->arch.fpr, current->thread.fpr, sizeof(vcpu->arch.fpr));
+	vcpu->arch.fpscr = current->thread.fpscr.val;
+
+	/* Restore userspace FPU state from stack */
+	memcpy(current->thread.fpr, fpr, sizeof(current->thread.fpr));
+	current->thread.fpscr.val = fpscr;
+	current->thread.fpexc_mode = fpexc_mode;
+#endif
 
 	return ret;
 }

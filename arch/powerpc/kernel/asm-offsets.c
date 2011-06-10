@@ -400,8 +400,6 @@ int main(void)
 	DEFINE(VCPU_HOST_PID, offsetof(struct kvm_vcpu, arch.host_pid));
 	DEFINE(VCPU_GUEST_PID, offsetof(struct kvm_vcpu, arch.pid));
 	DEFINE(VCPU_GPRS, offsetof(struct kvm_vcpu, arch.gpr));
-	DEFINE(VCPU_FPRS, offsetof(struct kvm_vcpu, arch.fpr));
-	DEFINE(VCPU_FPSCR, offsetof(struct kvm_vcpu, arch.fpscr));
 	DEFINE(VCPU_VRSAVE, offsetof(struct kvm_vcpu, arch.vrsave));
 	DEFINE(VCPU_SPRG4, offsetof(struct kvm_vcpu, arch.sprg4));
 	DEFINE(VCPU_SPRG5, offsetof(struct kvm_vcpu, arch.sprg5));
