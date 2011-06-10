@@ -416,6 +416,35 @@ static long fsl_hv_ioctl(struct file *file, unsigned int cmd,
 	void __user *arg = (void __user *)argaddr;
 	long ret;
 
+	/*
+	 * Provide backwards compatibility with older versions of partman
+	 * that used '0' for the type and '40' for the size.
+	 */
+	if ((_IOC_TYPE(cmd) == 0) && _IOC_SIZE(cmd) >= 40) {
+		pr_info_once("Warning: this application is using a deprecated"
+			     " ioctl interface that will be\nremoved in a "
+			     "future version of the Freescale hypervisor "
+			     "management driver.\n");
+		switch (_IOC_NR(cmd)) {
+		case _IOC_NR(FSL_HV_IOCTL_PARTITION_RESTART):
+			return ioctl_restart(arg);
+		case _IOC_NR(FSL_HV_IOCTL_PARTITION_GET_STATUS):
+			return ioctl_status(arg);
+		case _IOC_NR(FSL_HV_IOCTL_PARTITION_START):
+			return ioctl_start(arg);
+		case _IOC_NR(FSL_HV_IOCTL_PARTITION_STOP):
+			return ioctl_stop(arg);
+		case _IOC_NR(FSL_HV_IOCTL_MEMCPY):
+			return ioctl_memcpy(arg);
+		case _IOC_NR(FSL_HV_IOCTL_DOORBELL):
+			return ioctl_doorbell(arg);
+		case _IOC_NR(FSL_HV_IOCTL_GETPROP):
+			return ioctl_dtprop(arg, 0);
+		case _IOC_NR(FSL_HV_IOCTL_SETPROP):
+			return ioctl_dtprop(arg, 1);
+		}
+	}
+
 	switch (cmd) {
 	case FSL_HV_IOCTL_PARTITION_RESTART:
 		ret = ioctl_restart(arg);
