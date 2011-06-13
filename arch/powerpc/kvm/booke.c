@@ -128,6 +128,7 @@ void kvmppc_set_msr(struct kvm_vcpu *vcpu, u32 new_msr)
 	if (vcpu->arch.shared->msr & MSR_WE) {
 		kvm_vcpu_block(vcpu);
 		kvmppc_set_exit_type(vcpu, EMULATED_MTMSRWE_EXITS);
+		vcpu->arch.shared->msr &= ~MSR_WE;
 	};
 
 	kvmppc_vcpu_sync_spe(vcpu);
