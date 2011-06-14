@@ -16,6 +16,8 @@
  *  by reference.
  */
 
+#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+
 #include <linux/kernel.h>
 #include <linux/string.h>
 #include <linux/errno.h>
@@ -376,13 +378,13 @@ static int gfar_scoalesce(struct net_device *dev, struct ethtool_coalesce *cvals
 	/* Check the bounds of the values */
 	if (cvals->rx_coalesce_usecs > GFAR_MAX_COAL_USECS) {
 		pr_info("Coalescing is limited to %d microseconds\n",
-				GFAR_MAX_COAL_USECS);
+			GFAR_MAX_COAL_USECS);
 		return -EINVAL;
 	}
 
 	if (cvals->rx_max_coalesced_frames > GFAR_MAX_COAL_FRAMES) {
 		pr_info("Coalescing is limited to %d frames\n",
-				GFAR_MAX_COAL_FRAMES);
+			GFAR_MAX_COAL_FRAMES);
 		return -EINVAL;
 	}
 
@@ -405,13 +407,13 @@ static int gfar_scoalesce(struct net_device *dev, struct ethtool_coalesce *cvals
 	/* Check the bounds of the values */
 	if (cvals->tx_coalesce_usecs > GFAR_MAX_COAL_USECS) {
 		pr_info("Coalescing is limited to %d microseconds\n",
-				GFAR_MAX_COAL_USECS);
+			GFAR_MAX_COAL_USECS);
 		return -EINVAL;
 	}
 
 	if (cvals->tx_max_coalesced_frames > GFAR_MAX_COAL_FRAMES) {
 		pr_info("Coalescing is limited to %d frames\n",
-				GFAR_MAX_COAL_FRAMES);
+			GFAR_MAX_COAL_FRAMES);
 		return -EINVAL;
 	}
 
@@ -466,8 +468,7 @@ static int gfar_sringparam(struct net_device *dev, struct ethtool_ringparam *rva
 		return -EINVAL;
 
 	if (!is_power_of_2(rvals->rx_pending)) {
-		printk("%s: Ring sizes must be a power of 2\n",
-				dev->name);
+		netdev_err(dev, "Ring sizes must be a power of 2\n");
 		return -EINVAL;
 	}
 
@@ -475,8 +476,7 @@ static int gfar_sringparam(struct net_device *dev, struct ethtool_ringparam *rva
 		return -EINVAL;
 
 	if (!is_power_of_2(rvals->tx_pending)) {
-		printk("%s: Ring sizes must be a power of 2\n",
-				dev->name);
+		netdev_err(dev, "Ring sizes must be a power of 2\n");
 		return -EINVAL;
 	}
 
@@ -732,7 +732,7 @@ static int gfar_ethflow_to_filer_table(struct gfar_private *priv, u64 ethflow, u
 		cmp_rqfpr = RQFPR_IPV6 |RQFPR_UDP;
 		break;
 	default:
-		printk(KERN_ERR "Right now this class is not supported\n");
+		pr_err("Right now this class is not supported\n");
 		ret = 0;
 		goto err;
 	}
@@ -748,8 +748,7 @@ static int gfar_ethflow_to_filer_table(struct gfar_private *priv, u64 ethflow, u
 	}
 
 	if (i == MAX_FILER_IDX + 1) {
-		printk(KERN_ERR "No parse rule found, ");
-		printk(KERN_ERR "can't create hash rules\n");
+		pr_err("No parse rule found, can't create hash rules\n");
 		ret = 0;
 		goto err;
 	}
