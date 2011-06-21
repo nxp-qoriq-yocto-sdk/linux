@@ -72,3 +72,4 @@ obj-$(CONFIG_DRM_PSB)		+= gma500/
 obj-$(CONFIG_INTEL_MEI)		+= mei/
 obj-$(CONFIG_MFD_NVEC)		+= nvec/
 obj-$(CONFIG_FSL_DPA)		+= fsl_qbman/
+obj-$(CONFIG_FSL_PME2)		+= fsl_pme2/
