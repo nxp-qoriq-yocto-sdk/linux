@@ -256,6 +256,7 @@ static inline void do_message_pass(int cpu, int msg)
 		smp_muxed_ipi_message_pass(cpu, msg);
 #endif
 }
+EXPORT_SYMBOL_GPL(smp_send_reschedule);
 
 void smp_send_reschedule(int cpu)
 {
