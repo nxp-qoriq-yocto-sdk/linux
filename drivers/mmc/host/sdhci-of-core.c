@@ -182,6 +182,9 @@ static int __devinit sdhci_of_probe(struct platform_device *ofdev)
 	if (of_device_is_compatible(np, "fsl,esdhc"))
 		host->quirks |= SDHCI_QUIRK_QORIQ_PROCTL_WEIRD;
 
+	if (of_device_is_compatible(np, "fsl,p4080-esdhc"))
+		host->quirks |= SDHCI_QUIRK_QORIQ_HOSTCAPBLT_ONLY_VS33;
+
 	clk = of_get_property(np, "clock-frequency", &size);
 	if (clk && size == sizeof(*clk) && *clk)
 		of_host->clock = be32_to_cpup(clk);
