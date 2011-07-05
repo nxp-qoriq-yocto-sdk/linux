@@ -179,6 +179,9 @@ static int __devinit sdhci_of_probe(struct platform_device *ofdev)
 	if (sdhci_of_wp_inverted(np))
 		host->quirks |= SDHCI_QUIRK_INVERTED_WRITE_PROTECT;
 
+	if (of_device_is_compatible(np, "fsl,esdhc"))
+		host->quirks |= SDHCI_QUIRK_QORIQ_PROCTL_WEIRD;
+
 	clk = of_get_property(np, "clock-frequency", &size);
 	if (clk && size == sizeof(*clk) && *clk)
 		of_host->clock = be32_to_cpup(clk);
