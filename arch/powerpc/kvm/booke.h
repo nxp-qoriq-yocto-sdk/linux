@@ -127,4 +127,10 @@ static inline void kvmppc_save_guest_fp(struct kvm_vcpu *vcpu)
 		giveup_fpu(current);
 #endif
 }
+
+void kvmppc_booke_vcpu_load(struct kvm_vcpu *vcpu, int cpu);
+void kvmppc_booke_vcpu_put(struct kvm_vcpu *vcpu);
+
+u32 kvmppc_mpic_iack(struct kvm *kvm, int vcpu);
+
 #endif /* __KVM_BOOKE_H__ */

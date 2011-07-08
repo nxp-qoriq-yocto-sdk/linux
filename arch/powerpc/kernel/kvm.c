@@ -31,6 +31,7 @@
 #include <asm/disassemble.h>
 #include <asm/ppc-opcode.h>
 #include <asm/machdep.h>
+#include <asm/mpic.h>
 
 #define KVM_MAGIC_PAGE		(-4096L)
 #define magic_var(x) KVM_MAGIC_PAGE + offsetof(struct kvm_vcpu_arch_shared, x)
@@ -528,6 +529,12 @@ static void kvm_check_ins(u32 *inst, u32 features)
 		if (features & KVM_MAGIC_FEAT_MAS0_TO_SPRG7)
 			kvm_patch_ins_lwz(inst, magic_var(esr), inst_rt);
 		break;
+
+	/* FIXME feature bit */
+	case KVM_INST_SPR(SPRN_EPR, SPR_FROM):
+		if (features & KVM_MAGIC_FEAT_EPR)
+			kvm_patch_ins_lwz(inst, magic_var(epr), inst_rt);
+		break;
 #endif
 
 	case KVM_INST_MFSPR(SPRN_PIR):
@@ -703,6 +710,12 @@ static void kvm_use_magic_page(void)
 		}
 		kvm_check_ins(p, features);
 	}
+
+#ifdef CONFIG_MPIC
+	if ((features & KVM_MAGIC_FEAT_EPR) &&
+	    ppc_md.get_irq == mpic_get_irq)
+		ppc_md.get_irq = mpic_get_coreint_irq;
+#endif
 
 	local_irq_enable();
 

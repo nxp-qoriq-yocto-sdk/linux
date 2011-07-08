@@ -13,6 +13,7 @@
  * Foundation, 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  * Copyright IBM Corp. 2007
+ * Copyright 2010-2011 Freescale Semiconductor, Inc.
  *
  * Authors: Hollis Blanchard <hollisb@us.ibm.com>
  */
@@ -56,6 +57,10 @@ extern int kvm_age_hva(struct kvm *kvm, unsigned long hva);
 extern int kvm_test_age_hva(struct kvm *kvm, unsigned long hva);
 extern void kvm_set_spte_hva(struct kvm *kvm, unsigned long hva, pte_t pte);
 
+#endif
+
+#ifdef CONFIG_KVM_MPIC
+#define KVM_HAVE_SYSTEM_IRQ_ASSIGNMENT 1
 #endif
 
 /* We don't currently support large pages. */
@@ -242,6 +247,9 @@ struct kvm_arch {
 	struct kvmppc_vcore *vcores[KVM_MAX_VCORES];
 	struct kvmppc_linear_info *hpt_li;
 #endif /* CONFIG_KVM_BOOK3S_64_HV */
+	struct list_head assigned_dev_head;
+	struct kvm_pic *vpic;
+	int vm_init_done;
 };
 
 /*
