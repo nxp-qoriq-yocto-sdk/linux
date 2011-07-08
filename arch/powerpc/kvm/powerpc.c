@@ -13,6 +13,7 @@
  * Foundation, 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  * Copyright IBM Corp. 2007
+ * Copyright (C) 2010-2011 Freescale Semiconductor, Inc.
  *
  * Authors: Hollis Blanchard <hollisb@us.ibm.com>
  *          Christian Ehrhardt <ehrhardt@linux.vnet.ibm.com>
@@ -35,6 +36,7 @@
 
 #define CREATE_TRACE_POINTS
 #include "trace.h"
+#include "irq.h"
 
 int kvm_arch_vcpu_runnable(struct kvm_vcpu *v)
 {
@@ -67,6 +69,9 @@ int kvmppc_kvm_pv(struct kvm_vcpu *vcpu)
 		vcpu->arch.magic_page_ea = param2;
 
 		r2 = KVM_MAGIC_FEAT_SR | KVM_MAGIC_FEAT_MAS0_TO_SPRG7;
+
+		if (irqchip_in_kernel(vcpu->kvm))
+			r2 |= KVM_MAGIC_FEAT_EPR | KVM_MAGIC_FEAT_MPIC_CTPR;
 
 		r = HC_EV_SUCCESS;
 		break;
@@ -148,6 +153,7 @@ void kvm_arch_check_processor_compat(void *rtn)
 
 int kvm_arch_init_vm(struct kvm *kvm)
 {
+	INIT_LIST_HEAD(&kvm->arch.assigned_dev_head);
 	return 0;
 }
 
@@ -169,6 +175,9 @@ void kvm_arch_destroy_vm(struct kvm *kvm)
 
 void kvm_arch_sync_events(struct kvm *kvm)
 {
+#ifdef CONFIG_KVM_MPIC
+	kvm_free_all_assigned_devices(kvm);
+#endif
 }
 
 int kvm_dev_ioctl_check_extension(long ext)
@@ -189,6 +198,11 @@ int kvm_dev_ioctl_check_extension(long ext)
 	case KVM_CAP_PPC_GET_PVINFO:
 #ifdef CONFIG_KVM_E500
 	case KVM_CAP_SW_TLB:
+#endif
+#ifdef CONFIG_KVM_MPIC
+	case KVM_CAP_IRQCHIP:
+	case KVM_CAP_IRQ_INJECT_STATUS:
+	case KVM_CAP_SYSTEM_IRQ_ASSIGNMENT:
 #endif
 		r = 1;
 		break;
@@ -234,10 +248,35 @@ void kvm_arch_flush_shadow(struct kvm *kvm)
 struct kvm_vcpu *kvm_arch_vcpu_create(struct kvm *kvm, unsigned int id)
 {
 	struct kvm_vcpu *vcpu;
+	int ret;
+
+	/*
+	 * To avoid (possibly malicious) races where userspace
+	 * does something like create an irqchip at the same time
+	 * as creating a vcpu, we forbid such vm init after the
+	 * first vcpu is created, rather than using existing mechanisms
+	 * which can only tell whether a vcpu has come online.
+	 */
+	mutex_lock(&kvm->lock);
+	kvm->arch.vm_init_done = 1;
+	mutex_unlock(&kvm->lock);
+
 	vcpu = kvmppc_core_vcpu_create(kvm, id);
-	if (!IS_ERR(vcpu))
-		kvmppc_create_vcpu_debugfs(vcpu, id);
+	if (IS_ERR(vcpu))
+		return vcpu;
+
+	kvmppc_create_vcpu_debugfs(vcpu, id);
+
+	ret = kvm_arch_irqchip_add_vcpu(vcpu);
+	if (ret < 0)
+		goto err;
+
 	return vcpu;
+
+err:
+	kvmppc_remove_vcpu_debugfs(vcpu);
+	kvmppc_core_vcpu_free(vcpu);
+	return ERR_PTR(ret);
 }
 
 void kvm_arch_vcpu_free(struct kvm_vcpu *vcpu)
@@ -245,6 +284,10 @@ void kvm_arch_vcpu_free(struct kvm_vcpu *vcpu)
 	/* Make sure we're not using the vcpu anymore */
 	hrtimer_cancel(&vcpu->arch.dec_timer);
 	tasklet_kill(&vcpu->arch.tasklet);
+
+#ifdef CONFIG_KVM_MPIC
+	kvm_arch_irqchip_remove_vcpu(vcpu);
+#endif
 
 	kvmppc_remove_vcpu_debugfs(vcpu);
 	kvmppc_core_vcpu_free(vcpu);
@@ -407,12 +450,25 @@ static void kvmppc_complete_mmio_load(struct kvm_vcpu *vcpu,
 int kvmppc_handle_load(struct kvm_run *run, struct kvm_vcpu *vcpu,
                        unsigned int rt, unsigned int bytes, int is_bigendian)
 {
+	u64 addr = vcpu->arch.paddr_accessed;
+	void *regptr;
+
+#ifdef CONFIG_BOOKE
+	regptr = &vcpu->arch.gpr[rt];
+#else
+#error need regptr
+#endif
+
+	if (!kvm_io_bus_read(vcpu->kvm, KVM_MMIO_BUS, addr, bytes, regptr)) {
+		return EMULATE_DONE;
+	}
+
 	if (bytes > sizeof(run->mmio.data)) {
 		printk(KERN_ERR "%s: bad MMIO length: %d\n", __func__,
 		       run->mmio.len);
 	}
 
-	run->mmio.phys_addr = vcpu->arch.paddr_accessed;
+	run->mmio.phys_addr = addr;
 	run->mmio.len = bytes;
 	run->mmio.is_write = 0;
 
@@ -432,7 +488,26 @@ int kvmppc_handle_loads(struct kvm_run *run, struct kvm_vcpu *vcpu,
 	int r;
 
 	r = kvmppc_handle_load(run, vcpu, rt, bytes, is_bigendian);
-	vcpu->arch.mmio_sign_extend = 1;
+
+	if (r == EMULATE_DONE) {
+		unsigned long val = kvmppc_get_gpr(vcpu, rt);
+
+		switch (bytes) {
+		case 1:
+			val = (s8)val;
+			break;
+		case 2:
+			val = (s16)val;
+			break;
+		case 4:
+			val = (s32)val;
+			break;
+		}
+
+		kvmppc_set_gpr(vcpu, rt, val);
+	} else {
+		vcpu->arch.mmio_sign_extend = 1;
+	}
 
 	return r;
 }
@@ -440,18 +515,13 @@ int kvmppc_handle_loads(struct kvm_run *run, struct kvm_vcpu *vcpu,
 int kvmppc_handle_store(struct kvm_run *run, struct kvm_vcpu *vcpu,
                         u64 val, unsigned int bytes, int is_bigendian)
 {
+	u64 addr = vcpu->arch.paddr_accessed;
 	void *data = run->mmio.data;
 
 	if (bytes > sizeof(run->mmio.data)) {
 		printk(KERN_ERR "%s: bad MMIO length: %d\n", __func__,
 		       run->mmio.len);
 	}
-
-	run->mmio.phys_addr = vcpu->arch.paddr_accessed;
-	run->mmio.len = bytes;
-	run->mmio.is_write = 1;
-	vcpu->mmio_needed = 1;
-	vcpu->mmio_is_write = 1;
 
 	/* Store the value at the lowest bytes in 'data'. */
 	if (is_bigendian) {
@@ -469,6 +539,15 @@ int kvmppc_handle_store(struct kvm_run *run, struct kvm_vcpu *vcpu,
 		case 1: *(u8 *)data = val; break;
 		}
 	}
+
+	if (!kvm_io_bus_write(vcpu->kvm, KVM_MMIO_BUS, addr, bytes, data))
+		return EMULATE_DONE;
+
+	run->mmio.phys_addr = addr;
+	run->mmio.len = bytes;
+	run->mmio.is_write = 1;
+	vcpu->mmio_needed = 1;
+	vcpu->mmio_is_write = 1;
 
 	return EMULATE_DO_MMIO;
 }
@@ -647,6 +726,9 @@ static int kvm_vm_ioctl_get_pvinfo(struct kvm_ppc_pvinfo *pvinfo)
 long kvm_arch_vm_ioctl(struct file *filp,
                        unsigned int ioctl, unsigned long arg)
 {
+#ifdef CONFIG_KVM_MPIC
+	struct kvm *kvm = filp->private_data;
+#endif /* CONFIG_KVM_MPIC */
 	void __user *argp = (void __user *)arg;
 	long r;
 
@@ -662,6 +744,60 @@ long kvm_arch_vm_ioctl(struct file *filp,
 
 		break;
 	}
+#ifdef CONFIG_KVM_MPIC
+	case KVM_CREATE_IRQCHIP: {
+		struct kvm_pic *vpic;
+
+		mutex_lock(&kvm->lock);
+
+		r = -EPERM;
+		if (kvm->arch.vm_init_done)
+			goto create_irqchip_unlock;
+
+		r = -EEXIST;
+		if (kvm->arch.vpic)
+			goto create_irqchip_unlock;
+
+		r = -ENOMEM;
+		vpic = kvm_create_pic(kvm);
+		if (!vpic)
+			goto create_irqchip_unlock;
+
+		smp_wmb();
+		kvm->arch.vpic = vpic;
+		smp_wmb();
+
+		r = 0;
+create_irqchip_unlock:
+		mutex_unlock(&kvm->lock);
+		break;
+	}
+	case KVM_IRQ_LINE_STATUS:
+	case KVM_IRQ_LINE: {
+		struct kvm_irq_level irq_event;
+		s32 status;
+
+		r = -EFAULT;
+		if (copy_from_user(&irq_event, argp, sizeof irq_event))
+			goto out;
+
+		r = -ENXIO;
+		if (!irqchip_in_kernel(kvm))
+			goto out;
+
+		status = kvm_arch_set_irqnum(kvm, irq_event.irq,
+					     irq_event.level);
+		if (ioctl == KVM_IRQ_LINE_STATUS) {
+			r = -EFAULT;
+			irq_event.status = status;
+			if (copy_to_user(argp, &irq_event, sizeof(irq_event)))
+				goto out;
+		}
+
+		r = 0;
+		break;
+	}
+#endif /* CONFIG_KVM_MPIC */
 	default:
 		r = -ENOTTY;
 	}

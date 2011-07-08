@@ -283,6 +283,13 @@ static int kvmppc_booke_irqprio_deliver(struct kvm_vcpu *vcpu,
 
 		if (!keep_irq)
 			clear_bit(priority, &vcpu->arch.pending_exceptions);
+
+#ifdef CONFIG_KVM_MPIC
+		/* FIXME: nicer interface, vcpu, guest-requested */
+		if (priority == BOOKE_IRQPRIO_EXTERNAL &&
+		    vcpu->arch.magic_page_ea)
+			vcpu->arch.shared->epr = kvmppc_mpic_iack(vcpu->kvm, 0);
+#endif
 	}
 
 	return allowed;

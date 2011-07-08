@@ -13,6 +13,7 @@
  * Foundation, 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  * Copyright IBM Corp. 2007
+ * Copyright 2010-2011 Freescale Semiconductor, Inc.
  *
  * Authors: Hollis Blanchard <hollisb@us.ibm.com>
  */
@@ -34,6 +35,10 @@
 #define KVM_PRIVATE_MEM_SLOTS 4
 
 #define KVM_COALESCED_MMIO_PAGE_OFFSET 1
+
+#ifdef CONFIG_KVM_MPIC
+#define KVM_HAVE_SYSTEM_IRQ_ASSIGNMENT 1
+#endif
 
 /* We don't currently support large pages. */
 #define KVM_HPAGE_GFN_SHIFT(x)	0
@@ -134,6 +139,9 @@ struct kvmppc_exit_timing {
 };
 
 struct kvm_arch {
+	struct list_head assigned_dev_head;
+	struct kvm_pic *vpic;
+	int vm_init_done;
 };
 
 struct kvmppc_pte {

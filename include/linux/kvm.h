@@ -5,6 +5,8 @@
  * Userspace interface for /dev/kvm - kernel based virtual machine
  *
  * Note: you must update KVM_API_VERSION if you change this interface.
+ *
+ * Copyright 2011 Freescale Semiconductor, Inc.
  */
 
 #include <linux/types.h>
@@ -545,6 +547,7 @@ struct kvm_ppc_pvinfo {
 #define KVM_CAP_GET_TSC_KHZ 61
 #define KVM_CAP_PPC_BOOKE_SREGS 62
 #define KVM_CAP_SW_TLB 63
+#define KVM_CAP_SYSTEM_IRQ_ASSIGNMENT 1000
 
 #ifdef KVM_CAP_IRQ_ROUTING
 
@@ -782,13 +785,40 @@ struct kvm_assigned_pci_dev {
 #define KVM_DEV_IRQ_HOST_INTX    (1 << 0)
 #define KVM_DEV_IRQ_HOST_MSI     (1 << 1)
 #define KVM_DEV_IRQ_HOST_MSIX    (1 << 2)
+/*
+ * When assigning system (non-PCI) interrupts, assigned_dev_id must be zero.
+ * Non-zero values may in the future be used for selecting non-default
+ * interrupt controllers.
+ *
+ * host_irq and guest_irq are source numbers defined in an
+ * architecture/irqchip specific manner.  On powerpc, host_irq is a value
+ * suitable for passing to irq_create_mapping().
+ */
+#define KVM_DEV_IRQ_HOST_SYSTEM	 (1 << 3)
 
 #define KVM_DEV_IRQ_GUEST_INTX   (1 << 8)
 #define KVM_DEV_IRQ_GUEST_MSI    (1 << 9)
 #define KVM_DEV_IRQ_GUEST_MSIX   (1 << 10)
+#define KVM_DEV_IRQ_GUEST_SYSTEM (1 << 11)
 
 #define KVM_DEV_IRQ_HOST_MASK	 0x00ff
 #define KVM_DEV_IRQ_GUEST_MASK   0xff00
+
+/* flags for system interrupts */
+#define KVM_SYSIRQ_DEFAULT		0x00000000
+#define KVM_SYSIRQ_LEVEL		0x00000000
+#define KVM_SYSIRQ_EDGE			0x80000000
+#define KVM_SYSIRQ_HIGH			0x40000000
+#define KVM_SYSIRQ_LOW			0x20000000
+#define KVM_SYSIRQ_LEVEL_SENSE_MASK	0xe0000000
+
+/*
+ * If set, sysirq.intspec contains the full device-tree interrupt specifier
+ * of this interrupt.  The level/sense bits still need to be specified,
+ * but host_irq and guest_irq are ignored.
+ */
+#define KVM_SYSIRQ_DEVTREE_INTSPEC	0x10000000
+#define KVM_SYSIRQ_MAX_INTSPEC		6
 
 struct kvm_assigned_irq {
 	__u32 assigned_dev_id;
@@ -801,6 +831,10 @@ struct kvm_assigned_irq {
 			__u32 addr_hi;
 			__u32 data;
 		} guest_msi;
+		struct {
+			__u32 intspec_len; /* in 32-bit cells */
+			__u32 intspec[KVM_SYSIRQ_MAX_INTSPEC];
+		} sysirq;
 		__u32 reserved[12];
 	};
 };

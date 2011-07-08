@@ -518,6 +518,7 @@ struct kvm_assigned_dev_kernel {
 	spinlock_t intx_lock;
 	char irq_name[32];
 	struct pci_saved_state *pci_saved_state;
+	struct kvm_arch_irq *guest_arch_irq;
 };
 
 struct kvm_irq_mask_notifier {
@@ -538,10 +539,16 @@ void kvm_get_intr_delivery_bitmask(struct kvm_ioapic *ioapic,
 				   union kvm_ioapic_redirect_entry *entry,
 				   unsigned long *deliver_bitmask);
 #endif
+
+struct kvm_arch_irq *kvm_arch_lookup_irq(struct kvm *kvm,
+					 struct kvm_assigned_irq *irq);
+
 int kvm_set_irq(struct kvm *kvm, int irq_source_id, u32 irq, int level);
 int kvm_set_msi(struct kvm_kernel_irq_routing_entry *irq_entry, struct kvm *kvm,
 		int irq_source_id, int level);
+int kvm_arch_set_irq(struct kvm *kvm, struct kvm_arch_irq *irq, int level);
 void kvm_notify_acked_irq(struct kvm *kvm, unsigned irqchip, unsigned pin);
+void kvm_notify_acked_sysirq(struct kvm *kvm, struct kvm_arch_irq *irq);
 void kvm_register_irq_ack_notifier(struct kvm *kvm,
 				   struct kvm_irq_ack_notifier *kian);
 void kvm_unregister_irq_ack_notifier(struct kvm *kvm,
@@ -732,7 +739,8 @@ static inline bool kvm_vcpu_is_bsp(struct kvm_vcpu *vcpu)
 }
 #endif
 
-#ifdef __KVM_HAVE_DEVICE_ASSIGNMENT
+#if defined(__KVM_HAVE_DEVICE_ASSIGNMENT) || \
+    defined(KVM_HAVE_SYSTEM_IRQ_ASSIGNMENT)
 
 long kvm_vm_ioctl_assigned_device(struct kvm *kvm, unsigned ioctl,
 				  unsigned long arg);

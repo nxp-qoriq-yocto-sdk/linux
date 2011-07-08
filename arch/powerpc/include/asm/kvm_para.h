@@ -13,6 +13,7 @@
  * Foundation, 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  * Copyright IBM Corp. 2008
+ * Copyright (C) 2010-2011 Freescale Semiconductor, Inc.
  *
  * Authors: Hollis Blanchard <hollisb@us.ibm.com>
  */
@@ -59,6 +60,20 @@ struct kvm_vcpu_arch_shared {
 	__u64 sprg5;
 	__u64 sprg6;
 	__u64 sprg7;
+
+	__u32 epr;
+
+	/*
+	 * mpic_prio_pending acts like int_pending -- enter hv if
+	 * you set mpic_ctpr to be less than mpic_prio_pending.
+	 *
+	 * You may receive a spurious interrupt if MSR[EE]=0, you raise
+	 * mpic_ctpr to be at least mpic_prio_pending, and you then set
+	 * MSR[EE]=1 before lowering mpic_ctpr to be less than
+	 * mpic_prio_pending.  If you want to avoid this, enter the
+	 * hv any time you set ctpr and mpic_prio_pending is non-zero.
+	 */
+	__u32 mpic_ctpr, mpic_prio_pending;
 };
 
 #define KVM_SC_MAGIC_R0		0x4b564d21 /* "KVM!" */
@@ -72,6 +87,12 @@ struct kvm_vcpu_arch_shared {
 
 /* MASn, ESR, PIR, and high SPRGs */
 #define KVM_MAGIC_FEAT_MAS0_TO_SPRG7	(1 << 1)
+
+/* If set, paravirt EPR is used even if real hardware doesn't have it */
+#define KVM_MAGIC_FEAT_EPR		(1 << 2)
+
+/* Mask interrupts by priority */
+#define KVM_MAGIC_FEAT_MPIC_CTPR	(1 << 3)
 
 #ifdef __KERNEL__
 
