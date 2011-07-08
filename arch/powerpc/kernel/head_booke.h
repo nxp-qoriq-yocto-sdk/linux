@@ -2,6 +2,7 @@
 #define __HEAD_BOOKE_H__
 
 #include <asm/ptrace.h>	/* for STACK_FRAME_REGS_MARKER */
+#include <asm/kvm_booke_hv_asm.h>
 /*
  * Macros used for common Book-e exception handling
  */
@@ -20,20 +21,15 @@
 	addi	reg,reg,val@l
 #endif
 
-/*
- * Macro used to get to thread save registers.
- * Note that entries 0-3 are used for the prolog code, and the remaining
- * entries are available for specific exception use in the event a handler
- * requires more than 4 scratch registers.
- */
-#define THREAD_NORMSAVE(offset)	(THREAD_NORMSAVES + (offset * 4))
+/*TBD: Handle guest clearing CE/ME */
 
-#define NORMAL_EXCEPTION_PROLOG						     \
+#define NORMAL_EXCEPTION_PROLOG(ivor_nr)				     \
 	mtspr	SPRN_SPRG_WSCRATCH0, r10;	/* save one register */	     \
 	mfspr	r10, SPRN_SPRG_THREAD;					     \
 	stw	r11, THREAD_NORMSAVE(0)(r10);				     \
 	stw	r13, THREAD_NORMSAVE(2)(r10);				     \
 	mfcr	r13;			/* save CR in r13 for now	   */\
+	DO_KVM	ivor_nr;						     \
 	mfspr	r11,SPRN_SRR1;		/* check whether user or kernel    */\
 	andi.	r11,r11,MSR_PR;						     \
 	mr	r11, r1;						     \
@@ -181,9 +177,9 @@ label:
 	.long	func;						\
 	.long	ret_from_except_full
 
-#define EXCEPTION(n, label, hdlr, xfer)				\
+#define EXCEPTION(n, ivor_nr, label, hdlr, xfer)		\
 	START_EXCEPTION(label);					\
-	NORMAL_EXCEPTION_PROLOG;				\
+	NORMAL_EXCEPTION_PROLOG(ivor_nr);			\
 	addi	r3,r1,STACK_FRAME_OVERHEAD;			\
 	xfer(n, hdlr)
 
@@ -355,7 +351,7 @@ label:
 
 #define DATA_STORAGE_EXCEPTION						      \
 	START_EXCEPTION(DataStorage)					      \
-	NORMAL_EXCEPTION_PROLOG;					      \
+	NORMAL_EXCEPTION_PROLOG(BOOKE_INTERRUPT_DATA_STORAGE);		      \
 	mfspr	r5,SPRN_ESR;		/* Grab the ESR and save it */	      \
 	stw	r5,_ESR(r11);						      \
 	mfspr	r4,SPRN_DEAR;		/* Grab the DEAR */		      \
@@ -363,7 +359,7 @@ label:
 
 #define INSTRUCTION_STORAGE_EXCEPTION					      \
 	START_EXCEPTION(InstructionStorage)				      \
-	NORMAL_EXCEPTION_PROLOG;					      \
+	NORMAL_EXCEPTION_PROLOG(BOOKE_INTERRUPT_INST_STORAGE);		      \
 	mfspr	r5,SPRN_ESR;		/* Grab the ESR and save it */	      \
 	stw	r5,_ESR(r11);						      \
 	mr      r4,r12;                 /* Pass SRR0 as arg2 */		      \
@@ -372,7 +368,7 @@ label:
 
 #define ALIGNMENT_EXCEPTION						      \
 	START_EXCEPTION(Alignment)					      \
-	NORMAL_EXCEPTION_PROLOG;					      \
+	NORMAL_EXCEPTION_PROLOG(BOOKE_INTERRUPT_ALIGNMENT);		      \
 	mfspr   r4,SPRN_DEAR;           /* Grab the DEAR and save it */	      \
 	stw     r4,_DEAR(r11);						      \
 	addi    r3,r1,STACK_FRAME_OVERHEAD;				      \
@@ -380,7 +376,7 @@ label:
 
 #define PROGRAM_EXCEPTION						      \
 	START_EXCEPTION(Program)					      \
-	NORMAL_EXCEPTION_PROLOG;					      \
+	NORMAL_EXCEPTION_PROLOG(BOOKE_INTERRUPT_PROGRAM);		      \
 	mfspr	r4,SPRN_ESR;		/* Grab the ESR and save it */	      \
 	stw	r4,_ESR(r11);						      \
 	addi	r3,r1,STACK_FRAME_OVERHEAD;				      \
@@ -388,7 +384,7 @@ label:
 
 #define DECREMENTER_EXCEPTION						      \
 	START_EXCEPTION(Decrementer)					      \
-	NORMAL_EXCEPTION_PROLOG;					      \
+	NORMAL_EXCEPTION_PROLOG(BOOKE_INTERRUPT_DECREMENTER);		      \
 	lis     r0,TSR_DIS@h;           /* Setup the DEC interrupt mask */    \
 	mtspr   SPRN_TSR,r0;		/* Clear the DEC interrupt */	      \
 	addi    r3,r1,STACK_FRAME_OVERHEAD;				      \
@@ -396,7 +392,7 @@ label:
 
 #define FP_UNAVAILABLE_EXCEPTION					      \
 	START_EXCEPTION(FloatingPointUnavailable)			      \
-	NORMAL_EXCEPTION_PROLOG;					      \
+	NORMAL_EXCEPTION_PROLOG(BOOKE_INTERRUPT_FP_UNAVAIL);		      \
 	beq	1f;							      \
 	bl	load_up_fpu;		/* if from user, just load it up */   \
 	b	fast_exception_return;					      \

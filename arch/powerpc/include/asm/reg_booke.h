@@ -56,17 +56,29 @@
 #define SPRN_SPRG7W	0x117	/* Special Purpose Register General 7 Write */
 #define SPRN_EPCR	0x133	/* Embedded Processor Control Register */
 #define SPRN_DBCR2	0x136	/* Debug Control Register 2 */
+#define SPRN_MSRP	0x137	/* MSR Protect Register */
 #define SPRN_IAC3	0x13A	/* Instruction Address Compare 3 */
 #define SPRN_IAC4	0x13B	/* Instruction Address Compare 4 */
 #define SPRN_DVC1	0x13E	/* Data Value Compare Register 1 */
 #define SPRN_DVC2	0x13F	/* Data Value Compare Register 2 */
+#define SPRN_LPID	0x152	/* Logical Partition ID */
 #define SPRN_MAS8	0x155	/* MMU Assist Register 8 */
 #define SPRN_TLB0PS	0x158	/* TLB 0 Page Size Register */
 #define SPRN_MAS5_MAS6	0x15c	/* MMU Assist Register 5 || 6 */
 #define SPRN_MAS8_MAS1	0x15d	/* MMU Assist Register 8 || 1 */
 #define SPRN_EPTCFG	0x15e	/* Embedded Page Table Config */
+#define SPRN_GSPRG0	0x170	/* Guest SPRG0 */
+#define SPRN_GSPRG1	0x171	/* Guest SPRG1 */
+#define SPRN_GSPRG2	0x172	/* Guest SPRG2 */
+#define SPRN_GSPRG3	0x173	/* Guest SPRG3 */
 #define SPRN_MAS7_MAS3	0x174	/* MMU Assist Register 7 || 3 */
 #define SPRN_MAS0_MAS1	0x175	/* MMU Assist Register 0 || 1 */
+#define SPRN_GSRR0	0x17A	/* Guest SRR0 */
+#define SPRN_GSRR1	0x17B	/* Guest SRR1 */
+#define SPRN_GEPR	0x17C	/* Guest EPR */
+#define SPRN_GDEAR	0x17D	/* Guest DEAR */
+#define SPRN_GPIR	0x17E	/* Guest PIR */
+#define SPRN_GESR	0x17F	/* Guest Exception Syndrome Register */
 #define SPRN_IVOR0	0x190	/* Interrupt Vector Offset Register 0 */
 #define SPRN_IVOR1	0x191	/* Interrupt Vector Offset Register 1 */
 #define SPRN_IVOR2	0x192	/* Interrupt Vector Offset Register 2 */
@@ -87,6 +99,13 @@
 #define SPRN_IVOR39	0x1B1	/* Interrupt Vector Offset Register 39 */
 #define SPRN_IVOR40	0x1B2	/* Interrupt Vector Offset Register 40 */
 #define SPRN_IVOR41	0x1B3	/* Interrupt Vector Offset Register 41 */
+#define SPRN_GIVOR2	0x1B8	/* Guest IVOR2 */
+#define SPRN_GIVOR3	0x1B9	/* Guest IVOR3 */
+#define SPRN_GIVOR4	0x1BA	/* Guest IVOR4 */
+#define SPRN_GIVOR8	0x1BB	/* Guest IVOR8 */
+#define SPRN_GIVOR13	0x1BC	/* Guest IVOR13 */
+#define SPRN_GIVOR14	0x1BD	/* Guest IVOR14 */
+#define SPRN_GIVPR	0x1BF	/* Guest IVPR */
 #define SPRN_SPEFSCR	0x200	/* SPE & Embedded FP Status & Control */
 #define SPRN_BBEAR	0x201	/* Branch Buffer Entry Address Register */
 #define SPRN_BBTAR	0x202	/* Branch Buffer Target Address Register */
@@ -235,6 +254,22 @@
 #define MCSR_LDG	0x00002000UL /* Guarded Load */
 #define MCSR_TLBSYNC	0x00000002UL /* Multiple tlbsyncs detected */
 #define MCSR_BSL2_ERR	0x00000001UL /* Backside L2 cache error */
+
+
+#define	MSRP_UCLEP	0x04000000 /* Protect MSR[UCLE] */
+#define	MSRP_DEP	0x00000200 /* Protect MSR[DE] */
+#define	MSRP_PMMP	0x00000004 /* Protect MSR[PMM] */
+
+#define	EPCR_EXTGS	0x80000000 /* Guest gets external ints */
+#define	EPCR_DTLBGS	0x40000000 /* Guest gets DTLB errors */
+#define	EPCR_ITLBGS	0x20000000 /* Guest gets ITLB errors */
+#define	EPCR_DSIGS	0x10000000 /* Guest gets DSIs */
+#define	EPCR_ISIGS	0x08000000 /* Guest gets ISIs */
+#define	EPCR_DUVD	0x04000000 /* Disable Embedded HV Debug */
+#define	EPCR_ICM	0x02000000 /* Interrupt Compuation Mode */
+#define	EPCR_GICM	0x01000000 /* Guest Interrupt Compuation Mode */
+#define	EPCR_DGTMI	0x00800000 /* Disable guest TLB management insns */
+#define	EPCR_DMIUH	0x00400000 /* Disable MAS int updates for hypervisor */
 #endif
 
 #ifdef CONFIG_E200
@@ -673,6 +708,15 @@
 #define MMUBE1_VBE3		0x00000004
 #define MMUBE1_VBE4		0x00000002
 #define MMUBE1_VBE5		0x00000001
+
+/* FIXME: FIND a better place for adding this define */
+/*
+ * Macro used to get to thread save registers.
+ * Note that entries 0-3 are used for the prolog code, and the remaining
+ * entries are available for specific exception use in the event a handler
+ * requires more than 4 scratch registers.
+ */
+#define THREAD_NORMSAVE(offset)	(THREAD_NORMSAVES + (offset * 4))
 
 #endif /* __ASM_POWERPC_REG_BOOKE_H__ */
 #endif /* __KERNEL__ */

@@ -313,7 +313,7 @@ interrupt_base:
 
 	/* Data Storage Interrupt */
 	START_EXCEPTION(DataStorage)
-	NORMAL_EXCEPTION_PROLOG
+	NORMAL_EXCEPTION_PROLOG(BOOKE_INTERRUPT_DATA_STORAGE)
 	mfspr	r5,SPRN_ESR		/* Grab the ESR, save it, pass arg3 */
 	stw	r5,_ESR(r11)
 	mfspr	r4,SPRN_DEAR		/* Grab the DEAR, save it, pass arg2 */
@@ -328,7 +328,7 @@ interrupt_base:
 	INSTRUCTION_STORAGE_EXCEPTION
 
 	/* External Input Interrupt */
-	EXCEPTION(0x0500, ExternalInput, do_IRQ, EXC_XFER_LITE)
+	EXCEPTION(0x0500, BOOKE_INTERRUPT_EXTERNAL, ExternalInput, do_IRQ, EXC_XFER_LITE)
 
 	/* Alignment Interrupt */
 	ALIGNMENT_EXCEPTION
@@ -342,26 +342,26 @@ interrupt_base:
 #else
 #ifdef CONFIG_E200
 	/* E200 treats 'normal' floating point instructions as FP Unavail exception */
-	EXCEPTION(0x0800, FloatingPointUnavailable, program_check_exception, EXC_XFER_EE)
+	EXCEPTION(0x0800, BOOKE_INTERRUPT_FP_UNAVAIL, FloatingPointUnavailable, program_check_exception, EXC_XFER_EE)
 #else
-	EXCEPTION(0x0800, FloatingPointUnavailable, unknown_exception, EXC_XFER_EE)
+	EXCEPTION(0x0800, BOOKE_INTERRUPT_FP_UNAVAIL, FloatingPointUnavailable, unknown_exception, EXC_XFER_EE)
 #endif
 #endif
 
 	/* System Call Interrupt */
 	START_EXCEPTION(SystemCall)
-	NORMAL_EXCEPTION_PROLOG
+	NORMAL_EXCEPTION_PROLOG(BOOKE_INTERRUPT_SYSCALL)
 	EXC_XFER_EE_LITE(0x0c00, DoSyscall)
 
 	/* Auxiliary Processor Unavailable Interrupt */
-	EXCEPTION(0x2900, AuxillaryProcessorUnavailable, unknown_exception, EXC_XFER_EE)
+	EXCEPTION(0x2900, BOOKE_INTERRUPT_AP_UNAVAIL, AuxillaryProcessorUnavailable, unknown_exception, EXC_XFER_EE)
 
 	/* Decrementer Interrupt */
 	DECREMENTER_EXCEPTION
 
 	/* Fixed Internal Timer Interrupt */
 	/* TODO: Add FIT support */
-	EXCEPTION(0x3100, FixedIntervalTimer, unknown_exception, EXC_XFER_EE)
+	EXCEPTION(0x3100, BOOKE_INTERRUPT_FIT, FixedIntervalTimer, unknown_exception, EXC_XFER_EE)
 
 	/* Watchdog Timer Interrupt */
 #ifdef CONFIG_BOOKE_WDT
@@ -379,6 +379,7 @@ interrupt_base:
 	stw	r13, THREAD_NORMSAVE(2)(r10)
 	mfcr	r13
 	stw	r13, THREAD_NORMSAVE(3)(r10)
+	DO_KVM	BOOKE_INTERRUPT_DTLB_MISS
 	mfspr	r10, SPRN_DEAR		/* Get faulting address */
 
 	/* If we are faulting a kernel address, we have to use the
@@ -467,6 +468,7 @@ interrupt_base:
 	stw	r13, THREAD_NORMSAVE(2)(r10)
 	mfcr	r13
 	stw	r13, THREAD_NORMSAVE(3)(r10)
+	DO_KVM	BOOKE_INTERRUPT_ITLB_MISS
 	mfspr	r10, SPRN_SRR0		/* Get faulting address */
 
 	/* If we are faulting a kernel address, we have to use the
@@ -538,35 +540,47 @@ interrupt_base:
 #ifdef CONFIG_SPE
 	/* SPE Unavailable */
 	START_EXCEPTION(SPEUnavailable)
-	NORMAL_EXCEPTION_PROLOG
+	NORMAL_EXCEPTION_PROLOG(BOOKE_INTERRUPT_SPE_UNAVAIL)
 	bne	load_up_spe
 	addi	r3,r1,STACK_FRAME_OVERHEAD
 	EXC_XFER_EE_LITE(0x2010, KernelSPE)
 #else
-	EXCEPTION(0x2020, SPEUnavailable, unknown_exception, EXC_XFER_EE)
+	EXCEPTION(0x2020, BOOKE_INTERRUPT_SPE_UNAVAIL, SPEUnavailable, unknown_exception, EXC_XFER_EE)
 #endif /* CONFIG_SPE */
 
 	/* SPE Floating Point Data */
 #ifdef CONFIG_SPE
-	EXCEPTION(0x2030, SPEFloatingPointData, SPEFloatingPointException, EXC_XFER_EE);
+	EXCEPTION(0x2030, BOOKE_INTERRUPT_SPE_FP_DATA, SPEFloatingPointData, SPEFloatingPointException, EXC_XFER_EE);
 
 	/* SPE Floating Point Round */
-	EXCEPTION(0x2050, SPEFloatingPointRound, SPEFloatingPointRoundException, EXC_XFER_EE)
+	EXCEPTION(0x2050, BOOKE_INTERRUPT_SPE_FP_ROUND, SPEFloatingPointRound, SPEFloatingPointRoundException, EXC_XFER_EE)
 #else
-	EXCEPTION(0x2040, SPEFloatingPointData, unknown_exception, EXC_XFER_EE)
-	EXCEPTION(0x2050, SPEFloatingPointRound, unknown_exception, EXC_XFER_EE)
+	EXCEPTION(0x2040, BOOKE_INTERRUPT_SPE_FP_DATA, SPEFloatingPointData, unknown_exception, EXC_XFER_EE)
+	EXCEPTION(0x2050, BOOKE_INTERRUPT_SPE_FP_ROUND, SPEFloatingPointRound, unknown_exception, EXC_XFER_EE)
 #endif /* CONFIG_SPE */
 
 	/* Performance Monitor */
-	EXCEPTION(0x2060, PerformanceMonitor, performance_monitor_exception, EXC_XFER_STD)
+	EXCEPTION(0x2060, BOOKE_INTERRUPT_PERFORMANCE_MONITOR, PerformanceMonitor, performance_monitor_exception, EXC_XFER_STD)
 
-	EXCEPTION(0x2070, Doorbell, doorbell_exception, EXC_XFER_STD)
+	EXCEPTION(0x2070, BOOKE_INTERRUPT_DOORBELL, Doorbell, doorbell_exception, EXC_XFER_STD)
 
 	CRITICAL_EXCEPTION(0x2080, CriticalDoorbell, unknown_exception)
 
 	/* Debug Interrupt */
 	DEBUG_DEBUG_EXCEPTION
 	DEBUG_CRIT_EXCEPTION
+
+	/* Guest DoorBell */
+	EXCEPTION(0, BOOKE_HV_GUEST_DBELL, GuestDoorBell, unknown_exception, EXC_XFER_EE)
+
+	/* Guest DoorBell Critical -- Not being redirected to KVM currently */
+	CRITICAL_EXCEPTION(0, CriticalGuestDoorBell, unknown_exception)
+
+	/* Hypercall */
+	EXCEPTION(0, BOOKE_HV_SYSCALL, HyperCall, unknown_exception, EXC_XFER_EE)
+
+	/* Embedded Hypervisor Privilege */
+	EXCEPTION(0, BOOKE_HV_PRIV, Ehvpriv, unknown_exception, EXC_XFER_EE)
 
 /*
  * Local functions
@@ -871,6 +885,24 @@ _GLOBAL(__setup_e500mc_ivors)
 	mtspr	SPRN_IVOR36,r3
 	li	r3,CriticalDoorbell@l
 	mtspr	SPRN_IVOR37,r3
+
+	/*
+	 * We only want to touch IVOR38-41 if we're running on hardware
+	 * that supports category E.HV.  The architectural way to determine
+	 * this is MMUCFG[LPIDSIZE].
+	 */
+	mfspr	r3, SPRN_MMUCFG
+	andis.	r3, r3, MMUCFG_LPIDSIZE@h
+	beq	skip_hv_ivors
+	li	r3,GuestDoorBell@l
+	mtspr	SPRN_IVOR38,r3
+	li	r3,CriticalGuestDoorBell@l
+	mtspr	SPRN_IVOR39,r3
+	li	r3,HyperCall@l
+	mtspr	SPRN_IVOR40,r3
+	li	r3,Ehvpriv@l
+	mtspr	SPRN_IVOR41,r3
+skip_hv_ivors:
 	sync
 	blr
 

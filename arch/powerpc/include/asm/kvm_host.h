@@ -125,6 +125,7 @@ enum kvm_exit_types {
 	FP_UNAVAIL,
 	DEBUG_EXITS,
 	TIMEINGUEST,
+	PRG_INT_EXITS,
 	__NUMBER_OF_KVM_EXIT_TYPES
 };
 
@@ -248,6 +249,13 @@ struct kvm_vcpu_arch {
 
 	ulong xer;
 	u32 cr;
+#endif
+
+#ifdef CONFIG_KVM_BOOKE_HV
+	u32 host_mas4;
+	u32 host_mas6;
+	u32 gsrr1;
+	ulong gsrr0;
 #endif
 
 #ifdef CONFIG_PPC_BOOK3S

@@ -40,6 +40,16 @@ kvm-e500-objs := \
 	e500_emulate.o
 kvm-objs-$(CONFIG_KVM_E500) := $(kvm-e500-objs)
 
+kvm-e500mc-objs := \
+	$(common-objs-y) \
+	bookehv.o \
+	bookehv_emulate.o \
+	bookehv_interrupts.o \
+	e500mc.o \
+	e500mc_tlb.o \
+	e500mc_emulate.o
+kvm-objs-$(CONFIG_KVM_E500MC) := $(kvm-e500mc-objs)
+
 kvm-book3s_64-objs := \
 	$(common-objs-y) \
 	fpu.o \
@@ -71,6 +81,7 @@ kvm-objs := $(kvm-objs-m) $(kvm-objs-y)
 
 obj-$(CONFIG_KVM_440) += kvm.o
 obj-$(CONFIG_KVM_E500) += kvm.o
+obj-$(CONFIG_KVM_E500MC) += kvm.o
 obj-$(CONFIG_KVM_BOOK3S_64) += kvm.o
 obj-$(CONFIG_KVM_BOOK3S_32) += kvm.o
 

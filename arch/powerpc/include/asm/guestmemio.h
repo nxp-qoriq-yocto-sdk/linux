@@ -65,11 +65,11 @@ static inline void guestmem_set_data(struct kvm_vcpu *vcpu)
 	struct kvmppc_vcpu_e500mc *vcpu_e500mc = to_e500mc(vcpu);
 
 	new_eplc &= ~EPC_EAS;
-	new_eplc |= (vcpu_arch->msr << (63 - MSR_DR_LG - EPCBIT_EAS)) &
+	new_eplc |= (vcpu_arch->shared->msr << (63 - MSR_DR_LG - EPCBIT_EAS)) &
 			EPC_EAS;
 	new_eplc |= (vcpu_arch->shadow_pid << EPC_EPID_SHIFT) & EPC_EPID;
 	new_eplc |= (vcpu_e500mc->lpid << EPC_ELPID_SHIFT) & EPC_ELPID;
-	new_eplc |= (vcpu_arch->msr << (63 - MSR_PR_LG - EPCBIT_EPR)) &
+	new_eplc |= (vcpu_arch->shared->msr << (63 - MSR_PR_LG - EPCBIT_EPR)) &
 			 EPC_EPR;
 	new_eplc |= EPC_EGS; /* Always guest access */
 
@@ -87,11 +87,11 @@ static inline void guestmem_set_insn(struct kvm_vcpu *vcpu)
 	struct kvmppc_vcpu_e500mc *vcpu_e500mc = to_e500mc(vcpu);
 
 	new_eplc &= ~EPC_EAS;
-	new_eplc |= (vcpu_arch->msr << (63 - MSR_IR_LG - EPCBIT_EAS)) &
+	new_eplc |= (vcpu_arch->shared->msr << (63 - MSR_IR_LG - EPCBIT_EAS)) &
 			 EPC_EAS;
 	new_eplc |= (vcpu_arch->shadow_pid << EPC_EPID_SHIFT) & EPC_EPID;
 	new_eplc |= (vcpu_e500mc->lpid << EPC_ELPID_SHIFT) & EPC_ELPID;
-	new_eplc |= (vcpu_arch->msr << (63 - MSR_PR_LG - EPCBIT_EPR)) &
+	new_eplc |= (vcpu_arch->shared->msr << (63 - MSR_PR_LG - EPCBIT_EPR)) &
 			 EPC_EPR;
 	new_eplc |= EPC_EGS; /* Always guest access */
 

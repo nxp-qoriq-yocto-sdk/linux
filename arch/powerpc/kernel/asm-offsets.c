@@ -112,7 +112,7 @@ int main(void)
 	DEFINE(THREAD_USED_SPE, offsetof(struct thread_struct, used_spe));
 #endif /* CONFIG_SPE */
 #endif /* CONFIG_PPC64 */
-#ifdef CONFIG_KVM_BOOK3S_32_HANDLER
+#if defined(CONFIG_KVM_BOOK3S_32_HANDLER) || defined(CONFIG_KVM_BOOKE_HV)
 	DEFINE(THREAD_KVM_SVCPU, offsetof(struct thread_struct, kvm_shadow_vcpu));
 #endif
 
@@ -409,15 +409,12 @@ int main(void)
 	DEFINE(VCPU_SHARED, offsetof(struct kvm_vcpu, arch.shared));
 	DEFINE(VCPU_SHARED_MSR, offsetof(struct kvm_vcpu_arch_shared, msr));
 	DEFINE(VCPU_SHADOW_MSR, offsetof(struct kvm_vcpu, arch.shadow_msr));
-
-#ifdef CONFIG_FSL_BOOKE
 	DEFINE(VCPU_SHARED_MAS0, offsetof(struct kvm_vcpu_arch_shared, mas0));
 	DEFINE(VCPU_SHARED_MAS1, offsetof(struct kvm_vcpu_arch_shared, mas1));
 	DEFINE(VCPU_SHARED_MAS2, offsetof(struct kvm_vcpu_arch_shared, mas2));
 	DEFINE(VCPU_SHARED_MAS7_3, offsetof(struct kvm_vcpu_arch_shared, mas7_3));
 	DEFINE(VCPU_SHARED_MAS4, offsetof(struct kvm_vcpu_arch_shared, mas4));
 	DEFINE(VCPU_SHARED_MAS6, offsetof(struct kvm_vcpu_arch_shared, mas6));
-#endif
 
 	/* book3s */
 #ifdef CONFIG_PPC_BOOK3S
@@ -518,6 +515,13 @@ int main(void)
 	DEFINE(VCPU_ACC, offsetof(struct kvm_vcpu, arch.acc));
 	DEFINE(VCPU_SPEFSCR, offsetof(struct kvm_vcpu, arch.spefscr));
 	DEFINE(VCPU_HOST_SPEFSCR, offsetof(struct kvm_vcpu, arch.host_spefscr));
+#endif
+
+#ifdef CONFIG_KVM_BOOKE_HV
+	DEFINE(VCPU_HOST_MAS4, offsetof(struct kvm_vcpu, arch.host_mas4));
+	DEFINE(VCPU_HOST_MAS6, offsetof(struct kvm_vcpu, arch.host_mas6));
+	DEFINE(VCPU_GSRR0, offsetof(struct kvm_vcpu, arch.gsrr0));
+	DEFINE(VCPU_GSRR1, offsetof(struct kvm_vcpu, arch.gsrr1));
 #endif
 
 #ifdef CONFIG_KVM_EXIT_TIMING

@@ -115,6 +115,15 @@ extern void kvmppc_core_destroy_mmu(struct kvm_vcpu *vcpu);
 extern int kvmppc_kvm_pv(struct kvm_vcpu *vcpu);
 extern void kvmppc_map_magic(struct kvm_vcpu *vcpu);
 
+extern int kvmppc_bookehv_init(void);
+extern void kvmppc_bookehv_exit(void);
+extern void kvmppc_set_pending_interrupt(struct kvm_vcpu *vcpu);
+
+extern int kvmppc_bookehv_emulate_op(struct kvm_run *run, struct kvm_vcpu *vcpu,
+                            unsigned int inst, int *advance);
+extern int kvmppc_bookehv_emulate_mfspr(struct kvm_vcpu *vcpu, int sprn, int rt);
+extern int kvmppc_bookehv_emulate_mtspr(struct kvm_vcpu *vcpu, int sprn, int rs);
+
 /*
  * Cuts out inst bits with ordering according to spec.
  * That means the leftmost bit is zero. All given bits are included.

@@ -117,6 +117,10 @@
 
 #define MAS7_RPN		0xFFFFFFFF
 
+#define MAS8_TGS		0x80000000 /* Guest space */
+#define MAS8_VF 		0x40000000 /* Virtualization Fault */
+#define MAS8_TLPID		0x000000ff
+
 /* Bit definitions for MMUCFG */
 #define MMUCFG_MAVN	0x00000003	/* MMU Architecture Version Number */
 #define MMUCFG_MAVN_V1	0x00000000	/* v1.0 */
