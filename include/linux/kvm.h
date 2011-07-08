@@ -544,6 +544,7 @@ struct kvm_ppc_pvinfo {
 #define KVM_CAP_TSC_CONTROL 60
 #define KVM_CAP_GET_TSC_KHZ 61
 #define KVM_CAP_PPC_BOOKE_SREGS 62
+#define KVM_CAP_SW_TLB 63
 
 #ifdef KVM_CAP_IRQ_ROUTING
 
@@ -621,6 +622,21 @@ struct kvm_clock_data {
 	__u64 clock;
 	__u32 flags;
 	__u32 pad[9];
+};
+
+#define KVM_MMU_FSL_BOOKE_NOHV		0
+#define KVM_MMU_FSL_BOOKE_HV		1
+
+struct kvm_config_tlb {
+	__u64 params;
+	__u64 array;
+	__u32 mmu_type;
+	__u32 array_len;
+};
+
+struct kvm_dirty_tlb {
+	__u64 bitmap;
+	__u32 num_dirty;
 };
 
 /*
@@ -746,6 +762,9 @@ struct kvm_clock_data {
 /* Available with KVM_CAP_XCRS */
 #define KVM_GET_XCRS		  _IOR(KVMIO,  0xa6, struct kvm_xcrs)
 #define KVM_SET_XCRS		  _IOW(KVMIO,  0xa7, struct kvm_xcrs)
+/* Available with KVM_CAP_SW_TLB */
+#define KVM_CONFIG_TLB		  _IOW(KVMIO,  0xa8, struct kvm_config_tlb)
+#define KVM_DIRTY_TLB		  _IOW(KVMIO,  0xa9, struct kvm_dirty_tlb)
 
 #define KVM_DEV_ASSIGN_ENABLE_IOMMU	(1 << 0)
 

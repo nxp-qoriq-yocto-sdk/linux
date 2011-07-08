@@ -152,4 +152,11 @@ int kvmppc_set_sregs_ivor(struct kvm_vcpu *vcpu, struct kvm_sregs *sregs);
 
 void kvmppc_set_pid(struct kvm_vcpu *vcpu, u32 pid);
 
+int kvm_vcpu_ioctl_config_tlb(struct kvm_vcpu *vcpu,
+			      struct kvm_config_tlb *cfg);
+int kvm_vcpu_ioctl_dirty_tlb(struct kvm_vcpu *vcpu,
+			     struct kvm_dirty_tlb *cfg);
+
+void kvmppc_core_heavy_exit(struct kvm_vcpu *vcpu);
+
 #endif /* __POWERPC_KVM_PPC_H__ */
