@@ -208,8 +208,10 @@ int kvm_dev_ioctl_check_extension(long ext)
 	case KVM_CAP_ENABLE_CAP:
 	case KVM_CAP_PPC_OSI:
 	case KVM_CAP_PPC_GET_PVINFO:
-#ifdef CONFIG_KVM_E500
+#if defined(CONFIG_KVM_E500) || defined(CONFIG_KVM_E500MC)
 	case KVM_CAP_SW_TLB:
+#endif
+#ifdef CONFIG_KVM_E500
 	case KVM_CAP_ENABLE_PERFMON:
 #endif
 #ifdef CONFIG_KVM_MPIC
@@ -603,7 +605,7 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
 	kvm_guest_exit();
 	local_irq_enable();
 
-#ifdef CONFIG_KVM_E500
+#if defined(CONFIG_KVM_E500) || defined(CONFIG_KVM_E500MC)
 	kvmppc_core_heavy_exit(vcpu);
 #endif
 
@@ -724,7 +726,7 @@ long kvm_arch_vcpu_ioctl(struct file *filp,
 		break;
 	}
 
-#ifdef CONFIG_KVM_E500
+#if defined(CONFIG_KVM_E500) || defined(CONFIG_KVM_E500MC)
 	case KVM_CONFIG_TLB: {
 		struct kvm_config_tlb cfg;
 		r = -EFAULT;

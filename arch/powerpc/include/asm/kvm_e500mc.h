@@ -21,23 +21,29 @@
 
 #define E500MC_TLB_NUM   2
 
-struct tlbe{
-	u32 mas1;
-	u32 mas2;
-	u32 mas3;
-	u32 mas7;
-	u32 mas8;
+#define E500MC_TLB_VALID 1
+#define E500MC_TLB_DIRTY 2
+
+struct tlbe_priv {
+	pfn_t pfn;
+	unsigned int flags; /* E500MC_TLB_* */
 };
 
 struct kvmppc_vcpu_e500mc {
-	/* Unmodified copy of the guest's TLB. */
-	struct tlbe *guest_tlb[E500MC_TLB_NUM];
-	/* TLB that's actually used when the guest is running. */
-	struct tlbe *shadow_tlb[E500MC_TLB_NUM];
+	/* Unmodified copy of the guest's TLB -- shared with Qemu. */
+	struct kvm_book3e_206_tlb_entry *gtlb_arch;
 
-	unsigned int guest_tlb_size[E500MC_TLB_NUM];
-	unsigned int shadow_tlb_size[E500MC_TLB_NUM];
-	unsigned int guest_tlb_nv[E500MC_TLB_NUM];
+	/* Starting entry number in gtlb_arch[] */
+	int gtlb_offset[E500MC_TLB_NUM];
+
+	/* KVM internal information associated with each guest TLB entry */
+	struct tlbe_priv *gtlb_priv[E500MC_TLB_NUM];
+
+	unsigned int gtlb_size[E500MC_TLB_NUM];
+	unsigned int gtlb_nv[E500MC_TLB_NUM];
+
+	unsigned int gtlb0_ways;
+	unsigned int gtlb0_sets;
 
 	u32 oldpir;
 
@@ -52,6 +58,9 @@ struct kvmppc_vcpu_e500mc {
 	u32 tlb0cfg;
 	u32 tlb1cfg;
 	u64 mcar;
+
+	struct page **shared_tlb_pages;
+	int num_shared_tlb_pages;
 
 	u32 epcr;
 	u32 msrp;
