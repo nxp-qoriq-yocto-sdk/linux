@@ -31,6 +31,7 @@
 #include <asm/disassemble.h>
 #include "timing.h"
 #include "trace.h"
+#include "booke.h"
 
 #define OP_TRAP 3
 #define OP_TRAP_64 2
@@ -54,6 +55,9 @@
 #define OP_31_XOP_STWBRX    662
 #define OP_31_XOP_LHBRX     790
 #define OP_31_XOP_STHBRX    918
+
+#define OP_31_XOP_MFPMR     334
+#define OP_31_XOP_MTPMR     462
 
 #define OP_LWZ  32
 #define OP_LWZU 33
@@ -130,6 +134,10 @@ int kvmppc_emulate_instruction(struct kvm_run *run, struct kvm_vcpu *vcpu)
 	int rs;
 	int rt;
 	int sprn;
+#ifdef CONFIG_KVM_E500
+	int pmrn;
+	u32 reg;
+#endif
 	enum emulation_result emulated = EMULATE_DONE;
 	int advance = 1;
 
@@ -227,6 +235,157 @@ int kvmppc_emulate_instruction(struct kvm_run *run, struct kvm_vcpu *vcpu)
 			emulated = kvmppc_handle_load(run, vcpu, rt, 2, 1);
 			kvmppc_set_gpr(vcpu, ra, ea);
 			break;
+
+#ifdef CONFIG_KVM_E500
+		case OP_31_XOP_MFPMR:
+			/* If PerfMon not reserved by guest then return ZERO */
+			if (!vcpu->arch.pm_is_reserved) {
+				kvmppc_set_gpr(vcpu, rt, 0);
+				break;
+			}
+
+			pmrn = get_pmrn(inst);
+			rt = get_rt(inst);
+
+			switch (pmrn) {
+			case PMRN_PMGC0:
+				kvmppc_set_gpr(vcpu, rt, vcpu->arch.pm_reg.pmgc0);
+				break;
+			case PMRN_PMC0:
+				vcpu->arch.pm_reg.pmc[0] = mfpmr(PMRN_PMC0);
+				kvmppc_set_gpr(vcpu, rt, vcpu->arch.pm_reg.pmc[0]);
+				break;
+			case PMRN_PMC1:
+				vcpu->arch.pm_reg.pmc[1] = mfpmr(PMRN_PMC1);
+				kvmppc_set_gpr(vcpu, rt, vcpu->arch.pm_reg.pmc[1]);
+				break;
+			case PMRN_PMC2:
+				vcpu->arch.pm_reg.pmc[2] = mfpmr(PMRN_PMC2);
+				kvmppc_set_gpr(vcpu, rt, vcpu->arch.pm_reg.pmc[2]);
+				break;
+			case PMRN_PMC3:
+				vcpu->arch.pm_reg.pmc[3] = mfpmr(PMRN_PMC3);
+				kvmppc_set_gpr(vcpu, rt, vcpu->arch.pm_reg.pmc[3]);
+				break;
+			case PMRN_PMLCA0:
+				kvmppc_set_gpr(vcpu, rt, vcpu->arch.pm_reg.pmlca[0]);
+				break;
+			case PMRN_PMLCA1:
+				kvmppc_set_gpr(vcpu, rt, vcpu->arch.pm_reg.pmlca[1]);
+				break;
+			case PMRN_PMLCA2:
+				kvmppc_set_gpr(vcpu, rt, vcpu->arch.pm_reg.pmlca[2]);
+				break;
+			case PMRN_PMLCA3:
+				kvmppc_set_gpr(vcpu, rt, vcpu->arch.pm_reg.pmlca[3]);
+				break;
+			case PMRN_PMLCB0:
+				kvmppc_set_gpr(vcpu, rt, vcpu->arch.pm_reg.pmlcb[0]);
+				break;
+			case PMRN_PMLCB1:
+				kvmppc_set_gpr(vcpu, rt, vcpu->arch.pm_reg.pmlcb[1]);
+				break;
+			case PMRN_PMLCB2:
+				kvmppc_set_gpr(vcpu, rt, vcpu->arch.pm_reg.pmlcb[2]);
+				break;
+			case PMRN_PMLCB3:
+				kvmppc_set_gpr(vcpu, rt, vcpu->arch.pm_reg.pmlcb[3]);
+				break;
+			default:
+				pr_err("%s: mfpmr: unknown pmr %u from %#llx\n",
+					__func__, pmrn,	vcpu->arch.shared->srr0);
+
+			}
+			break;
+
+		case OP_31_XOP_MTPMR:
+			/* If PerfMon not reserved by guest then do not emulate
+			   its registers */
+			if (!vcpu->arch.pm_is_reserved)
+				break;
+
+			pmrn = get_pmrn(inst);
+			rs = get_rs(inst);
+
+			switch (pmrn) {
+			case PMRN_PMGC0:
+				vcpu->arch.pm_reg.pmgc0 = kvmppc_get_gpr(vcpu, rs);
+				mtpmr(PMRN_PMGC0, vcpu->arch.pm_reg.pmgc0);
+				break;
+			case PMRN_PMC0:
+				vcpu->arch.pm_reg.pmc[0] = kvmppc_get_gpr(vcpu, rs);
+				mtpmr(PMRN_PMC0, vcpu->arch.pm_reg.pmc[0]);
+				if (kvmppc_core_pending_perfmon(vcpu))
+					kvmppc_clear_pending_perfmon(vcpu);
+				break;
+			case PMRN_PMC1:
+				vcpu->arch.pm_reg.pmc[1] = kvmppc_get_gpr(vcpu, rs);
+				mtpmr(PMRN_PMC1, vcpu->arch.pm_reg.pmc[1]);
+				if (kvmppc_core_pending_perfmon(vcpu))
+					kvmppc_clear_pending_perfmon(vcpu);
+				break;
+			case PMRN_PMC2:
+				vcpu->arch.pm_reg.pmc[2] = kvmppc_get_gpr(vcpu, rs);
+				mtpmr(PMRN_PMC2, vcpu->arch.pm_reg.pmc[2]);
+				if (kvmppc_core_pending_perfmon(vcpu))
+					kvmppc_clear_pending_perfmon(vcpu);
+				break;
+			case PMRN_PMC3:
+				vcpu->arch.pm_reg.pmc[3] = kvmppc_get_gpr(vcpu, rs);
+				mtpmr(PMRN_PMC3, vcpu->arch.pm_reg.pmc[3]);
+				if (kvmppc_core_pending_perfmon(vcpu))
+					kvmppc_clear_pending_perfmon(vcpu);
+				break;
+			case PMRN_PMLCA0:
+				reg = kvmppc_get_gpr(vcpu, rs);
+				vcpu->arch.pm_reg.pmlca[0] = reg;
+				kvmppc_set_hwpmlca(0, vcpu);
+				if (kvmppc_core_pending_perfmon(vcpu))
+					kvmppc_clear_pending_perfmon(vcpu);
+				break;
+			case PMRN_PMLCA1:
+				reg = kvmppc_get_gpr(vcpu, rs);
+				vcpu->arch.pm_reg.pmlca[1] = reg;
+				kvmppc_set_hwpmlca(1, vcpu);
+				if (kvmppc_core_pending_perfmon(vcpu))
+					kvmppc_clear_pending_perfmon(vcpu);
+				break;
+			case PMRN_PMLCA2:
+				reg = kvmppc_get_gpr(vcpu, rs);
+				vcpu->arch.pm_reg.pmlca[2] = reg;
+				kvmppc_set_hwpmlca(2, vcpu);
+				if (kvmppc_core_pending_perfmon(vcpu))
+					kvmppc_clear_pending_perfmon(vcpu);
+				break;
+			case PMRN_PMLCA3:
+				reg = kvmppc_get_gpr(vcpu, rs);
+				vcpu->arch.pm_reg.pmlca[3] = reg;
+				kvmppc_set_hwpmlca(3, vcpu);
+				if (kvmppc_core_pending_perfmon(vcpu))
+					kvmppc_clear_pending_perfmon(vcpu);
+				break;
+			case PMRN_PMLCB0:
+				vcpu->arch.pm_reg.pmlcb[0] = kvmppc_get_gpr(vcpu, rs);
+				mtpmr(PMRN_PMLCB0, vcpu->arch.pm_reg.pmlcb[0]);
+				break;
+			case PMRN_PMLCB1:
+				vcpu->arch.pm_reg.pmlcb[1] = kvmppc_get_gpr(vcpu, rs);
+				mtpmr(PMRN_PMLCB1, vcpu->arch.pm_reg.pmlcb[1]);
+				break;
+			case PMRN_PMLCB2:
+				vcpu->arch.pm_reg.pmlcb[2] = kvmppc_get_gpr(vcpu, rs);
+				mtpmr(PMRN_PMLCB2, vcpu->arch.pm_reg.pmlcb[2]);
+				break;
+			case PMRN_PMLCB3:
+				vcpu->arch.pm_reg.pmlcb[3] = kvmppc_get_gpr(vcpu, rs);
+				mtpmr(PMRN_PMLCB3, vcpu->arch.pm_reg.pmlcb[3]);
+				break;
+			default:
+				pr_err("%s: mtpmr: unknown pmr %u from %#llx\n",
+					__func__, pmrn,	vcpu->arch.shared->srr0);
+			}
+			break;
+#endif
 
 		case OP_31_XOP_MFSPR:
 			sprn = get_sprn(inst);

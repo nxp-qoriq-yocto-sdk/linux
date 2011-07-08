@@ -110,6 +110,7 @@ extern void kvmppc_core_dequeue_external(struct kvm_vcpu *vcpu,
                                          struct kvm_interrupt *irq);
 extern void kvmppc_core_queue_watchdog(struct kvm_vcpu *vcpu);
 extern void kvmppc_core_dequeue_watchdog(struct kvm_vcpu *vcpu);
+extern void kvmppc_core_dequeue_perfmon(struct kvm_vcpu *vcpu);
 
 extern int kvmppc_core_emulate_op(struct kvm_run *run, struct kvm_vcpu *vcpu,
                                   unsigned int op, int *advance);

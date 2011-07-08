@@ -549,6 +549,7 @@ struct kvm_ppc_pvinfo {
 #define KVM_CAP_PPC_BOOKE_SREGS 62
 #define KVM_CAP_SW_TLB 63
 #define KVM_CAP_SYSTEM_IRQ_ASSIGNMENT 1000
+#define KVM_CAP_ENABLE_PERFMON 1003
 
 #ifdef KVM_CAP_IRQ_ROUTING
 
@@ -769,6 +770,8 @@ struct kvm_dirty_tlb {
 /* Available with KVM_CAP_SW_TLB */
 #define KVM_CONFIG_TLB		  _IOW(KVMIO,  0xa8, struct kvm_config_tlb)
 #define KVM_DIRTY_TLB		  _IOW(KVMIO,  0xa9, struct kvm_dirty_tlb)
+
+#define KVM_RESERVE_PERFMON	  _IO(KVMIO,  0xaa)
 
 #define KVM_DEV_ASSIGN_ENABLE_IOMMU	(1 << 0)
 

@@ -35,7 +35,28 @@ void kvmppc_core_load_guest_debugstate(struct kvm_vcpu *vcpu)
 
 void kvmppc_core_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
 {
+	current->thread.kvm_shadow_vcpu = vcpu;
 	kvmppc_e500_tlb_load(vcpu, cpu);
+
+	/* Retore the PM Registers on VCPU load */
+	if (vcpu->arch.pm_is_reserved) {
+		mtpmr(PMRN_PMC0, vcpu->arch.pm_reg.pmc[0]);
+		mtpmr(PMRN_PMC1, vcpu->arch.pm_reg.pmc[1]);
+		mtpmr(PMRN_PMC2, vcpu->arch.pm_reg.pmc[2]);
+		mtpmr(PMRN_PMC3, vcpu->arch.pm_reg.pmc[3]);
+		mtpmr(PMRN_PMLCB0, vcpu->arch.pm_reg.pmlcb[0]);
+		mtpmr(PMRN_PMLCB1, vcpu->arch.pm_reg.pmlcb[1]);
+		mtpmr(PMRN_PMLCB2, vcpu->arch.pm_reg.pmlcb[2]);
+		mtpmr(PMRN_PMLCB3, vcpu->arch.pm_reg.pmlcb[3]);
+		kvmppc_set_hwpmlca_all(vcpu);
+		if (kvmppc_core_pending_perfmon(vcpu))
+			mtpmr(PMRN_PMGC0, vcpu->arch.pm_reg.pmgc0 &
+							~PMGC0_PMIE);
+		else
+			mtpmr(PMRN_PMGC0, vcpu->arch.pm_reg.pmgc0);
+
+		isync();
+	}
 }
 
 void kvmppc_core_vcpu_put(struct kvm_vcpu *vcpu)
@@ -46,6 +67,19 @@ void kvmppc_core_vcpu_put(struct kvm_vcpu *vcpu)
 	if (vcpu->arch.shadow_msr & MSR_SPE)
 		kvmppc_vcpu_disable_spe(vcpu);
 #endif
+	/* Freeze all counters and disable PM interrupt. Store the
+	 * current value of PM counters before the other guest owerwrites.
+	 */
+
+	if (vcpu->arch.pm_is_reserved) {
+		vcpu->arch.pm_reg.pmc[0] = mfpmr(PMRN_PMC0);
+		vcpu->arch.pm_reg.pmc[1] = mfpmr(PMRN_PMC1);
+		vcpu->arch.pm_reg.pmc[2] = mfpmr(PMRN_PMC2);
+		vcpu->arch.pm_reg.pmc[3] = mfpmr(PMRN_PMC3);
+		mtpmr(PMRN_PMGC0, PMGC0_FAC);
+		isync();
+	}
+	current->thread.kvm_shadow_vcpu = NULL;
 }
 
 int kvmppc_core_check_processor_compat(void)
@@ -234,7 +268,7 @@ void kvmppc_core_vcpu_free(struct kvm_vcpu *vcpu)
 static int __init kvmppc_e500_init(void)
 {
 	int r, i;
-	unsigned long ivor[3];
+	unsigned long ivor[4];
 	unsigned long *handler = kvmppc_booke_handler_addr;
 	unsigned long max_ivor = 0;
 
@@ -248,7 +282,8 @@ static int __init kvmppc_e500_init(void)
 	ivor[0] = mfspr(SPRN_IVOR32);
 	ivor[1] = mfspr(SPRN_IVOR33);
 	ivor[2] = mfspr(SPRN_IVOR34);
-	for (i = 0; i < 3; i++) {
+	ivor[3] = mfspr(SPRN_IVOR35);
+	for (i = 0; i < 4; i++) {
 		if (ivor[i] > ivor[max_ivor])
 			max_ivor = i;
 

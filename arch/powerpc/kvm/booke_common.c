@@ -162,3 +162,153 @@ void kvmppc_decrementer_func(unsigned long data)
 
 	kvmppc_set_tsr_bits(vcpu, TSR_DIS);
 }
+
+#ifdef CONFIG_KVM_E500
+void kvmppc_read_hwpmr(unsigned int pmr, u32 *val)
+{
+	switch (pmr) {
+	case PMRN_PMC0:
+		*val = mfpmr(PMRN_PMC0);
+		break;
+	case PMRN_PMC1:
+		*val = mfpmr(PMRN_PMC1);
+		break;
+	case PMRN_PMC2:
+		*val = mfpmr(PMRN_PMC2);
+		break;
+	case PMRN_PMC3:
+		*val = mfpmr(PMRN_PMC3);
+		break;
+	case PMRN_PMLCA0:
+		*val = mfpmr(PMRN_PMLCA0);
+		break;
+	case PMRN_PMLCA1:
+		*val = mfpmr(PMRN_PMLCA1);
+		break;
+	case PMRN_PMLCA2:
+		*val = mfpmr(PMRN_PMLCA2);
+		break;
+	case PMRN_PMLCA3:
+		*val = mfpmr(PMRN_PMLCA3);
+		break;
+	case PMRN_PMLCB0:
+		*val = mfpmr(PMRN_PMLCB0);
+		break;
+	case PMRN_PMLCB1:
+		*val = mfpmr(PMRN_PMLCB1);
+		break;
+	case PMRN_PMLCB2:
+		*val = mfpmr(PMRN_PMLCB2);
+		break;
+	case PMRN_PMLCB3:
+		*val = mfpmr(PMRN_PMLCB3);
+		break;
+	case PMRN_PMGC0:
+		*val = mfpmr(PMRN_PMGC0);
+		break;
+	default:
+		pr_err("%s: mfpmr: unknown PMR %d\n", __func__, pmr);
+	}
+}
+
+void kvmppc_write_hwpmr(unsigned int pmr, u32 val)
+{
+	switch (pmr) {
+	case PMRN_PMC0:
+		mtpmr(PMRN_PMC0, val);
+		break;
+	case PMRN_PMC1:
+		mtpmr(PMRN_PMC1, val);
+		break;
+	case PMRN_PMC2:
+		mtpmr(PMRN_PMC2, val);
+		break;
+	case PMRN_PMC3:
+		mtpmr(PMRN_PMC3, val);
+		break;
+	case PMRN_PMLCA0:
+		mtpmr(PMRN_PMLCA0, val);
+		break;
+	case PMRN_PMLCA1:
+		mtpmr(PMRN_PMLCA1, val);
+		break;
+	case PMRN_PMLCA2:
+		mtpmr(PMRN_PMLCA2, val);
+		break;
+	case PMRN_PMLCA3:
+		mtpmr(PMRN_PMLCA3, val);
+		break;
+	case PMRN_PMLCB0:
+		mtpmr(PMRN_PMLCB0, val);
+		break;
+	case PMRN_PMLCB1:
+		mtpmr(PMRN_PMLCB1, val);
+		break;
+	case PMRN_PMLCB2:
+		mtpmr(PMRN_PMLCB2, val);
+		break;
+	case PMRN_PMLCB3:
+		mtpmr(PMRN_PMLCB3, val);
+		break;
+	case PMRN_PMGC0:
+		mtpmr(PMRN_PMGC0, val);
+		break;
+	default:
+		pr_err("%s: mtpmr: unknown PMR %d\n", __func__, pmr);
+	}
+
+	isync();
+}
+
+void kvmppc_clear_pending_perfmon(struct kvm_vcpu *vcpu)
+{
+	u32 pmr;
+	int i;
+
+	for (i = 0; i < PERFMON_COUNTERS; i++) {
+		/* If not enabled, can't be the cause of pending interrupt */
+		kvmppc_read_hwpmr(PMRN_PMLCA0 + i, &pmr);
+		if (!(pmr & PMLCA_CE))
+			continue;
+
+		/* If PMC.OV set, then interrupt handling is still pending */
+		kvmppc_read_hwpmr(PMRN_PMC0 + i, &pmr);
+		if (pmr & 0x80000000)
+			return;
+	}
+	kvmppc_core_dequeue_perfmon(vcpu);
+	mtpmr(PMRN_PMGC0, vcpu->arch.pm_reg.pmgc0);
+	isync();
+}
+
+void kvmppc_set_hwpmlca(unsigned int idx, struct kvm_vcpu *vcpu)
+{
+	u32 reg;
+
+	if (idx >= PERFMON_COUNTERS) {
+		pr_err("%s: unknown PMLCA%d\n", __func__, idx);
+		return;
+	}
+
+	reg = vcpu->arch.pm_reg.pmlca[idx];
+
+	if ((reg & PMLCA_FCS) && !(vcpu->arch.shared->msr & MSR_PR))
+		reg |= PMLCA_FC;
+	if ((reg & PMLCA_FCU) && (vcpu->arch.shared->msr & MSR_PR))
+		reg |= PMLCA_FC;
+	if ((reg & PMLCA_FCM0) && !(vcpu->arch.shared->msr & MSR_PMM))
+		reg |= PMLCA_FC;
+	if ((reg & PMLCA_FCM1) && (vcpu->arch.shared->msr & MSR_PMM))
+		reg |= PMLCA_FC;
+
+	reg |= PMLCA_FCS;
+	kvmppc_write_hwpmr(PMRN_PMLCA0 + idx, reg);
+}
+
+void kvmppc_set_hwpmlca_all(struct kvm_vcpu *vcpu)
+{
+	unsigned int i;
+	for (i = 0; i < PERFMON_COUNTERS; i++)
+		kvmppc_set_hwpmlca(i, vcpu);
+}
+#endif /* CONFIG_KVM_E500 */

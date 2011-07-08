@@ -483,6 +483,9 @@ int main(void)
 	DEFINE(VCPU_SHADOW_DBG, offsetof(struct kvm_vcpu, arch.shadow_dbg_reg));
 	DEFINE(VCPU_HOST_DBG, offsetof(struct kvm_vcpu, arch.host_dbg_reg));
 	DEFINE(VCPU_GUEST_DEBUG, offsetof(struct kvm_vcpu, guest_debug));
+	DEFINE(VCPU_PM_REG, offsetof(struct kvm_vcpu, arch.pm_reg));
+	DEFINE(VCPU_PM_IS_RESERVED, offsetof(struct kvm_vcpu,
+						arch.pm_is_reserved));
 #endif /* CONFIG_PPC_BOOK3S */
 #endif
 

@@ -1367,7 +1367,23 @@ The "num_dirty" field is a performance hint for KVM to determine whether it
 should skip processing the bitmap and just invalidate everything.  It must
 be set to the number of set bits in the bitmap.
 
+4.59 KVM_RESERVE_PERFMON
 
+Capability: KVM_CAP_ENABLE_PERFMON
+Architectures: ppc
+Type: vcpu ioctl
+Parameters: none
+Returns: 0 on success, -1 on error
+
+This ioctl reserves the performance monitor for requesting vcpu. This should
+be called when vcpu is created. If the performance monitor is successfully
+reserved for the vcpu then the performance monitor APU is emulated for that vcpu.
+
+Once the performance monitor is reserved for one or more vcpus, it
+can not be used by the host kernel till it is released by the vcpus.
+
+The performance monitor is released on vcpu reset/exit
+(in kvmppc_core_vcpu_free()).
 
 5. The kvm_run structure
 

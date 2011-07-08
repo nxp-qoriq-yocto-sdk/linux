@@ -31,12 +31,19 @@
 #include <asm/uaccess.h>
 #include <asm/kvm_ppc.h>
 #include <asm/tlbflush.h>
+#include <asm/pmc.h>
 #include "timing.h"
 #include "../mm/mmu_decl.h"
 
 #define CREATE_TRACE_POINTS
 #include "trace.h"
+#include "booke.h"
 #include "irq.h"
+
+#ifdef CONFIG_KVM_E500
+static DEFINE_SPINLOCK(perfmon_lock);
+static unsigned int perfmon_refcount;
+#endif
 
 int kvm_arch_vcpu_runnable(struct kvm_vcpu *v)
 {
@@ -203,6 +210,7 @@ int kvm_dev_ioctl_check_extension(long ext)
 	case KVM_CAP_PPC_GET_PVINFO:
 #ifdef CONFIG_KVM_E500
 	case KVM_CAP_SW_TLB:
+	case KVM_CAP_ENABLE_PERFMON:
 #endif
 #ifdef CONFIG_KVM_MPIC
 	case KVM_CAP_IRQCHIP:
@@ -343,6 +351,16 @@ void kvm_arch_vcpu_uninit(struct kvm_vcpu *vcpu)
 {
 #ifdef CONFIG_BOOKE
 	del_timer(&vcpu->arch.wdt_timer);
+#endif
+#ifdef CONFIG_KVM_E500
+	if (vcpu->arch.pm_is_reserved) {
+		spin_lock(&perfmon_lock);
+		vcpu->arch.pm_is_reserved = false;
+
+		if (!(--perfmon_refcount))
+			release_pmc_hardware();
+		spin_unlock(&perfmon_lock);
+	}
 #endif
 	kvmppc_mmu_destroy(vcpu);
 }
@@ -628,6 +646,45 @@ static int kvm_vcpu_ioctl_enable_cap(struct kvm_vcpu *vcpu,
 	return r;
 }
 
+#ifdef CONFIG_KVM_E500
+static void pm_dummy_handler(struct pt_regs *regs)
+{
+	struct kvm_vcpu *vcpu = current->thread.kvm_shadow_vcpu;
+
+	mtpmr(PMRN_PMGC0, mfpmr(PMRN_PMGC0) & ~PMGC0_PMIE);
+	if (!vcpu || !vcpu->arch.pm_is_reserved) {
+		pr_warning("%s KVM: Guest PerfMon Interrupt taken"
+			" in kernel\n", __func__);
+		return;
+	}
+
+	if (vcpu->arch.pm_reg.pmgc0 & PMGC0_FCECE)
+		vcpu->arch.pm_reg.pmgc0 |= PMGC0_FAC;
+
+	kvmppc_core_queue_perfmon(vcpu);
+}
+#endif
+
+static int kvm_arch_vcpu_ioctl_reserve_perfmon(struct kvm_vcpu *vcpu)
+{
+#ifdef CONFIG_KVM_E500
+	spin_lock(&perfmon_lock);
+
+	if ((!perfmon_refcount) && (reserve_pmc_hardware(pm_dummy_handler)))
+		goto err;
+
+	perfmon_refcount++;
+	vcpu->arch.pm_is_reserved = true;
+	spin_unlock(&perfmon_lock);
+	return 0;
+err:
+	spin_unlock(&perfmon_lock);
+	return -EBUSY;
+#else
+	return -EINVAL;
+#endif
+}
+
 int kvm_arch_vcpu_ioctl_get_mpstate(struct kvm_vcpu *vcpu,
                                     struct kvm_mp_state *mp_state)
 {
@@ -686,6 +743,11 @@ long kvm_arch_vcpu_ioctl(struct file *filp,
 		break;
 	}
 #endif
+
+	case KVM_RESERVE_PERFMON: {
+		r = kvm_arch_vcpu_ioctl_reserve_perfmon(vcpu);
+		break;
+	}
 
 	default:
 		r = -EINVAL;

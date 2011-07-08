@@ -240,9 +240,9 @@ struct thread_struct {
 	unsigned long	spefscr;	/* SPE & eFP status */
 	int		used_spe;	/* set if process has used spe */
 #endif /* CONFIG_SPE */
-#if defined(CONFIG_KVM_BOOK3S_32_HANDLER) || defined(CONFIG_KVM_BOOKE_HV)
+#ifdef CONFIG_KVM
 	void*		kvm_shadow_vcpu; /* KVM internal data */
-#endif /* CONFIG_KVM_BOOK3S_32_HANDLER */
+#endif
 #ifdef CONFIG_PPC64
 	unsigned long	dscr;
 	int		dscr_inherit;

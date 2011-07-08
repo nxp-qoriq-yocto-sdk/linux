@@ -125,6 +125,13 @@ void kvmppc_set_msr(struct kvm_vcpu *vcpu, u32 new_msr)
 
 	kvmppc_mmu_msr_notify(vcpu, old_msr);
 
+#ifdef CONFIG_KVM_E500
+	/* Change PMLCA for all counters if MSR_PR or MSR_PMM changes */
+	if (vcpu->arch.pm_is_reserved &&
+	    (old_msr ^ new_msr) & (MSR_PMM | MSR_PR))
+		kvmppc_set_hwpmlca_all(vcpu);
+#endif
+
 	if (vcpu->arch.shared->msr & MSR_WE) {
 		kvm_vcpu_block(vcpu);
 		kvmppc_set_exit_type(vcpu, EMULATED_MTMSRWE_EXITS);
@@ -182,6 +189,22 @@ int kvmppc_core_pending_dec(struct kvm_vcpu *vcpu)
 void kvmppc_core_dequeue_dec(struct kvm_vcpu *vcpu)
 {
 	clear_bit(BOOKE_IRQPRIO_DECREMENTER, &vcpu->arch.pending_exceptions);
+}
+
+void kvmppc_core_queue_perfmon(struct kvm_vcpu *vcpu)
+{
+	kvmppc_booke_queue_irqprio(vcpu, BOOKE_IRQPRIO_PERFORMANCE_MONITOR);
+}
+
+int kvmppc_core_pending_perfmon(struct kvm_vcpu *vcpu)
+{
+	return test_bit(BOOKE_IRQPRIO_PERFORMANCE_MONITOR,
+					&vcpu->arch.pending_exceptions);
+}
+void kvmppc_core_dequeue_perfmon(struct kvm_vcpu *vcpu)
+{
+	clear_bit(BOOKE_IRQPRIO_PERFORMANCE_MONITOR,
+					&vcpu->arch.pending_exceptions);
 }
 
 void kvmppc_core_queue_external(struct kvm_vcpu *vcpu,
@@ -263,6 +286,18 @@ static int kvmppc_booke_irqprio_deliver(struct kvm_vcpu *vcpu,
 		msr_mask = MSR_CE|MSR_ME|MSR_DE;
 		int_class = INT_CLASS_NONCRIT;
 		break;
+#ifdef CONFIG_KVM_E500
+	case BOOKE_IRQPRIO_PERFORMANCE_MONITOR:
+		allowed = allowed && vcpu->arch.shared->msr & MSR_EE;
+		if ((!(vcpu->arch.pm_reg.pmgc0 & PMGC0_PMIE))) {
+			allowed = 0;
+			dequeue = 1;
+		}
+		msr_mask = MSR_CE|MSR_ME|MSR_DE;
+		int_class = INT_CLASS_NONCRIT;
+		keep_irq = true;
+		break;
+#endif
 	case BOOKE_IRQPRIO_WATCHDOG:
 		if (!(vcpu->arch.tcr & TCR_WIE)) {
 			allowed = 0;
@@ -455,6 +490,12 @@ int kvmppc_handle_exit(struct kvm_run *run, struct kvm_vcpu *vcpu,
 			run->exit_reason = KVM_EXIT_DEBUG;
 			r = RESUME_HOST;
 		}
+		break;
+
+	case BOOKE_INTERRUPT_PERFORMANCE_MONITOR:
+		if (need_resched())
+			cond_resched();
+		r = RESUME_GUEST;
 		break;
 
 	case BOOKE_INTERRUPT_FP_UNAVAIL:
