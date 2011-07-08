@@ -163,6 +163,117 @@ void kvmppc_decrementer_func(unsigned long data)
 	kvmppc_set_tsr_bits(vcpu, TSR_DIS);
 }
 
+#define BP_NUM	KVMPPC_IAC_NUM
+#define WP_NUM	KVMPPC_DAC_NUM
+void kvmppc_recalc_shadow_ac(struct kvm_vcpu *vcpu)
+{
+	if (vcpu->guest_debug == 0) {
+		struct kvmppc_debug_reg *sreg = &(vcpu->arch.shadow_dbg_reg),
+		                        *greg = &(vcpu->arch.dbg_reg);
+		int i;
+
+		for (i = 0; i < BP_NUM; i++)
+			sreg->iac[i] = greg->iac[i];
+		for (i = 0; i < WP_NUM; i++)
+			sreg->dac[i] = greg->dac[i];
+	}
+}
+
+void kvmppc_recalc_shadow_dbcr(struct kvm_vcpu *vcpu)
+{
+#define MASK_EVENT (DBCR0_IC | DBCR0_BRT)
+	if (vcpu->guest_debug == 0) {
+		struct kvmppc_debug_reg *sreg = &(vcpu->arch.shadow_dbg_reg),
+		                        *greg = &(vcpu->arch.dbg_reg);
+
+		/* We always enable debug event in shadow */
+		sreg->dbcr0 = greg->dbcr0 | DBCR0_IDM;
+
+		/*
+		 * Some event should not occur if MSR[DE] = 0,
+		 * since MSR[DE] is always set in shadow,
+		 * we disable these events in shadow when guest MSR[DE] = 0
+		 */
+		if (!(vcpu->arch.shared->msr & MSR_DE))
+			sreg->dbcr0 = greg->dbcr0 & ~MASK_EVENT;
+
+		/* XXX assume that guest always wants to debug eaddr */
+		sreg->dbcr1 = DBCR1_IAC1US | DBCR1_IAC2US |
+		              DBCR1_IAC3US | DBCR1_IAC4US;
+		sreg->dbcr2 = DBCR2_DAC1US | DBCR2_DAC2US;
+	}
+}
+
+int kvmppc_core_set_guest_debug(struct kvm_vcpu *vcpu,
+                                struct kvm_guest_debug *dbg)
+{
+	if (!(dbg->control & KVM_GUESTDBG_ENABLE)) {
+		vcpu->guest_debug = 0;
+		kvmppc_recalc_shadow_ac(vcpu);
+		kvmppc_recalc_shadow_dbcr(vcpu);
+		return 0;
+	}
+
+	vcpu->guest_debug = dbg->control;
+	vcpu->arch.shadow_dbg_reg.dbcr0 = 0;
+
+	if (vcpu->guest_debug & KVM_GUESTDBG_SINGLESTEP)
+		vcpu->arch.shadow_dbg_reg.dbcr0 |= DBCR0_IDM | DBCR0_IC;
+
+	if (vcpu->guest_debug & KVM_GUESTDBG_USE_HW_BP) {
+		struct kvmppc_debug_reg *gdbgr = &(vcpu->arch.shadow_dbg_reg);
+		int n, b = 0, w = 0;
+		const u32 bp_code[] = {
+			DBCR0_IAC1 | DBCR0_IDM,
+			DBCR0_IAC2 | DBCR0_IDM,
+			DBCR0_IAC3 | DBCR0_IDM,
+			DBCR0_IAC4 | DBCR0_IDM
+		};
+		const u32 wp_code[] = {
+			DBCR0_DAC1W | DBCR0_IDM,
+			DBCR0_DAC2W | DBCR0_IDM,
+			DBCR0_DAC1R | DBCR0_IDM,
+			DBCR0_DAC2R | DBCR0_IDM
+		};
+
+#ifndef CONFIG_KVM_BOOKE_HV
+		gdbgr->dbcr1 = DBCR1_IAC1US | DBCR1_IAC2US |
+		               DBCR1_IAC3US | DBCR1_IAC4US;
+		gdbgr->dbcr2 = DBCR2_DAC1US | DBCR2_DAC2US;
+#else
+		gdbgr->dbcr1 = 0;
+		gdbgr->dbcr2 = 0;
+#endif
+
+		for (n = 0; n < (BP_NUM + WP_NUM); n++) {
+			u32 type = dbg->arch.bp[n].type;
+
+			if (!type)
+				break;
+
+			if (type & (KVMPPC_DEBUG_WATCH_READ |
+			            KVMPPC_DEBUG_WATCH_WRITE)) {
+				if (w < WP_NUM) {
+					if (type & KVMPPC_DEBUG_WATCH_READ)
+						gdbgr->dbcr0 |= wp_code[w + 2];
+					if (type & KVMPPC_DEBUG_WATCH_WRITE)
+						gdbgr->dbcr0 |= wp_code[w];
+					gdbgr->dac[w] = dbg->arch.bp[n].addr;
+					w++;
+				}
+			} else if (type & KVMPPC_DEBUG_BREAKPOINT) {
+				if (b < BP_NUM) {
+					gdbgr->dbcr0 |= bp_code[b];
+					gdbgr->iac[b] = dbg->arch.bp[n].addr;
+					b++;
+				}
+			}
+		}
+	}
+
+	return 0;
+}
+
 #ifdef CONFIG_KVM_E500
 void kvmppc_read_hwpmr(unsigned int pmr, u32 *val)
 {
