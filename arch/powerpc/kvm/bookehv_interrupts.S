@@ -312,6 +312,18 @@ kvm_lvl_handler BOOKE_INTERRUPT_DEBUG, \
  *  r14: KVM exit number
  */
 _GLOBAL(kvmppc_resume_host)
+	/* Save PMGC0 and Freeze all counters */
+	lwz	r9, VCPU_PM_IS_RESERVED(r4)
+	cmpwi	r9, 0
+	beq	skip_pmgc0_save
+	mfpmr	r9, PMRN_PMGC0
+	stw	r9, VCPU_SHADOW_PMGC0(r4)
+	lis	r8, PMGC0_FAC@h
+	ori	r8, r8, PMGC0_FAC@l
+	ori	r9, r9, r8
+	mtpmr	PMRN_PMGC0, r9
+skip_pmgc0_save:
+
 	/* Save remaining volatile guest register state to vcpu. */
 	mfspr	r3, SPRN_VRSAVE
 	PPC_STL	r0, VCPU_GPR(r0)(r4)
@@ -557,7 +569,15 @@ lightweight_exit:
 	mtspr	SPRN_SPRG5W, r6
 	lwz	r8, VCPU_SHARED_SPRG7(r11)
 	mtspr	SPRN_SPRG6W, r7
+	lwz	r9, VCPU_PM_IS_RESERVED(r4)
 	mtspr	SPRN_SPRG7W, r8
+
+	/* Load Guest PMGC0 */
+	cmpwi	r9, 0
+	beq	skip_pmgc0_restore
+	lwz	r9, VCPU_SHADOW_PMGC0(r4)
+	mtpmr	PMRN_PMGC0, r9
+skip_pmgc0_restore:
 
 	/* Load some guest volatiles. */
 	PPC_LL	r3, VCPU_LR(r4)

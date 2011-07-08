@@ -113,6 +113,10 @@ void kvmppc_core_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
 
 	kvmppc_booke_vcpu_load(vcpu, cpu);
 
+	/* Retore the PM Registers on VCPU load */
+	if (vcpu->arch.pm_is_reserved)
+		kvmppc_load_perfmon_regs(vcpu);
+
 	mtspr(SPRN_LPID, vcpu->kvm->arch.lpid);
 	mtspr(SPRN_EPCR, vcpu->arch.shadow_epcr);
 	mtspr(SPRN_GPIR, vcpu->vcpu_id);
@@ -150,6 +154,7 @@ void kvmppc_core_vcpu_put(struct kvm_vcpu *vcpu)
 	vcpu->arch.shared->sprg1 = mfspr(SPRN_GSPRG1);
 	vcpu->arch.shared->sprg2 = mfspr(SPRN_GSPRG2);
 	vcpu->arch.shared->sprg3 = mfspr(SPRN_GSPRG3);
+	vcpu->arch.shadow_msrp = mfspr(SPRN_MSRP);
 
 	vcpu->arch.shared->srr0 = mfspr(SPRN_GSRR0);
 	vcpu->arch.shared->srr1 = mfspr(SPRN_GSRR1);
@@ -159,6 +164,10 @@ void kvmppc_core_vcpu_put(struct kvm_vcpu *vcpu)
 	vcpu->arch.shared->esr = mfspr(SPRN_GESR);
 
 	vcpu->arch.oldpir = mfspr(SPRN_PIR);
+
+
+	if (vcpu->arch.pm_is_reserved)
+		kvmppc_save_perfmon_regs(vcpu);
 
 	kvmppc_booke_vcpu_put(vcpu);
 }
@@ -183,9 +192,13 @@ int kvmppc_core_vcpu_setup(struct kvm_vcpu *vcpu)
 
 	vcpu->arch.shadow_epcr = SPRN_EPCR_DSIGS | SPRN_EPCR_DGTMI | \
 				 SPRN_EPCR_DUVD;
-	vcpu->arch.shadow_msrp = MSRP_UCLEP | MSRP_DEP | MSRP_PMMP;
 	vcpu->arch.eplc = EPC_EGS | (vcpu->kvm->arch.lpid << EPC_ELPID_SHIFT);
 	vcpu->arch.epsc = vcpu->arch.eplc;
+
+	if (vcpu->arch.pm_is_reserved)
+		vcpu->arch.shadow_msrp = MSRP_UCLEP | MSRP_DEP;
+	else
+		vcpu->arch.shadow_msrp = MSRP_UCLEP | MSRP_DEP | MSRP_PMMP;
 
 	vcpu->arch.pvr = mfspr(SPRN_PVR);
 	vcpu_e500->svr = mfspr(SPRN_SVR);

@@ -311,6 +311,10 @@ void kvmppc_core_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
 
 	/* Shadow PID may be expired on local core */
 	kvmppc_e500_recalc_shadow_pid(to_e500(vcpu));
+
+	/* Retore the PM Registers on VCPU load */
+	if (vcpu->arch.pm_is_reserved)
+		kvmppc_load_perfmon_regs(vcpu);
 }
 
 void kvmppc_core_vcpu_put(struct kvm_vcpu *vcpu)
@@ -319,6 +323,13 @@ void kvmppc_core_vcpu_put(struct kvm_vcpu *vcpu)
 	if (vcpu->arch.shadow_msr & MSR_SPE)
 		kvmppc_vcpu_disable_spe(vcpu);
 #endif
+
+	/* Freeze all counters and disable PM interrupt. Store the
+	 * current value of PM counters before the other guest owerwrites.
+	 */
+
+	if (vcpu->arch.pm_is_reserved)
+		kvmppc_save_perfmon_regs(vcpu);
 
 	kvmppc_booke_vcpu_put(vcpu);
 }
@@ -490,7 +501,7 @@ void kvmppc_core_destroy_vm(struct kvm *kvm)
 static int __init kvmppc_e500_init(void)
 {
 	int r, i;
-	unsigned long ivor[3];
+	unsigned long ivor[4];
 	unsigned long *handler = kvmppc_booke_handler_addr;
 	unsigned long max_ivor = 0;
 
@@ -508,7 +519,8 @@ static int __init kvmppc_e500_init(void)
 	ivor[0] = mfspr(SPRN_IVOR32);
 	ivor[1] = mfspr(SPRN_IVOR33);
 	ivor[2] = mfspr(SPRN_IVOR34);
-	for (i = 0; i < 3; i++) {
+	ivor[3] = mfspr(SPRN_IVOR35);
+	for (i = 0; i < 4; i++) {
 		if (ivor[i] > ivor[max_ivor])
 			max_ivor = i;
 

@@ -1444,6 +1444,24 @@ at the memory location pointed to by "addr".
 The list of registers accessible using this interface is identical to the
 list in 4.64.
 
+4.xx KVM_RESERVE_PERFMON
+
+Capability: KVM_CAP_ENABLE_PERFMON
+Architectures: ppc
+Type: vcpu ioctl
+Parameters: none
+Returns: 0 on success, -1 on error
+
+This ioctl reserves the performance monitor for requesting vcpu. This should
+be called when vcpu is created. If the performance monitor is successfully
+reserved for the vcpu then the performance monitor APU is emulated for that vcpu.
+
+Once the performance monitor is reserved for one or more vcpus, it
+can not be used by the host kernel till it is released by the vcpus.
+
+The performance monitor is released on vcpu reset/exit
+(in kvmppc_core_vcpu_free()).
+
 5. The kvm_run structure
 
 Application code obtains a pointer to the kvm_run structure by
