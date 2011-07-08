@@ -36,6 +36,7 @@
 	    (\ivor_nr == BOOKE_HV_SYSCALL) ||				\
 	    (\ivor_nr == BOOKE_HV_PRIV)
 
+BEGIN_FTR_SECTION
 	mfspr	r11, SPRN_SRR1
 	andis. 	r11, r11, MSR_GS@h
 	/*
@@ -46,6 +47,7 @@
 	 */
 	beq	kvmppc_resume_\ivor_nr
 	b	kvmppc_handler_\ivor_nr
+END_FTR_SECTION_IFSET(CPU_FTR_EMB_HV)
 	.endif
 kvmppc_resume_\ivor_nr:
 .endm

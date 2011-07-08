@@ -893,7 +893,7 @@ _GLOBAL(__setup_e500mc_ivors)
 	 */
 	mfspr	r3, SPRN_MMUCFG
 	andis.	r3, r3, MMUCFG_LPIDSIZE@h
-	beq	skip_hv_ivors
+	beq	no_hv
 	li	r3,GuestDoorBell@l
 	mtspr	SPRN_IVOR38,r3
 	li	r3,CriticalGuestDoorBell@l
@@ -905,6 +905,11 @@ _GLOBAL(__setup_e500mc_ivors)
 skip_hv_ivors:
 	sync
 	blr
+no_hv:
+	lwz	r3, CPU_SPEC_FEATURES(r5)
+	rlwinm	r3, r3, 0, ~CPU_FTR_EMB_HV
+	stw	r3, CPU_SPEC_FEATURES(r5)
+	b	skip_hv_ivors
 
 /*
  * extern void giveup_altivec(struct task_struct *prev)
