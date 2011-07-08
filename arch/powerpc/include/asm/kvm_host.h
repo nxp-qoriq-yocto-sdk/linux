@@ -335,6 +335,16 @@ struct kvmppc_slb {
 # endif
 #endif
 
+#define PERFMON_COUNTERS	4
+struct kvmppc_pm_reg {
+#ifdef CONFIG_BOOKE
+	u32 pmgc0;
+	u32 pmlca[PERFMON_COUNTERS];
+	u32 pmlcb[PERFMON_COUNTERS];
+	u32 pmc[PERFMON_COUNTERS];
+#endif
+};
+
 struct kvmppc_debug_reg {
 #ifdef CONFIG_BOOKE
 	u32 iac[KVMPPC_IAC_NUM];
@@ -441,6 +451,10 @@ struct kvm_vcpu_arch {
 
 	u64 mmcr[3];
 	u32 pmc[8];
+
+	struct kvmppc_pm_reg pm_reg;
+	struct kvmppc_pm_reg shadow_pm_reg;
+	bool pm_is_reserved;
 
 	struct kvmppc_debug_reg shadow_dbg_reg; /* shadow debug registers */
 	struct kvmppc_debug_reg host_dbg_reg;	/* host debug regiters*/

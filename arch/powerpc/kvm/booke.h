@@ -133,4 +133,13 @@ void kvmppc_booke_vcpu_put(struct kvm_vcpu *vcpu);
 
 u32 kvmppc_mpic_iack(struct kvm *kvm, int vcpu);
 
+void kvmppc_set_hwpmlca_all(struct kvm_vcpu *vcpu);
+void kvmppc_set_hwpmlca(unsigned int idx, struct kvm_vcpu *vcpu);
+void kvmppc_core_dequeue_perfmon(struct kvm_vcpu *vcpu);
+int kvmppc_core_pending_perfmon(struct kvm_vcpu *vcpu);
+void kvmppc_core_queue_perfmon(struct kvm_vcpu *vcpu);
+void kvmppc_clear_pending_perfmon(struct kvm_vcpu *vcpu);
+void kvmppc_load_perfmon_regs(struct kvm_vcpu *vcpu);
+void kvmppc_save_perfmon_regs(struct kvm_vcpu *vcpu);
+
 #endif /* __KVM_BOOKE_H__ */

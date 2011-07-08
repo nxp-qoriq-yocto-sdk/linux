@@ -559,6 +559,7 @@ struct kvm_ppc_pvinfo {
 #define KVM_CAP_SW_TLB 69
 #define KVM_CAP_ONE_REG 70
 #define KVM_CAP_SYSTEM_IRQ_ASSIGNMENT 1000
+#define KVM_CAP_ENABLE_PERFMON 1003
 
 #ifdef KVM_CAP_IRQ_ROUTING
 
@@ -815,6 +816,8 @@ struct kvm_one_reg {
 /* Available with KVM_CAP_ONE_REG */
 #define KVM_GET_ONE_REG		  _IOW(KVMIO,  0xab, struct kvm_one_reg)
 #define KVM_SET_ONE_REG		  _IOW(KVMIO,  0xac, struct kvm_one_reg)
+
+#define KVM_RESERVE_PERFMON	  _IO(KVMIO,  0xf0)
 
 #define KVM_DEV_ASSIGN_ENABLE_IOMMU	(1 << 0)
 
