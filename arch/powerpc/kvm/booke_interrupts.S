@@ -70,27 +70,31 @@ _GLOBAL(kvmppc_handler_\ivor_nr)
 
 .macro KVM_DBG_HANDLER ivor_nr
 _GLOBAL(kvmppc_handler_\ivor_nr)
-	/* Get pointer to vcpu and record exit number. */
-	mtspr   SPRN_SPRG_WSCRATCH0, r4
-	mtspr   SPRN_SPRG_WSCRATCH_CRIT, r3
+	mtspr   SPRN_SPRG_WSCRATCH_CRIT, r4
+	mfspr	r4, SPRN_SPRG_RVCPU
+	stw	r3, VCPU_CRIT_SAVE(r4)
 	mfcr	r3
 	mfspr	r4, SPRN_CSRR1
 	andi.	r4, r4, MSR_PR
 	bne	1f
+	/* debug interrupt happened in enter/exit path */
 	mfspr   r4, SPRN_CSRR1
 	rlwinm  r4, r4, 0, ~MSR_DE
 	mtspr   SPRN_CSRR1, r4
 	lis	r4, 0xffff
 	ori	r4, r4, 0xffff
 	mtspr	SPRN_DBSR, r4
-	mtcr	r3
-	mfspr   r3, SPRN_SPRG_RSCRATCH_CRIT
-	mfspr   r4, SPRN_SPRG_RSCRATCH0
-	rfci
-1:	/* it's a guest debug event */
-	mtcr	r3
-	mfspr   r3, SPRN_SPRG_RSCRATCH_CRIT
 	mfspr	r4, SPRN_SPRG_RVCPU
+	mtcr	r3
+	lwz     r3, VCPU_CRIT_SAVE(r4)
+	mfspr   r4, SPRN_SPRG_RSCRATCH_CRIT
+	rfci
+1:	/* debug interrupt happened in guest */
+	mfspr   r4, SPRN_SPRG_RSCRATCH_CRIT
+	mtspr	SPRN_SPRG_WSCRATCH0, r4
+	mfspr	r4, SPRN_SPRG_RVCPU
+	mtcr	r3
+	lwz     r3, VCPU_CRIT_SAVE(r4)
 	stw	r5, VCPU_GPR(r5)(r4)
 	stw	r6, VCPU_GPR(r6)(r4)
 	mfctr	r5

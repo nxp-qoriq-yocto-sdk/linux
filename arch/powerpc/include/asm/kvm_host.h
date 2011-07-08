@@ -332,6 +332,7 @@ struct kvm_vcpu_arch {
 	struct timer_list wdt_timer;
 	u32 wdt_period;
 	bool wdt_want_action;
+	u32 crit_save;
 #endif
 	gpa_t paddr_accessed;
 

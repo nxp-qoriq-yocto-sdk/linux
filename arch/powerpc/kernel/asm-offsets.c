@@ -417,7 +417,9 @@ int main(void)
 	DEFINE(VCPU_SHARED_MAS7_3, offsetof(struct kvm_vcpu_arch_shared, mas7_3));
 	DEFINE(VCPU_SHARED_MAS4, offsetof(struct kvm_vcpu_arch_shared, mas4));
 	DEFINE(VCPU_SHARED_MAS6, offsetof(struct kvm_vcpu_arch_shared, mas6));
-
+#ifdef CONFIG_BOOKE
+	DEFINE(VCPU_CRIT_SAVE, offsetof(struct kvm_vcpu, arch.crit_save));
+#endif
 	/* book3s */
 #ifdef CONFIG_PPC_BOOK3S
 	DEFINE(VCPU_HOST_RETIP, offsetof(struct kvm_vcpu, arch.host_retip));
