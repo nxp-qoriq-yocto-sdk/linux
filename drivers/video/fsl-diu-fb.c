@@ -31,8 +31,6 @@
 #include <linux/uaccess.h>
 #include <linux/vmalloc.h>
 
-#include <linux/of_platform.h>
-
 #include <sysdev/fsl_soc.h>
 #include <linux/fsl-diu-fb.h>
 #include "edid.h"
@@ -301,7 +299,8 @@ static struct fb_videomode __devinitdata fsl_diu_mode_db[] = {
 
 static char *fb_mode;
 static unsigned long default_bpp = 32;
-static int monitor_port;
+static enum fsl_diu_monitor_port monitor_port;
+static char *monitor_string;
 
 #if defined(CONFIG_NOT_COHERENT_CACHE)
 static u8 *coherence_data;
@@ -319,7 +318,7 @@ struct fsl_diu_data {
 	void *dummy_aoi_virt;
 	unsigned int irq;
 	int fb_enabled;
-	int monitor_port;
+	enum fsl_diu_monitor_port monitor_port;
 };
 
 struct mfb_info {
@@ -398,6 +397,37 @@ static struct diu_hw dr = {
 };
 
 static struct diu_pool pool;
+
+/**
+ * fsl_diu_name_to_port - convert a port name to a monitor port enum
+ *
+ * Takes the name of a monitor port ("dvi", "lvds", or "dlvds") and returns
+ * the enum fsl_diu_monitor_port that corresponds to that string.
+ *
+ * For compatibility with older versions, a number ("0", "1", or "2") is also
+ * supported.
+ *
+ * If the string is unknown, DVI is assumed.
+ *
+ * If the particular port is not supported by the platform, another port
+ * (platform-specific) is chosen instead.
+ */
+static enum fsl_diu_monitor_port fsl_diu_name_to_port(const char *s)
+{
+	enum fsl_diu_monitor_port port = FSL_DIU_PORT_DVI;
+	unsigned long val;
+
+	if (s) {
+		if (!strict_strtoul(s, 10, &val) && (val <= 2))
+			port = (enum fsl_diu_monitor_port) val;
+		else if (strncmp(s, "lvds", 4) == 0)
+			port = FSL_DIU_PORT_LVDS;
+		else if (strncmp(s, "dlvds", 5) == 0)
+			port = FSL_DIU_PORT_DLVDS;
+	}
+
+	return diu_ops.valid_monitor_port(port);
+}
 
 /**
  * fsl_diu_alloc - allocate memory for the DIU
@@ -948,9 +978,8 @@ static int fsl_diu_set_par(struct fb_info *info)
 		}
 	}
 
-	ad->pix_fmt =
-		diu_ops.get_pixel_format(var->bits_per_pixel,
-					 machine_data->monitor_port);
+	ad->pix_fmt = diu_ops.get_pixel_format(machine_data->monitor_port,
+					       var->bits_per_pixel);
 	ad->addr    = cpu_to_le32(info->fix.smem_start);
 	ad->src_size_g_alpha = cpu_to_le32((var->yres_virtual << 12) |
 				var->xres_virtual) | mfbi->g_alpha;
@@ -1554,16 +1583,12 @@ static void free_buf(struct device *dev, struct diu_addr *buf, u32 size,
 static ssize_t store_monitor(struct device *device,
 	struct device_attribute *attr, const char *buf, size_t count)
 {
-	int old_monitor_port;
-	unsigned long val;
+	enum fsl_diu_monitor_port old_monitor_port;
 	struct fsl_diu_data *machine_data =
 		container_of(attr, struct fsl_diu_data, dev_attr);
 
-	if (strict_strtoul(buf, 10, &val))
-		return 0;
-
 	old_monitor_port = machine_data->monitor_port;
-	machine_data->monitor_port = diu_ops.set_sysfs_monitor_port(val);
+	machine_data->monitor_port = fsl_diu_name_to_port(buf);
 
 	if (old_monitor_port != machine_data->monitor_port) {
 		/* All AOIs need adjust pixel format
@@ -1583,7 +1608,17 @@ static ssize_t show_monitor(struct device *device,
 {
 	struct fsl_diu_data *machine_data =
 		container_of(attr, struct fsl_diu_data, dev_attr);
-	return diu_ops.show_monitor_port(machine_data->monitor_port, buf);
+
+	switch (machine_data->monitor_port) {
+	case FSL_DIU_PORT_DVI:
+		return sprintf(buf, "DVI\n");
+	case FSL_DIU_PORT_LVDS:
+		return sprintf(buf, "Single-link LVDS\n");
+	case FSL_DIU_PORT_DLVDS:
+		return sprintf(buf, "Dual-link LVDS\n");
+	}
+
+	return 0;
 }
 
 static int __devinit fsl_diu_probe(struct platform_device *ofdev)
@@ -1807,8 +1842,7 @@ static int __init fsl_diu_setup(char *options)
 		if (!*opt)
 			continue;
 		if (!strncmp(opt, "monitor=", 8)) {
-			if (!strict_strtoul(opt + 8, 10, &val) && (val <= 2))
-				monitor_port = val;
+			monitor_port = fsl_diu_name_to_port(opt + 8);
 		} else if (!strncmp(opt, "bpp=", 4)) {
 			if (!strict_strtoul(opt + 4, 10, &val))
 				default_bpp = val;
@@ -1861,6 +1895,8 @@ static int __init fsl_diu_init(void)
 	if (fb_get_options("fslfb", &option))
 		return -ENODEV;
 	fsl_diu_setup(option);
+#else
+	monitor_port = fsl_diu_name_to_port(monitor_string);
 #endif
 	printk(KERN_INFO "Freescale DIU driver\n");
 
@@ -1927,7 +1963,7 @@ MODULE_PARM_DESC(mode,
 	"Specify resolution as \"<xres>x<yres>[-<bpp>][@<refresh>]\" ");
 module_param_named(bpp, default_bpp, ulong, 0);
 MODULE_PARM_DESC(bpp, "Specify bit-per-pixel if not specified mode");
-module_param_named(monitor, monitor_port, int, 0);
-MODULE_PARM_DESC(monitor,
-	"Specify the monitor port (0, 1 or 2) if supported by the platform");
+module_param_named(monitor, monitor_string, charp, 0);
+MODULE_PARM_DESC(monitor, "Specify the monitor port "
+	"(\"dvi\", \"lvds\", or \"dlvds\") if supported by the platform");
 
