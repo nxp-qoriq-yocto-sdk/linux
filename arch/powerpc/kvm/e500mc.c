@@ -110,6 +110,8 @@ void kvmppc_core_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
 	mtspr(SPRN_GSRR1, vcpu->arch.gsrr1);
 
 	mtspr(SPRN_GEPR, vcpu->arch.shared->epr);
+	mtspr(SPRN_GDEAR, vcpu->arch.shared->dar);
+	mtspr(SPRN_GESR, vcpu->arch.shared->esr);
 
 	kvmppc_e500mc_tlb_load(vcpu, cpu);
 	local_irq_enable();
@@ -128,6 +130,8 @@ void kvmppc_core_vcpu_put(struct kvm_vcpu *vcpu)
 	vcpu->arch.gsrr1 = mfspr(SPRN_GSRR1);
 
 	vcpu->arch.shared->epr = mfspr(SPRN_GEPR);
+	vcpu->arch.shared->dar = mfspr(SPRN_GDEAR);
+	vcpu->arch.shared->esr = mfspr(SPRN_GESR);
 
 	kvmppc_e500mc_tlb_put(vcpu);
 }
