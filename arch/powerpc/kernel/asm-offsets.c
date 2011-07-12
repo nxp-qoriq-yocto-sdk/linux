@@ -526,8 +526,6 @@ int main(void)
 #ifdef CONFIG_KVM_BOOKE_HV
 	DEFINE(VCPU_HOST_MAS4, offsetof(struct kvm_vcpu, arch.host_mas4));
 	DEFINE(VCPU_HOST_MAS6, offsetof(struct kvm_vcpu, arch.host_mas6));
-	DEFINE(VCPU_GSRR0, offsetof(struct kvm_vcpu, arch.gsrr0));
-	DEFINE(VCPU_GSRR1, offsetof(struct kvm_vcpu, arch.gsrr1));
 #endif
 
 #ifdef CONFIG_KVM_EXIT_TIMING

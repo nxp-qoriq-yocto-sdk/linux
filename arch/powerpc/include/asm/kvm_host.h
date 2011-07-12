@@ -275,8 +275,6 @@ struct kvm_vcpu_arch {
 #ifdef CONFIG_KVM_BOOKE_HV
 	u32 host_mas4;
 	u32 host_mas6;
-	u32 gsrr1;
-	ulong gsrr0;
 #endif
 
 #ifdef CONFIG_PPC_BOOK3S

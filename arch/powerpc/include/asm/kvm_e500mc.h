@@ -80,8 +80,6 @@ struct kvmppc_vcpu_e500mc {
 	u32 gpir;
 	u32 gesr;
 	u32 gepr;
-	u32 gsrr0;
-	u32 gsrr1;
 
 	struct kvm_vcpu vcpu;
 };

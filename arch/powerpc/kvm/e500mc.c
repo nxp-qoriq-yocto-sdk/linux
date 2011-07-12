@@ -106,8 +106,8 @@ void kvmppc_core_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
 	mtspr(SPRN_GSPRG2, (unsigned long)vcpu->arch.shared->sprg2);
 	mtspr(SPRN_GSPRG3, (unsigned long)vcpu->arch.shared->sprg3);
 
-	mtspr(SPRN_GSRR0, vcpu->arch.gsrr0);
-	mtspr(SPRN_GSRR1, vcpu->arch.gsrr1);
+	mtspr(SPRN_GSRR0, vcpu->arch.shared->srr0);
+	mtspr(SPRN_GSRR1, vcpu->arch.shared->srr1);
 
 	mtspr(SPRN_GEPR, vcpu->arch.shared->epr);
 	mtspr(SPRN_GDEAR, vcpu->arch.shared->dar);
@@ -126,8 +126,8 @@ void kvmppc_core_vcpu_put(struct kvm_vcpu *vcpu)
 	vcpu->arch.shared->sprg2 = mfspr(SPRN_GSPRG2);
 	vcpu->arch.shared->sprg3 = mfspr(SPRN_GSPRG3);
 
-	vcpu->arch.gsrr0 = mfspr(SPRN_GSRR0);
-	vcpu->arch.gsrr1 = mfspr(SPRN_GSRR1);
+	vcpu->arch.shared->srr0 = mfspr(SPRN_GSRR0);
+	vcpu->arch.shared->srr1 = mfspr(SPRN_GSRR1);
 
 	vcpu->arch.shared->epr = mfspr(SPRN_GEPR);
 	vcpu->arch.shared->dar = mfspr(SPRN_GDEAR);
