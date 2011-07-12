@@ -1207,12 +1207,16 @@ int kvm_vcpu_ioctl_config_tlb(struct kvm_vcpu *vcpu,
 	vcpu_e500->gtlb_offset[0] = 0;
 	vcpu_e500->gtlb_offset[1] = params.tlb_sizes[0];
 
-	vcpu_e500->tlb0cfg = mfspr(SPRN_TLB0CFG) & ~0xfffUL;
+	vcpu_e500->tlb0cfg = mfspr(SPRN_TLB0CFG) &
+			       ~(TLBnCFG_N_ENTRY | TLBnCFG_ASSOC);
 	if (params.tlb_sizes[0] <= 2048)
 		vcpu_e500->tlb0cfg |= params.tlb_sizes[0];
+	vcpu_e500->tlb0cfg |= params.tlb_ways[0] << TLBnCFG_ASSOC_SHIFT;
 
-	vcpu_e500->tlb1cfg = mfspr(SPRN_TLB1CFG) & ~0xfffUL;
+	vcpu_e500->tlb1cfg = mfspr(SPRN_TLB1CFG) &
+			       ~(TLBnCFG_N_ENTRY | TLBnCFG_ASSOC);
 	vcpu_e500->tlb1cfg |= params.tlb_sizes[1];
+	vcpu_e500->tlb1cfg |= params.tlb_ways[1] << TLBnCFG_ASSOC_SHIFT;
 
 	vcpu_e500->shared_tlb_pages = pages;
 	vcpu_e500->num_shared_tlb_pages = num_pages;
