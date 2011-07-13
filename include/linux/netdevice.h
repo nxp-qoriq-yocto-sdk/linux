@@ -1065,6 +1065,7 @@ struct net_device {
 #define NETIF_F_RXCSUM		(1 << 29) /* Receive checksumming offload */
 #define NETIF_F_NOCACHE_COPY	(1 << 30) /* Use no-cache copyfromuser */
 #define NETIF_F_LOOPBACK	(1 << 31) /* Enable loopback */
+#define NETIF_F_HW_QDISC	(1 << 24) /* Supports hardware Qdisc */
 
 	/* Segmentation offload features */
 #define NETIF_F_GSO_SHIFT	16

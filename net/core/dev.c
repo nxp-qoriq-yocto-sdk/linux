@@ -2420,6 +2420,12 @@ int dev_queue_xmit(struct sk_buff *skb)
 	 */
 	rcu_read_lock_bh();
 
+	if (dev->features & NETIF_F_HW_QDISC) {
+		txq = dev_pick_tx(dev, skb);
+		rc = dev_hard_start_xmit(skb, dev, txq);
+		goto out;
+	}
+
 	txq = dev_pick_tx(dev, skb);
 	q = rcu_dereference_bh(txq->qdisc);
 
