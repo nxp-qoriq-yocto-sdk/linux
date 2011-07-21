@@ -134,7 +134,7 @@ int kvmppc_emulate_instruction(struct kvm_run *run, struct kvm_vcpu *vcpu)
 	int rs;
 	int rt;
 	int sprn;
-#ifdef CONFIG_KVM_E500
+#ifdef CONFIG_KVM_BOOKE206_PERFMON
 	int pmrn;
 	u32 reg;
 #endif
@@ -236,7 +236,7 @@ int kvmppc_emulate_instruction(struct kvm_run *run, struct kvm_vcpu *vcpu)
 			kvmppc_set_gpr(vcpu, ra, ea);
 			break;
 
-#ifdef CONFIG_KVM_E500
+#ifdef CONFIG_KVM_BOOKE206_PERFMON
 		case OP_31_XOP_MFPMR:
 			/* If PerfMon not reserved by guest then return ZERO */
 			if (!vcpu->arch.pm_is_reserved) {
@@ -268,27 +268,51 @@ int kvmppc_emulate_instruction(struct kvm_run *run, struct kvm_vcpu *vcpu)
 				kvmppc_set_gpr(vcpu, rt, vcpu->arch.pm_reg.pmc[3]);
 				break;
 			case PMRN_PMLCA0:
+#ifdef CONFIG_KVM_BOOKE_HV
+				vcpu->arch.pm_reg.pmlca[0] = mfpmr(PMRN_PMLCA0);
+#endif
 				kvmppc_set_gpr(vcpu, rt, vcpu->arch.pm_reg.pmlca[0]);
 				break;
 			case PMRN_PMLCA1:
+#ifdef CONFIG_KVM_BOOKE_HV
+				vcpu->arch.pm_reg.pmlca[1] = mfpmr(PMRN_PMLCA1);
+#endif
 				kvmppc_set_gpr(vcpu, rt, vcpu->arch.pm_reg.pmlca[1]);
 				break;
 			case PMRN_PMLCA2:
+#ifdef CONFIG_KVM_BOOKE_HV
+				vcpu->arch.pm_reg.pmlca[2] = mfpmr(PMRN_PMLCA2);
+#endif
 				kvmppc_set_gpr(vcpu, rt, vcpu->arch.pm_reg.pmlca[2]);
 				break;
 			case PMRN_PMLCA3:
+#ifdef CONFIG_KVM_BOOKE_HV
+				vcpu->arch.pm_reg.pmlca[3] = mfpmr(PMRN_PMLCA3);
+#endif
 				kvmppc_set_gpr(vcpu, rt, vcpu->arch.pm_reg.pmlca[3]);
 				break;
 			case PMRN_PMLCB0:
+#ifdef CONFIG_KVM_BOOKE_HV
+				vcpu->arch.pm_reg.pmlcb[0] = mfpmr(PMRN_PMLCB0);
+#endif
 				kvmppc_set_gpr(vcpu, rt, vcpu->arch.pm_reg.pmlcb[0]);
 				break;
 			case PMRN_PMLCB1:
+#ifdef CONFIG_KVM_BOOKE_HV
+				vcpu->arch.pm_reg.pmlcb[1] = mfpmr(PMRN_PMLCB1);
+#endif
 				kvmppc_set_gpr(vcpu, rt, vcpu->arch.pm_reg.pmlcb[1]);
 				break;
 			case PMRN_PMLCB2:
+#ifdef CONFIG_KVM_BOOKE_HV
+				vcpu->arch.pm_reg.pmlcb[2] = mfpmr(PMRN_PMLCB2);
+#endif
 				kvmppc_set_gpr(vcpu, rt, vcpu->arch.pm_reg.pmlcb[2]);
 				break;
 			case PMRN_PMLCB3:
+#ifdef CONFIG_KVM_BOOKE_HV
+				vcpu->arch.pm_reg.pmlcb[3] = mfpmr(PMRN_PMLCB3);
+#endif
 				kvmppc_set_gpr(vcpu, rt, vcpu->arch.pm_reg.pmlcb[3]);
 				break;
 			default:
@@ -309,8 +333,19 @@ int kvmppc_emulate_instruction(struct kvm_run *run, struct kvm_vcpu *vcpu)
 
 			switch (pmrn) {
 			case PMRN_PMGC0:
-				vcpu->arch.pm_reg.pmgc0 = kvmppc_get_gpr(vcpu, rs);
-				mtpmr(PMRN_PMGC0, vcpu->arch.pm_reg.pmgc0);
+				reg = kvmppc_get_gpr(vcpu, rs);
+				vcpu->arch.pm_reg.pmgc0 = reg;
+#ifdef CONFIG_KVM_BOOKE_HV
+				if (!(reg & PMGC0_PMIE))
+					mtspr(SPRN_MSRP, mfspr(SPRN_MSRP) & ~MSRP_PMMP);
+
+				reg &= ~PMGC0_PMIE;
+				vcpu->arch.shadow_pm_reg.pmgc0 = reg;
+#else
+				mtpmr(PMRN_PMGC0, reg);
+#endif
+				if (!(reg & PMGC0_PMIE))
+					kvmppc_core_dequeue_perfmon(vcpu);
 				break;
 			case PMRN_PMC0:
 				vcpu->arch.pm_reg.pmc[0] = kvmppc_get_gpr(vcpu, rs);

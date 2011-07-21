@@ -313,24 +313,8 @@ void kvmppc_core_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
 	kvmppc_e500_recalc_shadow_pid(to_e500(vcpu));
 
 	/* Retore the PM Registers on VCPU load */
-	if (vcpu->arch.pm_is_reserved) {
-		mtpmr(PMRN_PMC0, vcpu->arch.pm_reg.pmc[0]);
-		mtpmr(PMRN_PMC1, vcpu->arch.pm_reg.pmc[1]);
-		mtpmr(PMRN_PMC2, vcpu->arch.pm_reg.pmc[2]);
-		mtpmr(PMRN_PMC3, vcpu->arch.pm_reg.pmc[3]);
-		mtpmr(PMRN_PMLCB0, vcpu->arch.pm_reg.pmlcb[0]);
-		mtpmr(PMRN_PMLCB1, vcpu->arch.pm_reg.pmlcb[1]);
-		mtpmr(PMRN_PMLCB2, vcpu->arch.pm_reg.pmlcb[2]);
-		mtpmr(PMRN_PMLCB3, vcpu->arch.pm_reg.pmlcb[3]);
-		kvmppc_set_hwpmlca_all(vcpu);
-		if (kvmppc_core_pending_perfmon(vcpu))
-			mtpmr(PMRN_PMGC0, vcpu->arch.pm_reg.pmgc0 &
-							~PMGC0_PMIE);
-		else
-			mtpmr(PMRN_PMGC0, vcpu->arch.pm_reg.pmgc0);
-
-		isync();
-	}
+	if (vcpu->arch.pm_is_reserved)
+		kvmppc_load_perfmon_regs(vcpu);
 }
 
 void kvmppc_core_vcpu_put(struct kvm_vcpu *vcpu)
@@ -343,14 +327,9 @@ void kvmppc_core_vcpu_put(struct kvm_vcpu *vcpu)
 	 * current value of PM counters before the other guest owerwrites.
 	 */
 
-	if (vcpu->arch.pm_is_reserved) {
-		vcpu->arch.pm_reg.pmc[0] = mfpmr(PMRN_PMC0);
-		vcpu->arch.pm_reg.pmc[1] = mfpmr(PMRN_PMC1);
-		vcpu->arch.pm_reg.pmc[2] = mfpmr(PMRN_PMC2);
-		vcpu->arch.pm_reg.pmc[3] = mfpmr(PMRN_PMC3);
-		mtpmr(PMRN_PMGC0, PMGC0_FAC);
-		isync();
-	}
+	if (vcpu->arch.pm_is_reserved)
+		kvmppc_save_perfmon_regs(vcpu);
+
 	current->thread.kvm_shadow_vcpu = NULL;
 }
 

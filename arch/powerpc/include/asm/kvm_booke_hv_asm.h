@@ -36,6 +36,7 @@
 	    (\ivor_nr == BOOKE_HV_SYSCALL) ||				\
 	    (\ivor_nr == BOOKE_HV_PRIV) ||				\
 	    (\ivor_nr == BOOKE_INTERRUPT_DEBUG) ||			\
+	    (\ivor_nr == BOOKE_INTERRUPT_PERFORMANCE_MONITOR) ||	\
 	    (\ivor_nr == BOOKE_INTERRUPT_HV_GS_DBELL_CRIT)
 
 BEGIN_FTR_SECTION

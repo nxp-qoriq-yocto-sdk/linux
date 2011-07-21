@@ -326,6 +326,7 @@ struct kvm_vcpu_arch {
 	u32 dbsr;
 
 	struct kvmppc_pm_reg pm_reg;
+	struct kvmppc_pm_reg shadow_pm_reg;
 	bool pm_is_reserved;
 
 	struct kvmppc_debug_reg dbg_reg;	/* guest debug regiters*/

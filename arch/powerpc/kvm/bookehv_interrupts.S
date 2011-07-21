@@ -159,6 +159,7 @@ KVM_HANDLER BOOKE_HV_GUEST_DBELL
 KVM_HANDLER BOOKE_INTERRUPT_DOORBELL
 KVM_LVL_HANDLER BOOKE_INTERRUPT_HV_GS_DBELL_CRIT SPRN_SPRG_RSCRATCH_CRIT
 KVM_LVL_HANDLER BOOKE_INTERRUPT_DEBUG SPRN_SPRG_RSCRATCH_DBG
+KVM_HANDLER BOOKE_INTERRUPT_PERFORMANCE_MONITOR
 
 
 /* Registers:
@@ -191,6 +192,17 @@ _GLOBAL(kvmppc_resume_host)
 	 */
 	PPC_LL	r13, VCPU_SHARED(r4)
 
+	/* Save PMGC0 and Freeze all counters */
+	lwz	r9, VCPU_PM_IS_RESERVED(r4)
+	cmpwi	r9, 0
+	beq	..skip_pmgc0_save
+	mfpmr	r9, PMRN_PMGC0
+	stw	r9, VCPU_SHADOW_PMGC0(r4)
+	lis	r8, PMGC0_FAC@h
+	ori	r8, r8, PMGC0_FAC@l
+	ori	r9, r9, r8
+	mtpmr	PMRN_PMGC0, r9
+..skip_pmgc0_save:
 	lwz	r6, VCPU_GUEST_DEBUG(r4)
 	cmpwi	r6, 0
 	beq	..skip_load_host_debug
@@ -622,6 +634,14 @@ lightweight_exit:
 	mtspr	SPRN_DBCR0, r6
 ..skip_load_guest_debug:
 
+	/* Load Guest PMGC0 */
+	lwz	r9, VCPU_PM_IS_RESERVED(r4)
+	cmpwi	r9, 0
+	beq	..skip_pmgc0_restore
+	lwz	r9, VCPU_SHADOW_PMGC0(r4)
+	mtpmr	PMRN_PMGC0, r9
+
+..skip_pmgc0_restore:
 	/* Load some guest volatiles. */
 	PPC_LL	r0, VCPU_GPR(r0)(r4)
 	PPC_LL	r2, VCPU_GPR(r2)(r4)

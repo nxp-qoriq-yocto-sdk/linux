@@ -274,7 +274,7 @@ int kvmppc_core_set_guest_debug(struct kvm_vcpu *vcpu,
 	return 0;
 }
 
-#ifdef CONFIG_KVM_E500
+#ifdef CONFIG_KVM_BOOKE206_PERFMON
 void kvmppc_read_hwpmr(unsigned int pmr, u32 *val)
 {
 	switch (pmr) {
@@ -388,7 +388,12 @@ void kvmppc_clear_pending_perfmon(struct kvm_vcpu *vcpu)
 			return;
 	}
 	kvmppc_core_dequeue_perfmon(vcpu);
+#ifdef CONFIG_KVM_BOOKE_HV
+	mtspr(SPRN_MSRP, mfspr(SPRN_MSRP) & ~MSRP_PMMP);
+	vcpu->arch.shadow_pm_reg.pmgc0 = vcpu->arch.pm_reg.pmgc0;
+#else
 	mtpmr(PMRN_PMGC0, vcpu->arch.pm_reg.pmgc0);
+#endif
 	isync();
 }
 
@@ -403,6 +408,7 @@ void kvmppc_set_hwpmlca(unsigned int idx, struct kvm_vcpu *vcpu)
 
 	reg = vcpu->arch.pm_reg.pmlca[idx];
 
+#ifndef CONFIG_KVM_BOOKE_HV
 	if ((reg & PMLCA_FCS) && !(vcpu->arch.shared->msr & MSR_PR))
 		reg |= PMLCA_FC;
 	if ((reg & PMLCA_FCU) && (vcpu->arch.shared->msr & MSR_PR))
@@ -413,6 +419,7 @@ void kvmppc_set_hwpmlca(unsigned int idx, struct kvm_vcpu *vcpu)
 		reg |= PMLCA_FC;
 
 	reg |= PMLCA_FCS;
+#endif
 	kvmppc_write_hwpmr(PMRN_PMLCA0 + idx, reg);
 }
 
@@ -422,7 +429,67 @@ void kvmppc_set_hwpmlca_all(struct kvm_vcpu *vcpu)
 	for (i = 0; i < PERFMON_COUNTERS; i++)
 		kvmppc_set_hwpmlca(i, vcpu);
 }
-#endif /* CONFIG_KVM_E500 */
+
+void kvmppc_save_perfmon_regs(struct kvm_vcpu *vcpu)
+{
+#ifndef CONFIG_KVM_BOOKE_HV
+	/* PMGC0 is saved at lightweight_exit for EHV */
+	vcpu->arch.shadow_pm_reg.pmgc0 = mfpmr(PMRN_PMGC0);
+#endif
+	mtpmr(PMRN_PMGC0, PMGC0_FAC);
+	isync();
+	vcpu->arch.shadow_pm_reg.pmc[0] = mfpmr(PMRN_PMC0);
+	vcpu->arch.shadow_pm_reg.pmc[1] = mfpmr(PMRN_PMC1);
+	vcpu->arch.shadow_pm_reg.pmc[2] = mfpmr(PMRN_PMC2);
+	vcpu->arch.shadow_pm_reg.pmc[3] = mfpmr(PMRN_PMC3);
+	vcpu->arch.shadow_pm_reg.pmlca[0] = mfpmr(PMRN_PMLCA0);
+	vcpu->arch.shadow_pm_reg.pmlca[1] = mfpmr(PMRN_PMLCA1);
+	vcpu->arch.shadow_pm_reg.pmlca[2] = mfpmr(PMRN_PMLCA2);
+	vcpu->arch.shadow_pm_reg.pmlca[3] = mfpmr(PMRN_PMLCA3);
+#ifdef CONFIG_KVM_BOOKE_HV
+	/* No need to save PMLCBx for no-EHV. They can be restored
+	 * from guest PMCLBx.
+	 */
+	vcpu->arch.shadow_pm_reg.pmlcb[0] = mfpmr(PMRN_PMLCB0);
+	vcpu->arch.shadow_pm_reg.pmlcb[1] = mfpmr(PMRN_PMLCB1);
+	vcpu->arch.shadow_pm_reg.pmlcb[2] = mfpmr(PMRN_PMLCB2);
+	vcpu->arch.shadow_pm_reg.pmlcb[3] = mfpmr(PMRN_PMLCB3);
+#endif
+}
+
+void kvmppc_load_perfmon_regs(struct kvm_vcpu *vcpu)
+{
+
+#ifdef CONFIG_KVM_BOOKE_HV
+	/* Do not rely on PMGC0 state, so freeze all counters
+	 * and disable interrupt now. Actual PMGC0 will be
+	 * loaded at lightweight_exit.
+	 */
+	mtpmr(PMRN_PMGC0, PMGC0_FAC);
+	isync();
+	mtpmr(PMRN_PMLCB0, vcpu->arch.shadow_pm_reg.pmlcb[0]);
+	mtpmr(PMRN_PMLCB1, vcpu->arch.shadow_pm_reg.pmlcb[1]);
+	mtpmr(PMRN_PMLCB2, vcpu->arch.shadow_pm_reg.pmlcb[2]);
+	mtpmr(PMRN_PMLCB3, vcpu->arch.shadow_pm_reg.pmlcb[3]);
+#else
+	mtpmr(PMRN_PMGC0, vcpu->arch.shadow_pm_reg.pmgc0);
+	isync();
+	mtpmr(PMRN_PMLCB0, vcpu->arch.pm_reg.pmlcb[0]);
+	mtpmr(PMRN_PMLCB1, vcpu->arch.pm_reg.pmlcb[1]);
+	mtpmr(PMRN_PMLCB2, vcpu->arch.pm_reg.pmlcb[2]);
+	mtpmr(PMRN_PMLCB3, vcpu->arch.pm_reg.pmlcb[3]);
+#endif
+	mtpmr(PMRN_PMC0, vcpu->arch.shadow_pm_reg.pmc[0]);
+	mtpmr(PMRN_PMC1, vcpu->arch.shadow_pm_reg.pmc[1]);
+	mtpmr(PMRN_PMC2, vcpu->arch.shadow_pm_reg.pmc[2]);
+	mtpmr(PMRN_PMC3, vcpu->arch.shadow_pm_reg.pmc[3]);
+	mtpmr(PMRN_PMLCA0, vcpu->arch.shadow_pm_reg.pmlca[0]);
+	mtpmr(PMRN_PMLCA1, vcpu->arch.shadow_pm_reg.pmlca[1]);
+	mtpmr(PMRN_PMLCA2, vcpu->arch.shadow_pm_reg.pmlca[2]);
+	mtpmr(PMRN_PMLCA3, vcpu->arch.shadow_pm_reg.pmlca[3]);
+	isync();
+}
+#endif /* CONFIG_KVM_BOOKE206_PERFMON */
 
 void kvmppc_set_dbsr_bits(struct kvm_vcpu *vcpu, u32 dbsr_bits)
 {

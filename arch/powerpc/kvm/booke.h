@@ -101,6 +101,8 @@ void kvmppc_core_dequeue_perfmon(struct kvm_vcpu *vcpu);
 int kvmppc_core_pending_perfmon(struct kvm_vcpu *vcpu);
 void kvmppc_core_queue_perfmon(struct kvm_vcpu *vcpu);
 void kvmppc_clear_pending_perfmon(struct kvm_vcpu *vcpu);
+void kvmppc_load_perfmon_regs(struct kvm_vcpu *vcpu);
+void kvmppc_save_perfmon_regs(struct kvm_vcpu *vcpu);
 
 /*
  * Load up guest vcpu FP state if it's needed.

@@ -160,12 +160,28 @@ void kvmppc_core_dequeue_debug(struct kvm_vcpu *vcpu)
 	clear_bit(BOOKE_IRQPRIO_DEBUG, &vcpu->arch.pending_exceptions);
 }
 
+void kvmppc_core_queue_perfmon(struct kvm_vcpu *vcpu)
+{
+	kvmppc_bookehv_queue_irqprio(vcpu, BOOKE_IRQPRIO_PERFORMANCE_MONITOR);
+}
+
+int kvmppc_core_pending_perfmon(struct kvm_vcpu *vcpu)
+{
+	return test_bit(BOOKE_IRQPRIO_PERFORMANCE_MONITOR,
+					&vcpu->arch.pending_exceptions);
+}
+void kvmppc_core_dequeue_perfmon(struct kvm_vcpu *vcpu)
+{
+	clear_bit(BOOKE_IRQPRIO_PERFORMANCE_MONITOR,
+					&vcpu->arch.pending_exceptions);
+}
 /* Deliver the interrupt of the corresponding priority, if possible. */
 static int kvmppc_bookehv_irqprio_deliver(struct kvm_vcpu *vcpu,
                                         unsigned int priority)
 {
 	int allowed = 1;
 	int dequeue = 0;
+	bool keep_irq = false;
 	ulong msr_mask = 0;
 	bool update_esr = false, update_dear = false;
 	enum int_class int_class = INT_CLASS_DBG;
@@ -187,6 +203,22 @@ static int kvmppc_bookehv_irqprio_deliver(struct kvm_vcpu *vcpu,
 	case BOOKE_IRQPRIO_AP_UNAVAIL:
 	case BOOKE_IRQPRIO_ALIGNMENT:
 		allowed = 1;
+		msr_mask = MSR_GS | MSR_CE | MSR_ME | MSR_DE;
+		int_class = INT_CLASS_NONCRIT;
+		break;
+	case BOOKE_IRQPRIO_PERFORMANCE_MONITOR:
+		allowed = allowed && vcpu->arch.shared->msr & MSR_EE;
+		/* MSRP_PMMP set in performance monitor interrupt handling
+		 * and cleared when interrupt condition goes away
+		 */
+		if (!(vcpu->arch.pm_reg.pmgc0 & PMGC0_PMIE)) {
+			pr_warning("%s KVM: PerfMon Interrupt taken"
+				" while PMIE disabled\n", __func__);
+			allowed = 0;
+			dequeue = 1;
+		}
+		keep_irq = true;
+
 		msr_mask = MSR_GS | MSR_CE | MSR_ME | MSR_DE;
 		int_class = INT_CLASS_NONCRIT;
 		break;
@@ -247,7 +279,8 @@ static int kvmppc_bookehv_irqprio_deliver(struct kvm_vcpu *vcpu,
 		if (priority == BOOKE_IRQPRIO_EXTERNAL)
 			mtspr(SPRN_GEPR, kvmppc_mpic_iack(vcpu->kvm, 0));
 #endif
-		clear_bit(priority, &vcpu->arch.pending_exceptions);
+		if (!keep_irq)
+			clear_bit(priority, &vcpu->arch.pending_exceptions);
 
 		if (vcpu->arch.pending_exceptions & BOOKE_IRQMASK_EE)
 			kvmppc_set_pending_interrupt(vcpu, INT_CLASS_NONCRIT);
@@ -351,6 +384,10 @@ int kvmppc_handle_exit(struct kvm_run *run, struct kvm_vcpu *vcpu,
 		r = RESUME_GUEST;
 		break;
 
+	case BOOKE_INTERRUPT_PERFORMANCE_MONITOR:
+		kvm_resched(vcpu);
+		r = RESUME_GUEST;
+		break;
 	case BOOKE_INTERRUPT_HV_GS_DBELL_CRIT:
 		kvmppc_account_exit(vcpu, GDBELL_EXITS);
 		/* we are here because there is a pending guest
