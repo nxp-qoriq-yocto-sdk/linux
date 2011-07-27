@@ -34,10 +34,10 @@
 #include <asm/cputable.h>
 #include <asm/uaccess.h>
 #include <asm/kvm_ppc.h>
-#include <asm/guestmemio.h>
 #include "timing.h"
 #include <asm/cacheflush.h>
 
+#include "guestmemio.h"
 #include "booke.h"
 
 #define VM_STAT(x) offsetof(struct kvm, stat.x), KVM_STAT_VM

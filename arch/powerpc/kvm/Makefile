@@ -50,7 +50,7 @@ kvm-e500mc-objs := \
 	bookehv_emulate.o \
 	bookehv_interrupts.o \
 	e500mc.o \
-	e500mc_tlb.o \
+	e500_tlb.o \
 	e500mc_emulate.o
 kvm-objs-$(CONFIG_KVM_E500MC) := $(kvm-e500mc-objs)
 

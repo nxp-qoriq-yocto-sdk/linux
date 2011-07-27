@@ -2,6 +2,9 @@
  * Copyright (C) 2008-2011 Freescale Semiconductor, Inc. All rights reserved.
  *
  * Author: Yu Liu, yu.liu@freescale.com
+ *         Scott Wood, scottwood@freescale.com
+ *         Ashish Kalra, ashish.kalra@freescale.com
+ *         Varun Sethi, varun.sethi@freescale.com
  *
  * Description:
  * This file is based on arch/powerpc/kvm/44x_tlb.h,
@@ -24,6 +27,7 @@
 
 #define E500_TLB_VALID 1
 #define E500_TLB_DIRTY 2
+#define E500_TLB_BITMAP 4
 
 struct tlbe_ref {
 	pfn_t pfn;
@@ -79,6 +83,9 @@ struct kvmppc_vcpu_e500 {
 	struct page **shared_tlb_pages;
 	int num_shared_tlb_pages;
 
+	u64 *g2h_tlb1_map;
+	unsigned int *h2g_tlb1_rmap;
+
 #ifdef CONFIG_KVM_E500
 	u32 pid[E500_PID_NUM];
 
@@ -117,6 +124,7 @@ extern int kvmppc_e500_emul_mt_mmucsr0(struct kvmppc_vcpu_e500 *, ulong);
 extern int kvmppc_e500_emul_tlbwe(struct kvm_vcpu *);
 extern int kvmppc_e500_emul_tlbre(struct kvm_vcpu *);
 extern int kvmppc_e500_emul_tlbivax(struct kvm_vcpu *, int, int);
+extern int kvmppc_e500_emul_tlbilx(struct kvm_vcpu *, int, int, int);
 extern int kvmppc_e500_emul_tlbsx(struct kvm_vcpu *, int);
 extern int kvmppc_e500_tlb_search(struct kvm_vcpu *, gva_t, unsigned int, int);
 extern void kvmppc_e500_tlb_put(struct kvm_vcpu *);
@@ -240,10 +248,12 @@ static inline int tlbe_is_host_safe(const struct kvm_vcpu *vcpu,
 	if (!get_tlb_v(tlbe))
 		return 0;
 
+#ifndef CONFIG_KVM_BOOKE_HV
 	/* Does it match current guest AS? */
 	/* XXX what about IS != DS? */
 	if (get_tlb_ts(tlbe) != !!(vcpu->arch.shared->msr & MSR_IS))
 		return 0;
+#endif
 
 	gpa = get_tlb_raddr(tlbe);
 	if (!gfn_to_memslot(vcpu->kvm, gpa >> PAGE_SHIFT))
@@ -264,7 +274,12 @@ extern void kvmppc_core_tlbil_one(struct kvmppc_vcpu_e500 *vcpu_e500,
                                   struct kvm_book3e_206_tlb_entry *gtlbe);
 extern void kvmppc_core_tlbil_all(struct kvmppc_vcpu_e500 *vcpu_e500);
 
-#ifdef CONFIG_KVM_E500
+#ifdef CONFIG_KVM_BOOKE_HV
+#define get_tlb_stid(vcpu, gtlbe)       get_tlb_tid(gtlbe)
+#define get_tlbmiss_tid(vcpu)           get_cur_pid(vcpu)
+#define get_tlb_sts(gtlbe)              (gtlbe->mas1 & MAS1_TS)
+#else
+# ifdef CONFIG_KVM_E500
 extern unsigned int get_tlb_stid(struct kvm_vcpu *vcpu,
                                  struct kvm_book3e_206_tlb_entry *gtlbe);
 
@@ -278,5 +293,7 @@ static inline unsigned int get_tlbmiss_tid(struct kvm_vcpu *vcpu)
 
 /* Force TS=1 for all guest mappings. */
 #define get_tlb_sts(gtlbe)              (MAS1_TS)
-#endif
+#endif /* CONFIG_KVM_E500 */
+#endif /* CONFIG_KVM_BOOKE_HV */
+
 #endif /* __KVM_E500_TLB_H__ */

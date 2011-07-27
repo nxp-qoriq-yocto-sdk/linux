@@ -14,10 +14,9 @@
 
 #include <asm/kvm_ppc.h>
 #include <asm/disassemble.h>
-#include <asm/kvm_e500mc.h>
 
 #include "booke.h"
-#include "e500mc_tlb.h"
+#include "e500_tlb.h"
 
 #define XOP_TLBIVAX 786
 #define XOP_TLBSX   914
@@ -38,29 +37,29 @@ int kvmppc_core_emulate_op(struct kvm_run *run, struct kvm_vcpu *vcpu,
 		switch (get_xop(inst)) {
 
 		case XOP_TLBRE:
-			emulated = kvmppc_e500mc_emul_tlbre(vcpu);
+			emulated = kvmppc_e500_emul_tlbre(vcpu);
 			break;
 
 		case XOP_TLBWE:
-			emulated = kvmppc_e500mc_emul_tlbwe(vcpu);
+			emulated = kvmppc_e500_emul_tlbwe(vcpu);
 			break;
 
 		case XOP_TLBSX:
 			rb = get_rb(inst);
-			emulated = kvmppc_e500mc_emul_tlbsx(vcpu,rb);
+			emulated = kvmppc_e500_emul_tlbsx(vcpu,rb);
 			break;
 
 		case XOP_TLBILX:
 			ra = get_ra(inst);
 			rb = get_rb(inst);
 			rt = get_rt(inst);
-			emulated = kvmppc_e500mc_emul_tlbilx(vcpu, rt, ra, rb);
+			emulated = kvmppc_e500_emul_tlbilx(vcpu, rt, ra, rb);
 			break;
 
 		case XOP_TLBIVAX:
 			ra = get_ra(inst);
 			rb = get_rb(inst);
-			emulated = kvmppc_e500mc_emul_tlbivax(vcpu, ra, rb);
+			emulated = kvmppc_e500_emul_tlbivax(vcpu, ra, rb);
 			break;
 
 		default:
@@ -81,7 +80,7 @@ int kvmppc_core_emulate_op(struct kvm_run *run, struct kvm_vcpu *vcpu,
 
 int kvmppc_core_emulate_mtspr(struct kvm_vcpu *vcpu, int sprn, int rs)
 {
-	struct kvmppc_vcpu_e500mc *vcpu_e500mc = to_e500mc(vcpu);
+	struct kvmppc_vcpu_e500 *vcpu_e500mc = to_e500(vcpu);
 	int emulated = EMULATE_DONE;
 	ulong spr_val = kvmppc_get_gpr(vcpu, rs);
 
@@ -98,7 +97,7 @@ int kvmppc_core_emulate_mtspr(struct kvm_vcpu *vcpu, int sprn, int rs)
 		vcpu_e500mc->hid1 = spr_val; break;
 
 	case SPRN_MMUCSR0:
-		emulated = kvmppc_e500mc_emul_mt_mmucsr0(vcpu_e500mc,
+		emulated = kvmppc_e500_emul_mt_mmucsr0(vcpu_e500mc,
 				spr_val);
 		break;
 
@@ -131,14 +130,14 @@ int kvmppc_core_emulate_mtspr(struct kvm_vcpu *vcpu, int sprn, int rs)
 
 int kvmppc_core_emulate_mfspr(struct kvm_vcpu *vcpu, int sprn, int rt)
 {
-	struct kvmppc_vcpu_e500mc *vcpu_e500mc = to_e500mc(vcpu);
+	struct kvmppc_vcpu_e500 *vcpu_e500mc = to_e500(vcpu);
 	int emulated = EMULATE_DONE;
 
 	switch (sprn) {
 	case SPRN_TLB0CFG:
-		kvmppc_set_gpr(vcpu, rt, vcpu_e500mc->tlb0cfg); break;
+		kvmppc_set_gpr(vcpu, rt, vcpu->arch.tlbcfg[0]); break;
 	case SPRN_TLB1CFG:
-		kvmppc_set_gpr(vcpu, rt, vcpu_e500mc->tlb1cfg); break;
+		kvmppc_set_gpr(vcpu, rt, vcpu->arch.tlbcfg[1]); break;
 	case SPRN_L1CSR0:
 		kvmppc_set_gpr(vcpu, rt, vcpu_e500mc->l1csr0); break;
 	case SPRN_L1CSR1:

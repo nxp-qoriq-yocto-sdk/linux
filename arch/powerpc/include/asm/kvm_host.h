@@ -271,11 +271,21 @@ struct kvm_vcpu_arch {
 	ulong xer;
 	u32 cr;
 	u32 tlbcfg[4];
+	u32 mmucfg;
 #endif
 
 #ifdef CONFIG_KVM_BOOKE_HV
 	u32 host_mas4;
 	u32 host_mas6;
+	u32 epcr;
+	u32 msrp;
+	u32 lpid;
+	u32 eplc;
+	u32 epsc;
+	u32 gpir;
+	u32 gesr;
+	u32 gepr;
+	u32 oldpir;
 #endif
 
 #ifdef CONFIG_PPC_BOOK3S
