@@ -18,7 +18,80 @@
 #include <linux/kvm_host.h>
 #include <asm/mmu-book3e.h>
 #include <asm/tlb.h>
-#include <asm/kvm_e500.h>
+
+#define E500_PID_NUM   3
+#define E500_TLB_NUM   2
+
+#define E500_TLB_VALID 1
+#define E500_TLB_DIRTY 2
+
+struct tlbe_ref {
+	pfn_t pfn;
+	unsigned int flags; /* E500_TLB_* */
+};
+
+struct tlbe_priv {
+	struct tlbe_ref ref; /* TLB0 only -- TLB1 uses tlb_refs */
+};
+
+#ifdef CONFIG_KVM_E500
+struct vcpu_id_table;
+#endif
+
+struct kvmppc_vcpu_e500 {
+	struct kvm_vcpu vcpu;
+
+	/* Unmodified copy of the guest's TLB -- shared with host userspace. */
+	struct kvm_book3e_206_tlb_entry *gtlb_arch;
+
+	/* Starting entry number in gtlb_arch[] */
+	int gtlb_offset[E500_TLB_NUM];
+
+	/* KVM internal information associated with each guest TLB entry */
+	struct tlbe_priv *gtlb_priv[E500_TLB_NUM];
+
+	unsigned int gtlb_size[E500_TLB_NUM];
+	unsigned int gtlb_nv[E500_TLB_NUM];
+
+	unsigned int gtlb0_ways;
+	unsigned int gtlb0_sets;
+
+	/*
+	 * information associated with each host TLB entry --
+	 * TLB1 only for now.  If/when guest TLB1 entries can be
+	 * mapped with host TLB0, this will be used for that too.
+	 *
+	 * We don't want to use this for guest TLB0 because then we'd
+	 * have the overhead of doing the translation again even if
+	 * the entry is still in the guest TLB (e.g. we swapped out
+	 * and back, and our host TLB entries got evicted).
+	 */
+	struct tlbe_ref *tlb_refs[E500_TLB_NUM];
+	unsigned int host_tlb1_nv;
+
+	u32 svr;
+	u32 l1csr0;
+	u32 l1csr1;
+	u32 hid0;
+	u32 hid1;
+	u64 mcar;
+
+	struct page **shared_tlb_pages;
+	int num_shared_tlb_pages;
+
+#ifdef CONFIG_KVM_E500
+	u32 pid[E500_PID_NUM];
+
+	/* vcpu id table */
+	struct vcpu_id_table *idt;
+#endif
+};
+
+static inline struct kvmppc_vcpu_e500 *to_e500(struct kvm_vcpu *vcpu)
+{
+	return container_of(vcpu, struct kvmppc_vcpu_e500, vcpu);
+}
+
 
 /* This geometry is the legacy default -- can be overridden by userspace */
 #define KVM_E500_TLB0_WAY_SIZE		128
@@ -50,8 +123,11 @@ extern void kvmppc_e500_tlb_put(struct kvm_vcpu *);
 extern void kvmppc_e500_tlb_load(struct kvm_vcpu *, int);
 extern int kvmppc_e500_tlb_init(struct kvmppc_vcpu_e500 *);
 extern void kvmppc_e500_tlb_uninit(struct kvmppc_vcpu_e500 *);
-extern void kvmppc_e500_tlb_setup(struct kvmppc_vcpu_e500 *);
-extern void kvmppc_e500_recalc_shadow_pid(struct kvmppc_vcpu_e500 *);
+#ifdef CONFIG_KVM_E500
+unsigned int e500_get_sid(struct kvmppc_vcpu_e500 *vcpu_e500,
+                          unsigned int as, unsigned int gid,
+                          unsigned int pr, int avoid_recursion);
+#endif
 
 /* TLB helper functions */
 static inline unsigned int
@@ -104,6 +180,12 @@ static inline unsigned int
 get_tlb_iprot(const struct kvm_book3e_206_tlb_entry *tlbe)
 {
 	return (tlbe->mas1 >> 30) & 0x1;
+}
+
+static inline unsigned int
+get_tlb_tsize(const struct kvm_book3e_206_tlb_entry *tlbe)
+{
+	return (tlbe->mas1 & MAS1_TSIZE_MASK) >> MAS1_TSIZE_SHIFT;
 }
 
 static inline unsigned int get_cur_pid(struct kvm_vcpu *vcpu)
@@ -171,4 +253,30 @@ static inline int tlbe_is_host_safe(const struct kvm_vcpu *vcpu,
 	return 1;
 }
 
+static inline struct kvm_book3e_206_tlb_entry *get_entry(
+	struct kvmppc_vcpu_e500 *vcpu_e500, int tlbsel, int entry)
+{
+	int offset = vcpu_e500->gtlb_offset[tlbsel];
+	return &vcpu_e500->gtlb_arch[offset + entry];
+}
+
+extern void kvmppc_core_tlbil_one(struct kvmppc_vcpu_e500 *vcpu_e500,
+                                  struct kvm_book3e_206_tlb_entry *gtlbe);
+extern void kvmppc_core_tlbil_all(struct kvmppc_vcpu_e500 *vcpu_e500);
+
+#ifdef CONFIG_KVM_E500
+extern unsigned int get_tlb_stid(struct kvm_vcpu *vcpu,
+                                 struct kvm_book3e_206_tlb_entry *gtlbe);
+
+static inline unsigned int get_tlbmiss_tid(struct kvm_vcpu *vcpu)
+{
+	struct kvmppc_vcpu_e500 *vcpu_e500 = to_e500(vcpu);
+	unsigned int tidseld = (vcpu->arch.shared->mas4 >> 16) & 0xf;
+
+	return vcpu_e500->pid[tidseld];
+}
+
+/* Force TS=1 for all guest mappings. */
+#define get_tlb_sts(gtlbe)              (MAS1_TS)
+#endif
 #endif /* __KVM_E500_TLB_H__ */

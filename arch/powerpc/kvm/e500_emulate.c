@@ -14,7 +14,6 @@
 
 #include <asm/kvm_ppc.h>
 #include <asm/disassemble.h>
-#include <asm/kvm_e500.h>
 
 #include "booke.h"
 #include "e500_tlb.h"
@@ -175,9 +174,9 @@ int kvmppc_core_emulate_mfspr(struct kvm_vcpu *vcpu, int sprn, int rt)
 		kvmppc_set_gpr(vcpu, rt, val);
 		break;
 	case SPRN_TLB0CFG:
-		kvmppc_set_gpr(vcpu, rt, vcpu_e500->tlb0cfg); break;
+		kvmppc_set_gpr(vcpu, rt, vcpu->arch.tlbcfg[0]); break;
 	case SPRN_TLB1CFG:
-		kvmppc_set_gpr(vcpu, rt, vcpu_e500->tlb1cfg); break;
+		kvmppc_set_gpr(vcpu, rt, vcpu->arch.tlbcfg[1]); break;
 	case SPRN_L1CSR0:
 		kvmppc_set_gpr(vcpu, rt, vcpu_e500->l1csr0); break;
 	case SPRN_L1CSR1:
