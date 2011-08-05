@@ -22,6 +22,7 @@
 
 #include <linux/types.h>
 #include <linux/kvm_host.h>
+#include <asm/system.h>
 #include <asm/kvm_ppc.h>
 #include "timing.h"
 
@@ -79,13 +80,6 @@ int kvmppc_booke_emulate_op(struct kvm_run *run, struct kvm_vcpu *vcpu,
                             unsigned int inst, int *advance);
 int kvmppc_booke_emulate_mfspr(struct kvm_vcpu *vcpu, int sprn, int rt);
 int kvmppc_booke_emulate_mtspr(struct kvm_vcpu *vcpu, int sprn, int rs);
-
-/* low-level asm code to transfer guest state */
-void kvmppc_load_guest_spe(struct kvm_vcpu *vcpu);
-void kvmppc_save_guest_spe(struct kvm_vcpu *vcpu);
-
-/* high-level function, manages flags, host state */
-void kvmppc_vcpu_disable_spe(struct kvm_vcpu *vcpu);
 
 void kvmppc_booke_vcpu_load(struct kvm_vcpu *vcpu, int cpu);
 void kvmppc_booke_vcpu_put(struct kvm_vcpu *vcpu);

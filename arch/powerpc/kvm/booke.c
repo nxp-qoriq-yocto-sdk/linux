@@ -61,6 +61,11 @@ struct kvm_stats_debugfs_item debugfs_entries[] = {
 	{ "halt_wakeup", VCPU_STAT(halt_wakeup) },
 	{ "doorbell", VCPU_STAT(dbell_exits) },
 	{ "guest doorbell", VCPU_STAT(gdbell_exits) },
+#ifdef CONFIG_SPE
+	{ "spe_unavail", VCPU_STAT(spe_unavail) },
+	{ "spe_fp_data", VCPU_STAT(spe_fp_data) },
+	{ "spe_fp_round", VCPU_STAT(spe_fp_round) },
+#endif
 	{ NULL }
 };
 
@@ -86,11 +91,11 @@ void kvmppc_dump_vcpu(struct kvm_vcpu *vcpu)
 }
 
 #ifdef CONFIG_SPE
-void kvmppc_vcpu_disable_spe(struct kvm_vcpu *vcpu)
+static void kvmppc_vcpu_disable_spe(struct kvm_vcpu *vcpu)
 {
 	preempt_disable();
-	enable_kernel_spe();
-	kvmppc_save_guest_spe(vcpu);
+	if (current->thread.regs->msr & MSR_SPE)
+		giveup_spe(current);
 	vcpu->arch.shadow_msr &= ~MSR_SPE;
 	preempt_enable();
 }
@@ -98,8 +103,10 @@ void kvmppc_vcpu_disable_spe(struct kvm_vcpu *vcpu)
 static void kvmppc_vcpu_enable_spe(struct kvm_vcpu *vcpu)
 {
 	preempt_disable();
-	enable_kernel_spe();
-	kvmppc_load_guest_spe(vcpu);
+	if (!(current->thread.regs->msr & MSR_SPE)) {
+		load_up_spe();
+		current->thread.regs->msr |= MSR_SPE;
+	}
 	vcpu->arch.shadow_msr |= MSR_SPE;
 	preempt_enable();
 }
@@ -142,7 +149,9 @@ void kvmppc_set_msr(struct kvm_vcpu *vcpu, u32 new_msr)
 		kvmppc_set_hwpmlca_all(vcpu);
 #endif
 
-	kvmppc_vcpu_sync_spe(vcpu);
+	if ((old_msr ^ new_msr) & MSR_SPE)
+		kvmppc_vcpu_sync_spe(vcpu);
+
 	kvmppc_recalc_shadow_dbcr(vcpu);
 }
 
@@ -652,6 +661,11 @@ int kvmppc_vcpu_run(struct kvm_run *kvm_run, struct kvm_vcpu *vcpu)
 	int fpexc_mode;
 	u64 fpr[32];
 #endif
+#ifdef CONFIG_SPE
+	ulong evr[32];
+	ulong spefscr;
+	u64 acc;
+#endif
 
 	if (!vcpu->arch.sane) {
 		kvm_run->exit_reason = KVM_EXIT_INTERNAL_ERROR;
@@ -695,6 +709,22 @@ int kvmppc_vcpu_run(struct kvm_run *kvm_run, struct kvm_vcpu *vcpu)
 	kvmppc_load_guest_fp(vcpu);
 #endif
 
+#ifdef CONFIG_SPE
+	/* Save userspace SPE state in stack */
+	enable_kernel_spe();
+	memcpy(evr, current->thread.evr, sizeof(current->thread.evr));
+	acc = current->thread.acc;
+
+	/* Restore guest SPE state to thread */
+	memcpy(current->thread.evr, vcpu->arch.evr, sizeof(vcpu->arch.evr));
+	current->thread.acc = vcpu->arch.acc;
+
+	/* Switch SPEFSCR and load guest SPE state if needed */
+	spefscr = mfspr(SPRN_SPEFSCR);
+	kvmppc_vcpu_sync_spe(vcpu);
+	mtspr(SPRN_SPEFSCR, vcpu->arch.spefscr);
+#endif
+
 	ret = __kvmppc_vcpu_run(kvm_run, vcpu);
 
 #ifdef CONFIG_PPC_FPU
@@ -710,6 +740,22 @@ int kvmppc_vcpu_run(struct kvm_run *kvm_run, struct kvm_vcpu *vcpu)
 	memcpy(current->thread.fpr, fpr, sizeof(current->thread.fpr));
 	current->thread.fpscr.val = fpscr;
 	current->thread.fpexc_mode = fpexc_mode;
+#endif
+
+#ifdef CONFIG_SPE
+	/* Switch SPEFSCR and save guest SPE state if needed */
+	vcpu->arch.spefscr = mfspr(SPRN_SPEFSCR);
+	kvmppc_vcpu_disable_spe(vcpu);
+	mtspr(SPRN_SPEFSCR, spefscr);
+
+	/* Save guest SPE state from thread */
+	memcpy(vcpu->arch.evr, current->thread.evr, sizeof(vcpu->arch.evr));
+	vcpu->arch.acc = current->thread.acc;
+
+	/* Restore userspace SPE state from stack */
+	memcpy(current->thread.evr, evr, sizeof(current->thread.evr));
+	current->thread.spefscr = spefscr;
+	current->thread.acc = acc;
 #endif
 
 	kvm_guest_exit();
@@ -980,17 +1026,20 @@ int kvmppc_handle_exit(struct kvm_run *run, struct kvm_vcpu *vcpu,
 		else
 			kvmppc_booke_queue_irqprio(vcpu,
 						   BOOKE_IRQPRIO_SPE_UNAVAIL);
+		kvmppc_account_exit(vcpu, SPE_UNAVAIL);
 		r = RESUME_GUEST;
 		break;
 	}
 
 	case BOOKE_INTERRUPT_SPE_FP_DATA:
 		kvmppc_booke_queue_irqprio(vcpu, BOOKE_IRQPRIO_SPE_FP_DATA);
+		kvmppc_account_exit(vcpu, SPE_FP_DATA);
 		r = RESUME_GUEST;
 		break;
 
 	case BOOKE_INTERRUPT_SPE_FP_ROUND:
 		kvmppc_booke_queue_irqprio(vcpu, BOOKE_IRQPRIO_SPE_FP_ROUND);
+		kvmppc_account_exit(vcpu, SPE_FP_ROUND);
 		r = RESUME_GUEST;
 		break;
 #else
