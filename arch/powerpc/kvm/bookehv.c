@@ -923,7 +923,7 @@ int kvm_vm_ioctl_get_dirty_log(struct kvm *kvm, struct kvm_dirty_log *log)
 	return -ENOTSUPP;
 }
 
-int __kvmppc_vcpu_run(struct kvm_run *kvm_run, struct kvm_vcpu *vcpu)
+int kvmppc_vcpu_run(struct kvm_run *kvm_run, struct kvm_vcpu *vcpu)
 {
 	int ret;
 #ifdef CONFIG_PPC_FPU
@@ -931,6 +931,9 @@ int __kvmppc_vcpu_run(struct kvm_run *kvm_run, struct kvm_vcpu *vcpu)
 	int fpexc_mode;
 	u64 fpr[32];
 #endif
+
+	local_irq_disable();
+	kvm_guest_enter();
 
 #ifdef CONFIG_PPC_FPU
 	/* Save userspace FPU state in stack */
@@ -958,7 +961,7 @@ int __kvmppc_vcpu_run(struct kvm_run *kvm_run, struct kvm_vcpu *vcpu)
 #endif
 
 	kvmppc_wdt_resume(vcpu);
-	ret = __kvmppc_vcpu_entry(kvm_run, vcpu);
+	ret = __kvmppc_vcpu_run(kvm_run, vcpu);
 	kvmppc_wdt_pause(vcpu);
 
 #ifdef CONFIG_PPC_FPU
@@ -975,6 +978,9 @@ int __kvmppc_vcpu_run(struct kvm_run *kvm_run, struct kvm_vcpu *vcpu)
 	current->thread.fpscr.val = fpscr;
 	current->thread.fpexc_mode = fpexc_mode;
 #endif
+
+	kvm_guest_exit();
+	local_irq_enable();
 
 	return ret;
 }

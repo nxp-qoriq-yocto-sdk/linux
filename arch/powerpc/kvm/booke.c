@@ -454,6 +454,23 @@ static int kvmppc_handle_debug(struct kvm_run *run, struct kvm_vcpu *vcpu)
 	}
 }
 
+int kvmppc_vcpu_run(struct kvm_run *kvm_run, struct kvm_vcpu *vcpu)
+{
+	int ret;
+
+	local_irq_disable();
+	kvm_guest_enter();
+
+	kvmppc_wdt_resume(vcpu);
+	ret = __kvmppc_vcpu_run(kvm_run, vcpu);
+	kvmppc_wdt_pause(vcpu);
+
+	kvm_guest_exit();
+	local_irq_enable();
+
+	return ret;
+}
+
 /**
  * kvmppc_handle_exit
  *

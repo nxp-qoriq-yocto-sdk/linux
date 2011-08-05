@@ -158,17 +158,6 @@ void kvmppc_core_vcpu_free(struct kvm_vcpu *vcpu)
 	kmem_cache_free(kvm_vcpu_cache, vcpu_44x);
 }
 
-int __kvmppc_vcpu_run(struct kvm_run *kvm_run, struct kvm_vcpu *vcpu)
-{
-	int ret;
-
-	kvmppc_wdt_resume(vcpu);
-	ret = __kvmppc_vcpu_entry(kvm_run, vcpu);
-	kvmppc_wdt_pause(vcpu);
-
-	return ret;
-}
-
 static int __init kvmppc_44x_init(void)
 {
 	int r;
