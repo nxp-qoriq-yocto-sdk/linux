@@ -517,13 +517,6 @@ int main(void)
 	DEFINE(TLBCAM_MAS7, offsetof(struct tlbcam, MAS7));
 #endif
 
-#if defined(CONFIG_KVM) && defined(CONFIG_SPE)
-	DEFINE(VCPU_EVR, offsetof(struct kvm_vcpu, arch.evr[0]));
-	DEFINE(VCPU_ACC, offsetof(struct kvm_vcpu, arch.acc));
-	DEFINE(VCPU_SPEFSCR, offsetof(struct kvm_vcpu, arch.spefscr));
-	DEFINE(VCPU_HOST_SPEFSCR, offsetof(struct kvm_vcpu, arch.host_spefscr));
-#endif
-
 #ifdef CONFIG_KVM_BOOKE_HV
 	DEFINE(VCPU_HOST_MAS4, offsetof(struct kvm_vcpu, arch.host_mas4));
 	DEFINE(VCPU_HOST_MAS6, offsetof(struct kvm_vcpu, arch.host_mas6));

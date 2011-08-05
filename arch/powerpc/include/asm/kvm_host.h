@@ -99,6 +99,11 @@ struct kvm_vcpu_stat {
 	u32 st;
 	u32 st_slow;
 #endif
+#ifdef CONFIG_SPE
+	u32 spe_unavail;
+	u32 spe_fp_data;
+	u32 spe_fp_round;
+#endif
 };
 
 enum kvm_exit_types {
@@ -134,6 +139,11 @@ enum kvm_exit_types {
 #ifdef CONFIG_KVM_BOOKE_HV
 	DBELL_EXITS,
 	GDBELL_EXITS,
+#endif
+#ifdef CONFIG_SPE
+	SPE_UNAVAIL,
+	SPE_FP_DATA,
+	SPE_FP_ROUND,
 #endif
 	__NUMBER_OF_KVM_EXIT_TYPES
 };
@@ -246,7 +256,6 @@ struct kvm_vcpu_arch {
 #ifdef CONFIG_SPE
 	ulong evr[32];
 	ulong spefscr;
-	ulong host_spefscr;
 	u64 acc;
 #endif
 #ifdef CONFIG_ALTIVEC

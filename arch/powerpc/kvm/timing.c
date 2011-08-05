@@ -135,6 +135,11 @@ static const char *kvm_exit_names[__NUMBER_OF_KVM_EXIT_TYPES] = {
 	[USR_PR_INST] =             "USR_PR_INST",
 	[FP_UNAVAIL] =              "FP_UNAVAIL",
 	[DEBUG_EXITS] =             "DEBUG",
+#ifdef CONFIG_SPE
+	[SPE_UNAVAIL] =              "SPE_UNAVAIL",
+	[SPE_FP_DATA] =              "SPE_FP_DATA",
+	[SPE_FP_ROUND] =             "SPE_FP_ROUND",
+#endif
 	[TIMEINGUEST] =             "TIMEINGUEST"
 };
 

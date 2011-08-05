@@ -329,15 +329,6 @@ _GLOBAL(kvmppc_resume_host)
 
 heavyweight_exit:
 	/* Not returning to guest. */
-
-#ifdef CONFIG_SPE
-	/* save guest SPEFSCR and load host SPEFSCR */
-	mfspr	r9, SPRN_SPEFSCR
-	stw	r9, VCPU_SPEFSCR(r4)
-	lwz	r9, VCPU_HOST_SPEFSCR(r4)
-	mtspr	SPRN_SPEFSCR, r9
-#endif
-
 	/* We already saved guest volatile register state; now save the
 	 * non-volatiles. */
 	stw	r15, VCPU_GPR(r15)(r4)
@@ -438,14 +429,6 @@ _GLOBAL(__kvmppc_vcpu_run)
 	lwz	r29, VCPU_GPR(r29)(r4)
 	lwz	r30, VCPU_GPR(r30)(r4)
 	lwz	r31, VCPU_GPR(r31)(r4)
-
-#ifdef CONFIG_SPE
-	/* save host SPEFSCR and load guest SPEFSCR */
-	mfspr	r3, SPRN_SPEFSCR
-	stw	r3, VCPU_HOST_SPEFSCR(r4)
-	lwz	r3, VCPU_SPEFSCR(r4)
-	mtspr	SPRN_SPEFSCR, r3
-#endif
 
 lightweight_exit:
 	stw	r2, HOST_R2(r1)
@@ -612,23 +595,3 @@ KVM_HANDLER_ADDR BOOKE_INTERRUPT_SPE_FP_ROUND
 KVM_HANDLER_ADDR BOOKE_INTERRUPT_PERFORMANCE_MONITOR
 KVM_HANDLER_ADDR BOOKE_INTERRUPT_END
 
-#ifdef CONFIG_SPE
-_GLOBAL(kvmppc_save_guest_spe)
-	cmpi	0,r3,0
-	beqlr-
-	SAVE_32EVRS(0, r4, r3, VCPU_EVR)
-	evxor   evr6, evr6, evr6
-	evmwumiaa evr6, evr6, evr6
-	li	r4,VCPU_ACC
-	evstddx evr6, r4, r3		/* save acc */
-	blr
-
-_GLOBAL(kvmppc_load_guest_spe)
-	cmpi	0,r3,0
-	beqlr-
-	li      r4,VCPU_ACC
-	evlddx  evr6,r4,r3
-	evmra   evr6,evr6		/* load acc */
-	REST_32EVRS(0, r4, r3, VCPU_EVR)
-	blr
-#endif

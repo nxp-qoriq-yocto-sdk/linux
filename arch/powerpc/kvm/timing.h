@@ -101,6 +101,17 @@ static inline void kvmppc_account_exit_stat(struct kvm_vcpu *vcpu, int type)
 		vcpu->stat.gdbell_exits++;
 		break;
 #endif
+#ifdef CONFIG_SPE
+	case SPE_UNAVAIL:
+		vcpu->stat.spe_unavail++;
+		break;
+	case SPE_FP_DATA:
+		vcpu->stat.spe_fp_data++;
+		break;
+	case SPE_FP_ROUND:
+		vcpu->stat.spe_fp_round++;
+		break;
+#endif
 	}
 }
 

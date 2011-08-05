@@ -312,6 +312,14 @@ void kvmppc_core_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
 	/* Shadow PID may be expired on local core */
 	kvmppc_e500_recalc_shadow_pid(to_e500(vcpu));
 
+	/*
+	 * Keep shadow MSR[SPE] consistent with thread MSR[SPE].
+	 * If guest SPE state is saved by host, we just diable guest SPE.
+	 */
+	if ((current->flags & PF_VCPU) &&
+	    !(current->thread.regs->msr & MSR_SPE))
+		vcpu->arch.shadow_msr &= ~MSR_SPE;
+
 	/* Retore the PM Registers on VCPU load */
 	if (vcpu->arch.pm_is_reserved)
 		kvmppc_load_perfmon_regs(vcpu);
@@ -319,10 +327,6 @@ void kvmppc_core_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
 
 void kvmppc_core_vcpu_put(struct kvm_vcpu *vcpu)
 {
-#ifdef CONFIG_SPE
-	if (vcpu->arch.shadow_msr & MSR_SPE)
-		kvmppc_vcpu_disable_spe(vcpu);
-#endif
 	/* Freeze all counters and disable PM interrupt. Store the
 	 * current value of PM counters before the other guest owerwrites.
 	 */
