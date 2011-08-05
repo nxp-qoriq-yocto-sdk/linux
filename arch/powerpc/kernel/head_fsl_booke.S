@@ -541,8 +541,10 @@ interrupt_base:
 	/* SPE Unavailable */
 	START_EXCEPTION(SPEUnavailable)
 	NORMAL_EXCEPTION_PROLOG(BOOKE_INTERRUPT_SPE_UNAVAIL)
-	bne	load_up_spe
-	addi	r3,r1,STACK_FRAME_OVERHEAD
+	beq	1f
+	bl	load_up_spe
+	b	fast_exception_return
+1:	addi	r3,r1,STACK_FRAME_OVERHEAD
 	EXC_XFER_EE_LITE(0x2010, KernelSPE)
 #else
 	EXCEPTION(0x2020, BOOKE_INTERRUPT_SPE_UNAVAIL, SPEUnavailable, unknown_exception, EXC_XFER_EE)
@@ -757,7 +759,7 @@ tlb_write_entry:
 /* Note that the SPE support is closely modeled after the AltiVec
  * support.  Changes to one are likely to be applicable to the
  * other!  */
-load_up_spe:
+_GLOBAL(load_up_spe)
 /*
  * Disable SPE for the task which had SPE previously,
  * and save its SPE registers in its thread_struct.
@@ -805,20 +807,7 @@ load_up_spe:
 	subi	r4,r5,THREAD
 	stw	r4,last_task_used_spe@l(r3)
 #endif /* !CONFIG_SMP */
-	/* restore registers and return */
-2:	REST_4GPRS(3, r11)
-	lwz	r10,_CCR(r11)
-	REST_GPR(1, r11)
-	mtcr	r10
-	lwz	r10,_LINK(r11)
-	mtlr	r10
-	REST_GPR(10, r11)
-	mtspr	SPRN_SRR1,r9
-	mtspr	SPRN_SRR0,r12
-	REST_GPR(9, r11)
-	REST_GPR(12, r11)
-	lwz	r11,GPR11(r11)
-	rfi
+	blr
 
 /*
  * SPE unavailable trap from kernel - print a message, but let
