@@ -553,6 +553,7 @@ struct kvm_ppc_pvinfo {
 #define KVM_CAP_SPAPR_TCE 63
 #define KVM_CAP_PPC_SMT 64
 #define KVM_CAP_PPC_RMA	65
+#define KVM_CAP_PPC_PAPR 68
 
 #ifdef KVM_CAP_IRQ_ROUTING
 
