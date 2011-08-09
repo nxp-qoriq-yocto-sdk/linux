@@ -29,7 +29,7 @@
 #include <linux/vmalloc.h>
 #include <asm/kvm_ppc.h>
 
-#include "e500_tlb.h"
+#include "e500.h"
 #include "trace.h"
 #include "timing.h"
 

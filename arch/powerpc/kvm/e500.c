@@ -23,7 +23,7 @@
 
 #include "../mm/mmu_decl.h"
 #include "booke.h"
-#include "e500_tlb.h"
+#include "e500.h"
 
 struct id {
 	unsigned long val;

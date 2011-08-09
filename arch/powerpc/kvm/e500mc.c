@@ -25,7 +25,7 @@
 #include <asm/doorbell.h>
 
 #include "booke.h"
-#include "e500_tlb.h"
+#include "e500.h"
 
 static DEFINE_SPINLOCK(lpid_idr_lock);
 static struct idr lpid_id_ns;
