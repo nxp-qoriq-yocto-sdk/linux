@@ -118,13 +118,36 @@ static inline void __write_host_tlbe(struct kvm_book3e_206_tlb_entry *stlbe,
 	                              stlbe->mas2, stlbe->mas7_3);
 }
 
+/*
+ * Acquire a mas0 with victim hint, as if we just took a TLB miss.
+ *
+ * We don't care about the address we're searching for, other than that
+ * it's right set and is not present in the TLB.  Using a zero PID and a
+ * userspace address means we don't have to set and then restore MAS5, or
+ * calculate a proper MAS6 value.
+ */
+static u32 get_host_mas0(unsigned long eaddr)
+{
+	unsigned long flags, mas0;
+
+	local_irq_save(flags);
+	mtspr(SPRN_MAS6, 0);
+	asm volatile("tlbsx 0, %0" : : "b" (eaddr & ~CONFIG_PAGE_OFFSET));
+	mas0 = mfspr(SPRN_MAS0);
+	local_irq_restore(flags);
+
+	return mas0;
+}
+
 /* esel is index into set, not whole array */
 static inline void write_host_tlbe(struct kvmppc_vcpu_e500 *vcpu_e500,
 		int tlbsel, int esel, struct kvm_book3e_206_tlb_entry *stlbe)
 {
+	unsigned long mas0;
+
 	if (tlbsel == 0) {
-		int way = esel & (vcpu_e500->gtlb0_ways - 1);
-		__write_host_tlbe(stlbe, MAS0_TLBSEL(0) | MAS0_ESEL(way));
+		mas0 = get_host_mas0(stlbe->mas2);
+		__write_host_tlbe(stlbe, mas0);
 	} else {
 		__write_host_tlbe(stlbe,
 				  MAS0_TLBSEL(1) |
@@ -390,8 +413,7 @@ static inline int kvmppc_book3e_setup_virt_mmio(
 	struct kvm_book3e_206_tlb_entry *gtlbe = get_entry(vcpu_e500, 0, esel);
 	struct kvm_vcpu *vcpu = &(vcpu_e500->vcpu);
 	struct tlbe_ref *ref;
-	unsigned long flags;
-	int sesel;
+	unsigned long mas0;
 
 	/* Force GS=1 IPROT=0, 4K Page size for all virt. mmio mappings. */
 	stlbe->mas1 = MAS1_TSIZE(BOOK3E_PAGESZ_4K) | MAS1_VALID |
@@ -406,16 +428,8 @@ static inline int kvmppc_book3e_setup_virt_mmio(
 	ref = &vcpu_e500->gtlb_priv[0][esel].ref;
 	kvmppc_e500_ref_release(ref);
 
-	/* Get a next-victim hint from the hardware */
-	local_irq_save(flags);
-
-	mtspr(SPRN_MAS6, 0); /* don't care about addr space, just way usage */
-	asm volatile("tlbsx 0, %0" : : "b" (stlbe->mas2));
-	sesel = MAS0_NV(mfspr(SPRN_MAS0));
-
-	local_irq_restore(flags);
-
-	return sesel;
+	mas0 = get_host_mas0(stlbe->mas2);
+	return (mas0 & MAS0_ESEL_MASK) >> MAS0_ESEL_SHIFT;
 }
 #endif
 
