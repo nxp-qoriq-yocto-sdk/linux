@@ -31,11 +31,13 @@
 #define OP_31_XOP_MTMSR   146
 #define OP_31_XOP_WRTEEI  163
 
+#ifndef CONFIG_KVM_BOOKE_HV
 static void kvmppc_emul_rfi(struct kvm_vcpu *vcpu)
 {
 	vcpu->arch.pc = vcpu->arch.shared->srr0;
 	kvmppc_set_msr(vcpu, vcpu->arch.shared->srr1);
 }
+#endif
 
 static void kvmppc_emul_rfci(struct kvm_vcpu *vcpu)
 {
@@ -47,17 +49,17 @@ int kvmppc_booke_emulate_op(struct kvm_run *run, struct kvm_vcpu *vcpu,
                             unsigned int inst, int *advance)
 {
 	int emulated = EMULATE_DONE;
-	int rs;
-	int rt;
 
 	switch (get_op(inst)) {
 	case 19:
 		switch (get_xop(inst)) {
+#ifndef CONFIG_KVM_BOOKE_HV
 		case OP_19_XOP_RFI:
 			kvmppc_emul_rfi(vcpu);
 			kvmppc_set_exit_type(vcpu, EMULATED_RFI_EXITS);
 			*advance = 0;
 			break;
+#endif
 
 		case OP_19_XOP_RFCI:
 			kvmppc_emul_rfci(vcpu);
@@ -70,9 +72,11 @@ int kvmppc_booke_emulate_op(struct kvm_run *run, struct kvm_vcpu *vcpu,
 			break;
 		}
 		break;
-
+#ifndef CONFIG_KVM_BOOKE_HV
 	case 31:
 		switch (get_xop(inst)) {
+			int rt;
+			int rs;
 
 		case OP_31_XOP_MFMSR:
 			rt = get_rt(inst);
@@ -105,6 +109,7 @@ int kvmppc_booke_emulate_op(struct kvm_run *run, struct kvm_vcpu *vcpu,
 
 		break;
 
+#endif
 	default:
 		emulated = EMULATE_FAIL;
 	}
@@ -118,14 +123,27 @@ int kvmppc_booke_emulate_mtspr(struct kvm_vcpu *vcpu, int sprn, int rs)
 	ulong spr_val = kvmppc_get_gpr(vcpu, rs);
 
 	switch (sprn) {
-	case SPRN_CSRR0:
-		vcpu->arch.csrr0 = spr_val; break;
-	case SPRN_CSRR1:
-		vcpu->arch.csrr1 = spr_val; break;
+#ifndef CONFIG_KVM_BOOKE_HV
 	case SPRN_DEAR:
 		vcpu->arch.shared->dar = spr_val; break;
 	case SPRN_ESR:
 		vcpu->arch.shared->esr = spr_val; break;
+	/* Note: SPRG4-7 are user-readable. These values are
+	 * loaded into the real SPRGs when resuming the
+	 * guest. */
+	case SPRN_SPRG4:
+		vcpu->arch.sprg4 = spr_val; break;
+	case SPRN_SPRG5:
+		vcpu->arch.sprg5 = spr_val; break;
+	case SPRN_SPRG6:
+		vcpu->arch.sprg6 = spr_val; break;
+	case SPRN_SPRG7:
+		vcpu->arch.sprg7 = spr_val; break;
+#endif
+	case SPRN_CSRR0:
+		vcpu->arch.csrr0 = spr_val; break;
+	case SPRN_CSRR1:
+		vcpu->arch.csrr1 = spr_val; break;
 	case SPRN_IAC1:
 		vcpu->arch.dbg_reg.iac[0] = spr_val;
 		kvmppc_recalc_shadow_ac(vcpu);
@@ -175,21 +193,11 @@ int kvmppc_booke_emulate_mtspr(struct kvm_vcpu *vcpu, int sprn, int rs)
 		kvmppc_set_tcr(vcpu,
 		               spr_val | (TCR_WRC_MASK & vcpu->arch.tcr));
 		break;
-
-	/* Note: SPRG4-7 are user-readable. These values are
-	 * loaded into the real SPRGs when resuming the
-	 * guest. */
-	case SPRN_SPRG4:
-		vcpu->arch.sprg4 = spr_val; break;
-	case SPRN_SPRG5:
-		vcpu->arch.sprg5 = spr_val; break;
-	case SPRN_SPRG6:
-		vcpu->arch.sprg6 = spr_val; break;
-	case SPRN_SPRG7:
-		vcpu->arch.sprg7 = spr_val; break;
-
 	case SPRN_IVPR:
 		vcpu->arch.ivpr = spr_val;
+#ifdef CONFIG_KVM_BOOKE_HV
+		mtspr(SPRN_GIVPR, spr_val);
+#endif
 		break;
 	case SPRN_IVOR0:
 		vcpu->arch.ivor[BOOKE_IRQPRIO_CRITICAL] = spr_val;
@@ -199,6 +207,9 @@ int kvmppc_booke_emulate_mtspr(struct kvm_vcpu *vcpu, int sprn, int rs)
 		break;
 	case SPRN_IVOR2:
 		vcpu->arch.ivor[BOOKE_IRQPRIO_DATA_STORAGE] = spr_val;
+#ifdef CONFIG_KVM_BOOKE_HV
+		mtspr(SPRN_GIVOR2, spr_val);
+#endif
 		break;
 	case SPRN_IVOR3:
 		vcpu->arch.ivor[BOOKE_IRQPRIO_INST_STORAGE] = spr_val;
@@ -217,6 +228,9 @@ int kvmppc_booke_emulate_mtspr(struct kvm_vcpu *vcpu, int sprn, int rs)
 		break;
 	case SPRN_IVOR8:
 		vcpu->arch.ivor[BOOKE_IRQPRIO_SYSCALL] = spr_val;
+#ifdef CONFIG_KVM_BOOKE_HV
+		mtspr(SPRN_GIVOR8, spr_val);
+#endif
 		break;
 	case SPRN_IVOR9:
 		vcpu->arch.ivor[BOOKE_IRQPRIO_AP_UNAVAIL] = spr_val;
@@ -252,16 +266,18 @@ int kvmppc_booke_emulate_mfspr(struct kvm_vcpu *vcpu, int sprn, int rt)
 	int emulated = EMULATE_DONE;
 
 	switch (sprn) {
-	case SPRN_CSRR0:
-		kvmppc_set_gpr(vcpu, rt, vcpu->arch.csrr0); break;
-	case SPRN_CSRR1:
-		kvmppc_set_gpr(vcpu, rt, vcpu->arch.csrr1); break;
+#ifndef CONFIG_KVM_BOOKE_HV
 	case SPRN_IVPR:
 		kvmppc_set_gpr(vcpu, rt, vcpu->arch.ivpr); break;
 	case SPRN_DEAR:
 		kvmppc_set_gpr(vcpu, rt, vcpu->arch.shared->dar); break;
 	case SPRN_ESR:
 		kvmppc_set_gpr(vcpu, rt, vcpu->arch.shared->esr); break;
+#endif
+	case SPRN_CSRR0:
+		kvmppc_set_gpr(vcpu, rt, vcpu->arch.csrr0); break;
+	case SPRN_CSRR1:
+		kvmppc_set_gpr(vcpu, rt, vcpu->arch.csrr1); break;
 	case SPRN_IAC1:
 		kvmppc_set_gpr(vcpu, rt, vcpu->arch.dbg_reg.iac[0]);
 		break;

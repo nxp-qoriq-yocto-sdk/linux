@@ -47,11 +47,11 @@ kvm-e500mc-objs := \
 	$(common-objs-y) \
 	bookehv.o \
 	booke_common.o \
-	bookehv_emulate.o \
+	booke_emulate.o \
 	bookehv_interrupts.o \
 	e500mc.o \
 	e500_tlb.o \
-	e500mc_emulate.o
+	e500_emulate.o
 kvm-objs-$(CONFIG_KVM_E500MC) := $(kvm-e500mc-objs)
 
 kvm-book3s_64-objs := \
