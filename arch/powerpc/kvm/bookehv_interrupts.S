@@ -368,9 +368,6 @@ _GLOBAL(kvmppc_resume_host)
 	/* Restore host stack pointer */
 	PPC_LL	r1, VCPU_HOST_STACK(r4)
 
-	/* set host r2 here as we will certainly reach lightweight exit
-	 * where we assume we have the host r2.
-	 */
 	PPC_LL	r2, HOST_R2(r1)
 
 	andi.	r7, r6, NEED_HOST_HANDLER_MASK_LOW
