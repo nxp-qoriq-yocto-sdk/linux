@@ -10,6 +10,7 @@
 
 #include <linux/interrupt.h>
 #include <linux/device.h>
+#include <linux/delay.h>
 
 struct request;
 struct mmc_data;
@@ -175,6 +176,16 @@ extern int mmc_try_claim_host(struct mmc_host *host);
 static inline void mmc_claim_host(struct mmc_host *host)
 {
 	__mmc_claim_host(host, NULL);
+}
+
+static inline void mmc_delay(unsigned int ms)
+{
+	if (ms < 1000 / HZ) {
+		cond_resched();
+		mdelay(ms);
+	} else {
+		msleep(ms);
+	}
 }
 
 extern u32 mmc_vddrange_to_ocrmask(int vdd_min, int vdd_max);
