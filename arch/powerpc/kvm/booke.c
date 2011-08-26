@@ -417,51 +417,6 @@ void kvmppc_core_deliver_interrupts(struct kvm_vcpu *vcpu)
 	vcpu->arch.shared->int_pending = !!*pending;
 }
 
-static int kvmppc_handle_debug(struct kvm_run *run, struct kvm_vcpu *vcpu)
-{
-#define DBSR_AC		(DBSR_IAC1 | DBSR_IAC2 | DBSR_IAC3 | DBSR_IAC4| \
-			 DBSR_DAC1R | DBSR_DAC1W | DBSR_DAC2R | DBSR_DAC2W)
-	u32 dbsr;
-
-	vcpu->arch.pc = mfspr(SPRN_CSRR0);
-	dbsr = mfspr(SPRN_DBSR);
-
-	/* Clear events we got in DBSR register */
-	mtspr(SPRN_DBSR, dbsr);
-
-	if (vcpu->guest_debug == 0) {
-		/*
-		 * Event from guest debug facility emulation.
-		 */
-		kvmppc_set_dbsr_bits(vcpu, dbsr);
-
-		/* Inject a program interrupt if trap debug is not allowed */
-		if ((dbsr & DBSR_TIE) && !(vcpu->arch.shared->msr & MSR_DE))
-			kvmppc_core_queue_program(vcpu, ESR_PTR);
-
-		return RESUME_GUEST;
-	} else {
-		/* Event from guest debug */
-		run->debug.arch.pc = vcpu->arch.pc;
-		run->debug.arch.status = 0;
-
-		if (dbsr & (DBSR_IAC1 | DBSR_IAC2 | DBSR_IAC3 | DBSR_IAC4)) {
-			run->debug.arch.status |= KVMPPC_DEBUG_BREAKPOINT;
-		} else {
-			if (dbsr & (DBSR_DAC1W | DBSR_DAC2W))
-				run->debug.arch.status |= KVMPPC_DEBUG_WATCH_WRITE;
-			else if (dbsr & (DBSR_DAC1R | DBSR_DAC2R))
-				run->debug.arch.status |= KVMPPC_DEBUG_WATCH_READ;
-			if (dbsr & (DBSR_DAC1R | DBSR_DAC1W))
-				run->debug.arch.pc = vcpu->arch.shadow_dbg_reg.dac[0];
-			else if (dbsr & (DBSR_DAC2R | DBSR_DAC2W))
-				run->debug.arch.pc = vcpu->arch.shadow_dbg_reg.dac[1];
-		}
-
-		return RESUME_HOST;
-	}
-}
-
 int kvmppc_vcpu_run(struct kvm_run *kvm_run, struct kvm_vcpu *vcpu)
 {
 	int ret;
@@ -793,6 +748,7 @@ int kvmppc_handle_exit(struct kvm_run *run, struct kvm_vcpu *vcpu,
 	}
 
 	case BOOKE_INTERRUPT_DEBUG:
+		vcpu->arch.pc = mfspr(SPRN_CSRR0);
 		r = kvmppc_handle_debug(run, vcpu);
 		if (r == RESUME_HOST) {
 			run->debug.arch.exception = exit_nr;

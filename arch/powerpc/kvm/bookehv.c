@@ -615,32 +615,12 @@ int kvmppc_handle_exit(struct kvm_run *run, struct kvm_vcpu *vcpu,
 	}
 
 	case BOOKE_INTERRUPT_DEBUG: {
-		u32 dbsr;
-
-		dbsr = mfspr(SPRN_DBSR);
-		run->debug.arch.pc = vcpu->arch.pc;
-		run->debug.arch.status = 0;
-
-		if (dbsr & (DBSR_IAC1 | DBSR_IAC2)) {
-			run->debug.arch.status |= KVMPPC_DEBUG_BREAKPOINT;
-		} else {
-			if (dbsr & (DBSR_DAC1W | DBSR_DAC2W))
-				run->debug.arch.status |= KVMPPC_DEBUG_WATCH_WRITE;
-			else if (dbsr & (DBSR_DAC1R | DBSR_DAC2R))
-				run->debug.arch.status |= KVMPPC_DEBUG_WATCH_READ;
-			if (dbsr & (DBSR_DAC1R | DBSR_DAC1W))
-				run->debug.arch.pc = vcpu->arch.shadow_dbg_reg.dac[0];
-			else if (dbsr & (DBSR_DAC2R | DBSR_DAC2W))
-				run->debug.arch.pc = vcpu->arch.shadow_dbg_reg.dac[1];
+		r = kvmppc_handle_debug(run, vcpu);
+		if (r == RESUME_HOST) {
+			run->debug.arch.exception = exit_nr;
+			run->exit_reason = KVM_EXIT_DEBUG;
 		}
-
-		/* clear events we got in DBSR register */
-		mtspr(SPRN_DBSR, dbsr);
-
-		run->debug.arch.exception = exit_nr;
-		run->exit_reason = KVM_EXIT_DEBUG;
 		kvmppc_account_exit(vcpu, DEBUG_EXITS);
-		r = RESUME_HOST;
 		break;
 	}
 

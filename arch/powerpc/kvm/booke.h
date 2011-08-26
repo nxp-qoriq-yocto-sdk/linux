@@ -88,6 +88,7 @@ void kvmppc_wdt_resume(struct kvm_vcpu *vcpu);
 
 void kvmppc_recalc_shadow_ac(struct kvm_vcpu *vcpu);
 void kvmppc_recalc_shadow_dbcr(struct kvm_vcpu *vcpu);
+int kvmppc_handle_debug(struct kvm_run *run, struct kvm_vcpu *vcpu);
 
 void kvmppc_set_hwpmlca_all(struct kvm_vcpu *vcpu);
 void kvmppc_set_hwpmlca(unsigned int idx, struct kvm_vcpu *vcpu);
