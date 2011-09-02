@@ -171,6 +171,7 @@ void kvmppc_map_magic(struct kvm_vcpu *vcpu)
 	preempt_disable();
 	stid = kvmppc_e500_get_sid(vcpu_e500, 0, 0, 0, 0);
 
+	magic.mas8 = 0;
 	magic.mas1 = MAS1_VALID | MAS1_TS | MAS1_TID(stid) |
 		     MAS1_TSIZE(BOOK3E_PAGESZ_4K);
 	magic.mas2 = vcpu->arch.magic_page_ea | MAS2_M;
