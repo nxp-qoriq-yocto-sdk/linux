@@ -149,6 +149,9 @@ int __init declare_of_platform_devices(void)
 		return err;
 
 	/* Now probe the fake MDIO buses */
+	for_each_compatible_node(np, NULL, "fsl,p3060qds-mdio")
+		of_platform_device_create(np, NULL, NULL);
+
 	for_each_compatible_node(np, NULL, "fsl,p4080ds-mdio")
 		of_platform_device_create(np, NULL, NULL);
 

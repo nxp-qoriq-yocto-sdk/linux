@@ -212,6 +212,9 @@ config P3060_QDS
 	select HAS_RAPIDIO
 	select PPC_EPAPR_HV_PIC
 	select HAS_FSL_PAMU
+	select HAS_FSL_QBMAN
+	select HAS_FSL_PME
+	select FSL_P3060_QDS_MDIO if PHYLIB
 	help
 	  This option enables support for the P3060 QDS board
 
@@ -251,6 +254,11 @@ config P5020_DS
 	  This option enables support for the P5020 DS board
 
 endif # FSL_SOC_BOOKE
+
+config FSL_P3060_QDS_MDIO
+	bool
+	select VITESSE_PHY
+	depends on PHYLIB
 
 config FSL_P4080_DS_MDIO
 	bool
