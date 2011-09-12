@@ -186,8 +186,7 @@ void kvmppc_recalc_shadow_dbcr(struct kvm_vcpu *vcpu)
 		struct kvmppc_debug_reg *sreg = &(vcpu->arch.shadow_dbg_reg),
 		                        *greg = &(vcpu->arch.dbg_reg);
 
-		/* We always enable debug event in shadow */
-		sreg->dbcr0 = greg->dbcr0 | DBCR0_IDM;
+		sreg->dbcr0 = greg->dbcr0;
 
 		/*
 		 * Some event should not occur if MSR[DE] = 0,
@@ -493,9 +492,10 @@ void kvmppc_load_perfmon_regs(struct kvm_vcpu *vcpu)
 
 void kvmppc_set_dbsr_bits(struct kvm_vcpu *vcpu, u32 dbsr_bits)
 {
-	vcpu->arch.dbsr |= dbsr_bits;
-	if (vcpu->arch.dbsr != 0)
+	if (dbsr_bits && (vcpu->arch.shared->msr & MSR_DE)) {
+		vcpu->arch.dbsr |= dbsr_bits;
 		kvmppc_core_queue_debug(vcpu);
+	}
 }
 
 void kvmppc_clr_dbsr_bits(struct kvm_vcpu *vcpu, u32 dbsr_bits)

@@ -350,7 +350,6 @@ static int kvmppc_booke_irqprio_deliver(struct kvm_vcpu *vcpu,
 		break;
 	case BOOKE_IRQPRIO_DEBUG:
 		allowed = vcpu->arch.shared->msr & MSR_DE;
-		allowed = allowed && (vcpu->arch.dbg_reg.dbcr0 & DBCR0_IDM);
 		allowed = allowed && !crit;
 		msr_mask = MSR_ME;
 		int_class = INT_CLASS_CRIT;
