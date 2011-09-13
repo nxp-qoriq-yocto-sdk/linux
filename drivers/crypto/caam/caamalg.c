@@ -709,14 +709,14 @@ static void caam_unmap(struct device *dev, struct scatterlist *src,
 		       dma_addr_t iv_dma, int ivsize, dma_addr_t sec4_sg_dma,
 		       int sec4_sg_bytes)
 {
-	if (unlikely(dst != src)) {
-		dma_unmap_sg_chained(dev, src, src_nents, DMA_TO_DEVICE,
+	if (dst != src) {
+		dma_unmap_sg_chained(dev, src, src_nents ? : 1, DMA_TO_DEVICE,
 				     src_chained);
-		dma_unmap_sg_chained(dev, dst, dst_nents, DMA_FROM_DEVICE,
+		dma_unmap_sg_chained(dev, dst, dst_nents ? : 1, DMA_FROM_DEVICE,
 				     dst_chained);
 	} else {
-		dma_unmap_sg_chained(dev, src, src_nents, DMA_BIDIRECTIONAL,
-				     src_chained);
+		dma_unmap_sg_chained(dev, src, src_nents ? : 1,
+				     DMA_BIDIRECTIONAL, src_chained);
 	}
 
 	if (iv_dma)
@@ -1487,7 +1487,7 @@ static struct ablkcipher_edesc *ablkcipher_edesc_alloc(struct ablkcipher_request
 
 	src_nents = sg_count(req->src, req->nbytes, &src_chained);
 
-	if (unlikely(req->dst != req->src))
+	if (req->dst != req->src)
 		dst_nents = sg_count(req->dst, req->nbytes, &dst_chained);
 
 	if (likely(req->src == req->dst)) {
@@ -1536,7 +1536,7 @@ static struct ablkcipher_edesc *ablkcipher_edesc_alloc(struct ablkcipher_request
 		sec4_sg_index += 1 + src_nents;
 	}
 
-	if (unlikely(dst_nents)) {
+	if (dst_nents) {
 		sg_to_sec4_sg_last(req->dst, dst_nents,
 			edesc->sec4_sg + sec4_sg_index, 0);
 	}
