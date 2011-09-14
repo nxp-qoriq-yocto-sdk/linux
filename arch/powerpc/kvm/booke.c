@@ -501,8 +501,7 @@ int kvmppc_handle_exit(struct kvm_run *run, struct kvm_vcpu *vcpu,
 
 	case BOOKE_INTERRUPT_EXTERNAL:
 		kvmppc_account_exit(vcpu, EXT_INTR_EXITS);
-		if (need_resched())
-			cond_resched();
+		kvm_resched(vcpu);
 		r = RESUME_GUEST;
 		break;
 
@@ -511,8 +510,7 @@ int kvmppc_handle_exit(struct kvm_run *run, struct kvm_vcpu *vcpu,
 		 * handled this interrupt the moment we enabled interrupts.
 		 * Now we just offer it a chance to reschedule the guest. */
 		kvmppc_account_exit(vcpu, DEC_EXITS);
-		if (need_resched())
-			cond_resched();
+		kvm_resched(vcpu);
 		r = RESUME_GUEST;
 		break;
 
@@ -572,8 +570,8 @@ int kvmppc_handle_exit(struct kvm_run *run, struct kvm_vcpu *vcpu,
 		break;
 
 	case BOOKE_INTERRUPT_PERFORMANCE_MONITOR:
-		if (need_resched())
-			cond_resched();
+		kvm_resched(vcpu);
+		kvmppc_account_exit(vcpu, PERFMON_EXITS);
 		r = RESUME_GUEST;
 		break;
 
