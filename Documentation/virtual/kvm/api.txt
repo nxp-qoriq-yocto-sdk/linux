@@ -1403,6 +1403,46 @@ is supported; 2 if the processor requires all virtual machines to have
 an RMA, or 1 if the processor can use an RMA but doesn't require it,
 because it supports the Virtual RMA (VRMA) facility.
 
+4.68 KVM_SET_ONE_REG
+
+Capability: KVM_CAP_ONE_REG
+Architectures: all
+Type: vcpu ioctl
+Parameters: struct kvm_one_reg (in)
+Returns: 0 on success, negative value on failure
+
+struct kvm_one_reg {
+       __u64 id;
+       __u64 addr;
+};
+
+Using this ioctl, a single vcpu register can be set to a specific value
+defined by user space with the passed in struct kvm_one_reg, where id
+refers to the register identifier as described below and addr is a pointer
+to a variable with the respective size. There can be architecture agnostic
+and architecture specific registers. Each have their own range of operation
+and their own constants and width. To keep track of the implemented
+registers, find a list below:
+
+  Arch  |       Register        | Width (bits)
+        |                       |
+
+4.69 KVM_GET_ONE_REG
+
+Capability: KVM_CAP_ONE_REG
+Architectures: all
+Type: vcpu ioctl
+Parameters: struct kvm_one_reg (in and out)
+Returns: 0 on success, negative value on failure
+
+This ioctl allows to receive the value of a single register implemented
+in a vcpu. The register to read is indicated by the "id" field of the
+kvm_one_reg struct passed in. On success, the register value can be found
+at the memory location pointed to by "addr".
+
+The list of registers accessible using this interface is identical to the
+list in 4.64.
+
 5. The kvm_run structure
 
 Application code obtains a pointer to the kvm_run structure by
