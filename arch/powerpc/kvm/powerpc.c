@@ -689,6 +689,9 @@ static int kvm_arch_vcpu_ioctl_reserve_perfmon(struct kvm_vcpu *vcpu)
 
 	perfmon_refcount++;
 	vcpu->arch.pm_is_reserved = true;
+#ifdef CONFIG_KVM_BOOKE_HV
+	mtspr(SPRN_MSRP, mfspr(SPRN_MSRP) & ~MSRP_PMMP);
+#endif
 	spin_unlock(&perfmon_lock);
 	return 0;
 err:
