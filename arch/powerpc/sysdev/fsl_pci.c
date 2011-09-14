@@ -113,6 +113,7 @@ static void __init setup_pci_atmu(struct pci_controller *hose,
 	u32 piwar = PIWAR_EN | PIWAR_PF | PIWAR_TGI_LOCAL |
 			PIWAR_READ_SNOOP | PIWAR_WRITE_SNOOP;
 	char *name = hose->dn->full_name;
+	struct device_node *node;
 
 	pr_debug("PCI memory map start 0x%016llx, size 0x%016llx\n",
 		    (u64)rsrc->start, (u64)rsrc->end - (u64)rsrc->start + 1);
@@ -205,6 +206,20 @@ static void __init setup_pci_atmu(struct pci_controller *hose,
 
 	/* Setup inbound mem window */
 	mem = memblock_end_of_DRAM();
+
+	/*
+	 * Under the hypervisor, the PCIe MSI address is mapped
+	 * just above the end of max available guest memory,
+	 * and MSI addresses hit the inbound memory window, hence
+	 * set PCIe inbound window greater than memory size.
+	 */
+	node = of_find_node_by_path("/hypervisor");
+
+	if (node && of_find_property(node, "fsl,hv-version", NULL)) {
+		of_node_put(node);
+		mem += PAGE_SIZE;
+	}
+
 	sz = min(mem, paddr_lo);
 	mem_log = __ilog2_u64(sz);
 
