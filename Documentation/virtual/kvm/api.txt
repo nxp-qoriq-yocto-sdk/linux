@@ -1426,6 +1426,7 @@ registers, find a list below:
 
   Arch  |       Register        | Width (bits)
         |                       |
+  PPC   | KVM_REG_PPC_HIOR      | 64
 
 4.69 KVM_GET_ONE_REG
 
