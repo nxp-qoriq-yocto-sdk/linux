@@ -129,16 +129,24 @@ static const char *kvm_exit_names[__NUMBER_OF_KVM_EXIT_TYPES] = {
 	[EMULATED_TLBSX_EXITS] =    "EMUL_TLBSX",
 	[EMULATED_TLBWE_EXITS] =    "EMUL_TLBWE",
 	[EMULATED_RFI_EXITS] =      "EMUL_RFI",
+	[EMULATED_RFCI_EXITS] =     "EMUL_RFCI",
+	[EMULATED_RFDI_EXITS] =     "EMUL_RFDI",
 	[DEC_EXITS] =               "DEC",
 	[EXT_INTR_EXITS] =          "EXTINT",
 	[HALT_WAKEUP] =             "HALT",
 	[USR_PR_INST] =             "USR_PR_INST",
 	[FP_UNAVAIL] =              "FP_UNAVAIL",
 	[DEBUG_EXITS] =             "DEBUG",
+	[PERFMON_EXITS] =           "PERFMON",
+	[PRG_INT_EXITS] =           "PROGRAM_INT",
+#ifdef CONFIG_KVM_BOOKE_HV
+	[DBELL_EXITS] =             "DBELL",
+	[GDBELL_EXITS] =            "GUEST_DBELL",
+#endif
 #ifdef CONFIG_SPE
-	[SPE_UNAVAIL] =              "SPE_UNAVAIL",
-	[SPE_FP_DATA] =              "SPE_FP_DATA",
-	[SPE_FP_ROUND] =             "SPE_FP_ROUND",
+	[SPE_UNAVAIL] =             "SPE_UNAVAIL",
+	[SPE_FP_DATA] =             "SPE_FP_DATA",
+	[SPE_FP_ROUND] =            "SPE_FP_ROUND",
 #endif
 	[TIMEINGUEST] =             "TIMEINGUEST"
 };

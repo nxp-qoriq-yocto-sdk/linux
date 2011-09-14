@@ -97,6 +97,7 @@ int kvmppc_booke_emulate_op(struct kvm_run *run, struct kvm_vcpu *vcpu,
 
 		case OP_19_XOP_RFDI:
 			kvmppc_emul_rfdi(vcpu);
+			kvmppc_set_exit_type(vcpu, EMULATED_RFDI_EXITS);
 			*advance = 0;
 			break;
 

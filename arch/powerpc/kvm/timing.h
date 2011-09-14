@@ -93,6 +93,21 @@ static inline void kvmppc_account_exit_stat(struct kvm_vcpu *vcpu, int type)
 	case SIGNAL_EXITS:
 		vcpu->stat.signal_exits++;
 		break;
+	case PERFMON_EXITS:
+		vcpu->stat.perfmon_exits++;
+		break;
+	case DEBUG_EXITS:
+		vcpu->stat.debug_exits++;
+		break;
+	case FP_UNAVAIL:
+		vcpu->stat.fp_unavail_exits++;
+		break;
+	case PRG_INT_EXITS:
+		vcpu->stat.program_int_exits++;
+		break;
+	case USR_PR_INST:
+		vcpu->stat.usr_pr_inst++;
+		break;
 #ifdef CONFIG_KVM_BOOKE_HV
 	case DBELL_EXITS:
 		vcpu->stat.dbell_exits++;

@@ -416,6 +416,7 @@ int kvmppc_handle_exit(struct kvm_run *run, struct kvm_vcpu *vcpu,
 
 	case BOOKE_INTERRUPT_PERFORMANCE_MONITOR:
 		kvm_resched(vcpu);
+		kvmppc_account_exit(vcpu, PERFMON_EXITS);
 		r = RESUME_GUEST;
 		break;
 	case BOOKE_INTERRUPT_HV_GS_DBELL_CRIT:

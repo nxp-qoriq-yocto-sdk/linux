@@ -84,6 +84,11 @@ struct kvm_vcpu_stat {
 	u32 dec_exits;
 	u32 ext_intr_exits;
 	u32 halt_wakeup;
+	u32 usr_pr_inst;
+	u32 fp_unavail_exits;
+	u32 debug_exits;
+	u32 perfmon_exits;
+	u32 program_int_exits;
 #ifdef CONFIG_KVM_BOOKE_HV
 	u32 dbell_exits;
 	u32 gdbell_exits;
@@ -129,12 +134,14 @@ enum kvm_exit_types {
 	EMULATED_RFI_EXITS,
 	EMULATED_RFCI_EXITS,
 	EMULATED_RFMCI_EXITS,
+	EMULATED_RFDI_EXITS,
 	DEC_EXITS,
 	EXT_INTR_EXITS,
 	HALT_WAKEUP,
 	USR_PR_INST,
 	FP_UNAVAIL,
 	DEBUG_EXITS,
+	PERFMON_EXITS,
 	TIMEINGUEST,
 	PRG_INT_EXITS,
 #ifdef CONFIG_KVM_BOOKE_HV
