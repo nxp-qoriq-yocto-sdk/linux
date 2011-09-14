@@ -1022,6 +1022,7 @@ int kvmppc_handle_exit(struct kvm_run *run, struct kvm_vcpu *vcpu,
 	case BOOKE_INTERRUPT_PERFORMANCE_MONITOR:
 		if (need_resched())
 			cond_resched();
+		kvmppc_account_exit(vcpu, PERFMON_EXITS);
 		r = RESUME_GUEST;
 		break;
 
