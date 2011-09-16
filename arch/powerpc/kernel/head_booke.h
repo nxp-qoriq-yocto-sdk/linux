@@ -21,8 +21,6 @@
 	addi	reg,reg,val@l
 #endif
 
-/*TBD: Handle guest clearing CE/ME */
-
 #define NORMAL_EXCEPTION_PROLOG(ivor_nr)				     \
 	mtspr	SPRN_SPRG_WSCRATCH0, r10;	/* save one register */	     \
 	mfspr	r10, SPRN_SPRG_THREAD;					     \
