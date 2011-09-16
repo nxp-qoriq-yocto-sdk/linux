@@ -43,11 +43,13 @@ BEGIN_FTR_SECTION
 	mfspr	r11, \excp_srr1
 	andis. 	r11, r11, MSR_GS@h
 	/*
-	 * NOTE: kvmppc_handler called with r10 in scratch0, CR in r13,
-	 * for critical r8 would be saved in sprg2
-	 * thread_struct * in r10, r11 as scratch,
-	 * saved r11 in thread_struct.normsave[0]
-	 * saved r13 in thread_struct.normsave[2]
+	 * NOTE: handler called with r10 in scratch0 for base exceptions.
+	 * For critical/mcheck/debug r8 will be saved in the respective
+	 * sprg registers.
+	 * CR is in r13.
+	 * thread_struct pointer is in r10.
+	 * r11 is available as scratch.
+	 * r11 and r13 are saved in thread_struct.normsave[0 and 2].
 	 */
 	beq	kvmppc_resume_\ivor_nr\excp_srr1
 	b	kvmppc_handler_\ivor_nr
