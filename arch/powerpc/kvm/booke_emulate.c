@@ -25,6 +25,7 @@
 
 #define OP_19_XOP_RFI     50
 #define OP_19_XOP_RFCI    51
+#define OP_19_XOP_RFMCI   38
 
 #define OP_31_XOP_MFMSR   83
 #define OP_31_XOP_WRTEE   131
@@ -38,6 +39,12 @@ static void kvmppc_emul_rfi(struct kvm_vcpu *vcpu)
 	kvmppc_set_msr(vcpu, vcpu->arch.shared->srr1);
 }
 #endif
+
+static void kvmppc_emul_rfmci(struct kvm_vcpu *vcpu)
+{
+	vcpu->arch.pc = vcpu->arch.mcsrr0;
+	kvmppc_set_msr(vcpu, vcpu->arch.mcsrr1);
+}
 
 static void kvmppc_emul_rfci(struct kvm_vcpu *vcpu)
 {
@@ -64,6 +71,12 @@ int kvmppc_booke_emulate_op(struct kvm_run *run, struct kvm_vcpu *vcpu,
 		case OP_19_XOP_RFCI:
 			kvmppc_emul_rfci(vcpu);
 			kvmppc_set_exit_type(vcpu, EMULATED_RFCI_EXITS);
+			*advance = 0;
+			break;
+
+		case OP_19_XOP_RFMCI:
+			kvmppc_emul_rfmci(vcpu);
+			kvmppc_set_exit_type(vcpu, EMULATED_RFMCI_EXITS);
 			*advance = 0;
 			break;
 
@@ -144,6 +157,10 @@ int kvmppc_booke_emulate_mtspr(struct kvm_vcpu *vcpu, int sprn, int rs)
 		vcpu->arch.csrr0 = spr_val; break;
 	case SPRN_CSRR1:
 		vcpu->arch.csrr1 = spr_val; break;
+	case SPRN_MCSRR0:
+		vcpu->arch.mcsrr0 = spr_val; break;
+	case SPRN_MCSRR1:
+		vcpu->arch.mcsrr1 = spr_val; break;
 	case SPRN_IAC1:
 		vcpu->arch.dbg_reg.iac[0] = spr_val;
 		kvmppc_recalc_shadow_ac(vcpu);
@@ -278,6 +295,10 @@ int kvmppc_booke_emulate_mfspr(struct kvm_vcpu *vcpu, int sprn, int rt)
 		kvmppc_set_gpr(vcpu, rt, vcpu->arch.csrr0); break;
 	case SPRN_CSRR1:
 		kvmppc_set_gpr(vcpu, rt, vcpu->arch.csrr1); break;
+	case SPRN_MCSRR0:
+		kvmppc_set_gpr(vcpu, rt, vcpu->arch.mcsrr0); break;
+	case SPRN_MCSRR1:
+		kvmppc_set_gpr(vcpu, rt, vcpu->arch.mcsrr1); break;
 	case SPRN_IAC1:
 		kvmppc_set_gpr(vcpu, rt, vcpu->arch.dbg_reg.iac[0]);
 		break;

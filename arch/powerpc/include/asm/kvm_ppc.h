@@ -55,6 +55,7 @@ extern int __kvmppc_vcpu_run(struct kvm_run *kvm_run, struct kvm_vcpu *vcpu);
 extern char kvmppc_handlers_start[];
 extern unsigned long kvmppc_handler_len;
 extern void kvmppc_handler_highmem(void);
+extern int kvmppc_invoke_host_mchk_vector(unsigned long excp_vector);
 
 extern void kvmppc_dump_vcpu(struct kvm_vcpu *vcpu);
 extern int kvmppc_handle_load(struct kvm_run *run, struct kvm_vcpu *vcpu,
@@ -114,6 +115,8 @@ extern void kvmppc_core_dequeue_watchdog(struct kvm_vcpu *vcpu);
 extern void kvmppc_core_dequeue_perfmon(struct kvm_vcpu *vcpu);
 extern void kvmppc_core_queue_debug(struct kvm_vcpu *vcpu);
 extern void kvmppc_core_dequeue_debug(struct kvm_vcpu *vcpu);
+extern void kvmppc_core_queue_mcheck(struct kvm_vcpu *vcpu);
+extern void kvmppc_core_dequeue_mcheck(struct kvm_vcpu *vcpu);
 
 extern int kvmppc_core_emulate_op(struct kvm_run *run, struct kvm_vcpu *vcpu,
                                   unsigned int op, int *advance);
@@ -172,8 +175,30 @@ static inline u32 kvmppc_set_field(u64 inst, int msb, int lsb, int value)
 	return r;
 }
 
+#if defined(CONFIG_KVM_E500MC)
+/* Return a valid mcsr value which can be returned to qemu */
+static inline u32 kvmppc_get_bad_ifetch_mcsr(void)
+{
+	u32 mcsr;
+
+	mcsr = MCSR_IF | MCSR_MAV | MCSR_MEA;
+
+	return mcsr;
+}
+#elif defined (CONFIG_KVM_E500)
+static inline u32 kvmppc_get_bad_ifetch_mcsr(void)
+{
+	u32 mcsr;
+
+	mcsr = MCSR_BUS_IAERR;
+
+	return mcsr;
+}
+#endif
+
 void kvmppc_core_get_sregs(struct kvm_vcpu *vcpu, struct kvm_sregs *sregs);
 int kvmppc_core_set_sregs(struct kvm_vcpu *vcpu, struct kvm_sregs *sregs);
+int kvmppc_handle_machine_check(struct kvm_run *run);
 
 void kvmppc_get_sregs_ivor(struct kvm_vcpu *vcpu, struct kvm_sregs *sregs);
 int kvmppc_set_sregs_ivor(struct kvm_vcpu *vcpu, struct kvm_sregs *sregs);

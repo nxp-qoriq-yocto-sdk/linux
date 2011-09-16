@@ -78,6 +78,8 @@
 
 #define NEED_DBG_SAVE_REGS (1<<BOOKE_INTERRUPT_DEBUG)
 
+#define NEED_MCHK_SAVE_REGS (1<<BOOKE_INTERRUPT_MACHINE_CHECK)
+
 /* Registers:
  *  r10: THREAD_POINTER
  *  r13: guest cr
@@ -159,6 +161,7 @@ KVM_HANDLER BOOKE_HV_GUEST_DBELL
 KVM_HANDLER BOOKE_INTERRUPT_DOORBELL
 KVM_LVL_HANDLER BOOKE_INTERRUPT_HV_GS_DBELL_CRIT SPRN_SPRG_RSCRATCH_CRIT
 KVM_LVL_HANDLER BOOKE_INTERRUPT_DEBUG SPRN_SPRG_RSCRATCH_DBG
+KVM_LVL_HANDLER BOOKE_INTERRUPT_MACHINE_CHECK SPRN_SPRG_RSCRATCH_MC
 KVM_HANDLER BOOKE_INTERRUPT_PERFORMANCE_MONITOR
 
 
@@ -252,35 +255,41 @@ _GLOBAL(kvmppc_resume_host)
 	PPC_STL	r8, VCPU_TIMING_EXIT_TBL(r4)
 	PPC_STL	r9, VCPU_TIMING_EXIT_TBU(r4)
 #endif
-	/* Don't allow guest clearing CE/ME/RI impact
-	 * the hypervisor
-	 */
-	mfmsr	r3
-	andi.	r7, r11, NEED_CRIT_SAVE_REGS_HIGH
-	bne	..skip_msr_crit
-	oris	r3, r3, MSR_CE@h
-..skip_msr_crit:
-	ori	r3, r3, (MSR_ME | MSR_RI)@l
-	mtmsr	r3
-
+	mfmsr	r9
 	mfsrr1	r3
 	mfsrr0	r8
 
-	andi.	r7, r11, NEED_CRIT_SAVE_REGS_HIGH
-	beq	..skip_crit_reg
-	mfspr	r3, SPRN_CSRR1
-	mfspr	r8, SPRN_CSRR0
-..skip_crit_reg:
-	andi.	r7, r6, NEED_DBG_SAVE_REGS
-	beq	..skip_dbg_reg
-	mfspr	r3, SPRN_DSRR1
-	mfspr	r8, SPRN_DSRR0
-..skip_dbg_reg:
 	andi.	r7, r11, NEED_GS_REG_SAVE_MASK
 	beq	..skip_gs_reg_save
 	mfspr	r3, SPRN_GSRR1
 	mfspr	r8, SPRN_GSRR0
 ..skip_gs_reg_save:
+	andi.	r7, r6, NEED_MCHK_SAVE_REGS
+	bne	..set_mchk_regs
+	andi.	r7, r6, NEED_DBG_SAVE_REGS
+	bne	..set_dbg_reg
+	andi.	r7, r11, NEED_CRIT_SAVE_REGS_HIGH
+	bne	..set_crit_reg
+	/* Don't allow guest clearing CE/ME/RI impact
+	 * the hypervisor
+	 */
+	oris	r9, r9, MSR_CE@h
+	b	..set_msr
+..set_mchk_regs:
+	mfspr	r3, SPRN_MCSRR1
+	mfspr	r8, SPRN_MCSRR0
+	b	..skip_msr
+..set_dbg_reg:
+	mfspr	r3, SPRN_DSRR1
+	mfspr	r8, SPRN_DSRR0
+	b	..set_msr
+..set_crit_reg:
+	mfspr	r3, SPRN_CSRR1
+	mfspr	r8, SPRN_CSRR0
+..set_msr:
+	ori	r9, r9, (MSR_ME | MSR_RI)@l
+	mtmsr	r9
+..skip_msr:
 
 #ifndef CONFIG_64BIT
 	stw	r3, (VCPU_SHARED_MSR + 4)(r13)
@@ -710,3 +719,18 @@ lightweight_exit:
 	PPC_LL	r3, VCPU_GPR(r3)(r4)
 	PPC_LL	r4, VCPU_GPR(r4)(r4)
 	rfi
+
+
+/* Registers:
+ *  r3: host exception vector
+ */
+_GLOBAL(kvmppc_invoke_host_mchk_vector)
+	mtctr	r3
+	LOAD_REG_IMMEDIATE(r3, kvm_host_excp_return_point)
+	mtspr	SPRN_MCSRR0, r3
+	mfmsr	r3
+	ori	r3, r3, MSR_ME | MSR_RI
+	mtspr	SPRN_MCSRR1, r3
+	bctr
+kvm_host_excp_return_point:
+	blr

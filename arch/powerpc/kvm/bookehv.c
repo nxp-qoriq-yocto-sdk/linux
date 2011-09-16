@@ -128,6 +128,16 @@ void kvmppc_core_dequeue_dec(struct kvm_vcpu *vcpu)
 	clear_bit(BOOKE_IRQPRIO_DECREMENTER, &vcpu->arch.pending_exceptions);
 }
 
+void kvmppc_core_queue_mcheck(struct kvm_vcpu *vcpu)
+{
+	kvmppc_bookehv_queue_irqprio(vcpu, BOOKE_IRQPRIO_MACHINE_CHECK);
+}
+
+void kvmppc_core_dequeue_mcheck(struct kvm_vcpu *vcpu)
+{
+	clear_bit(BOOKE_IRQPRIO_MACHINE_CHECK, &vcpu->arch.pending_exceptions);
+}
+
 void kvmppc_set_msr(struct kvm_vcpu *vcpu, u32 new_msr)
 {
 	vcpu->arch.shared->msr = new_msr;
@@ -250,6 +260,11 @@ static int kvmppc_bookehv_irqprio_deliver(struct kvm_vcpu *vcpu,
 		msr_mask = MSR_GS | MSR_ME;
 		int_class = INT_CLASS_CRIT;
 		break;
+	case BOOKE_IRQPRIO_MACHINE_CHECK:
+		allowed = allowed && vcpu->arch.shared->msr & MSR_ME;
+		msr_mask = MSR_GS;
+		int_class = INT_CLASS_MC;
+		break;
 	default:
 		allowed = 0;
 	}
@@ -264,8 +279,9 @@ static int kvmppc_bookehv_irqprio_deliver(struct kvm_vcpu *vcpu,
 			vcpu->arch.csrr0 = vcpu->arch.pc;
 			vcpu->arch.csrr1 = vcpu->arch.shared->msr;
 			break;
-		/* TBD */
 		case INT_CLASS_MC:
+			vcpu->arch.mcsrr0 = vcpu->arch.pc;
+			vcpu->arch.mcsrr1 = vcpu->arch.shared->msr;
 			break;
 		/* TBD */
 		case INT_CLASS_DBG:
@@ -359,7 +375,8 @@ int kvmppc_handle_exit(struct kvm_run *run, struct kvm_vcpu *vcpu,
 	/* update before a new last_exit_type is rewritten */
 	kvmppc_update_timing_stats(vcpu);
 
-	local_irq_enable();
+	if (likely(exit_nr != BOOKE_INTERRUPT_MACHINE_CHECK))
+		local_irq_enable();
 
 	run->exit_reason = KVM_EXIT_UNKNOWN;
 	run->ready_for_interrupt_injection = 1;
@@ -396,9 +413,9 @@ int kvmppc_handle_exit(struct kvm_run *run, struct kvm_vcpu *vcpu,
 	case BOOKE_INTERRUPT_HV_GS_DBELL_CRIT:
 		kvmppc_account_exit(vcpu, GDBELL_EXITS);
 		/* we are here because there is a pending guest
-		 * interrupt which could not be delivered as MSR_CE
-		 * was not set. Once we break from here we would again
-		 * go to kvmpcc_core_deliver_interrupts
+		 * interrupt which could not be delivered as MSR_CE/MSR_ME
+		 * was not set. Once we break from here, we would proceed
+		 * to kvmppc_core_deliver_interrupts for crit/mchk int delivery
 		 */
 		r = RESUME_GUEST;
 		break;
@@ -408,7 +425,7 @@ int kvmppc_handle_exit(struct kvm_run *run, struct kvm_vcpu *vcpu,
 		/* we are here because there is a pending guest
 		 * interrupt which could not be delivered as MSR_EE
 		 * was not set. Once we break from here we would again
-		 * go to kvmpcc_core_deliver_interrupts
+		 * go to kvmppc_core_deliver_interrupts
 		 */
 		r = RESUME_GUEST;
 		break;
@@ -608,11 +625,23 @@ int kvmppc_handle_exit(struct kvm_run *run, struct kvm_vcpu *vcpu,
 			kvmppc_mmu_map(vcpu, eaddr, gpaddr, gtlb_index);
 		} else {
 			/* Guest mapped and leaped at non-RAM! */
-			kvmppc_bookehv_queue_irqprio(vcpu, BOOKE_IRQPRIO_MACHINE_CHECK);
+			u32 ret;
+
+			ret = kvmppc_get_bad_ifetch_mcsr();
+			run->ex.exception = BOOKE_INTERRUPT_MACHINE_CHECK;
+			run->ex.error_code = ret;
+			run->ex.addr = gpaddr;
+			run->ex.addr_type = KVM_EX_ADDR_PHYSICAL;
+			run->exit_reason = KVM_EXIT_EXCEPTION;
+			r = RESUME_HOST;
 		}
 
 		break;
 	}
+
+	case BOOKE_INTERRUPT_MACHINE_CHECK:
+		r = kvmppc_handle_machine_check(run);
+		break;
 
 	case BOOKE_INTERRUPT_DEBUG: {
 		r = kvmppc_handle_debug(run, vcpu);
@@ -757,11 +786,18 @@ static int set_sregs_base(struct kvm_vcpu *vcpu,
 
 	vcpu->arch.csrr0 = sregs->u.e.csrr0;
 	vcpu->arch.csrr1 = sregs->u.e.csrr1;
-	vcpu->arch.mcsr = sregs->u.e.mcsr;
 	vcpu->arch.shared->esr = sregs->u.e.esr;
 	vcpu->arch.shared->dar = sregs->u.e.dear;
 	vcpu->arch.vrsave = sregs->u.e.vrsave;
 	kvmppc_set_tcr(vcpu, sregs->u.e.tcr);
+
+	if (sregs->u.e.update_special & KVM_SREGS_E_UPDATE_MCSR) {
+		vcpu->arch.mcsr = sregs->u.e.mcsr;
+		if (vcpu->arch.mcsr)
+			kvmppc_core_queue_mcheck(vcpu);
+		else
+			kvmppc_core_dequeue_mcheck(vcpu);
+	}
 
 	if (sregs->u.e.update_special & KVM_SREGS_E_UPDATE_DEC) {
 		vcpu->arch.dec = sregs->u.e.dec;

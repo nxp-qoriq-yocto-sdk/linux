@@ -54,6 +54,59 @@ retry:
 	return 0;
 }
 
+/*
+ * Set up the kvm structure with the machine check information.
+ * This information will be used by qemu to inject the
+ * guest exception.
+ *
+ * If there are any machine check bits we don't want to pass
+ * to qemu (async events unlikely to be related to the guest),
+ * we invoke the host handler.
+ */
+int kvmppc_handle_machine_check(struct kvm_run *run)
+{
+	u32 mcsr;
+	u32 host_mask;
+
+	/* These exceptions are redirected to the host for handling */
+	host_mask = MCSR_MCP | MCSR_NMI | MCSR_TLBSYNC;
+
+	mcsr = mfspr(SPRN_MCSR);
+
+	run->ex.exception = BOOKE_INTERRUPT_MACHINE_CHECK;
+	run->ex.error_code = mcsr;
+	if (mcsr & MCSR_MAV) {
+		run->ex.addr = (((u64)mfspr(SPRN_MCARU)) << 32)
+					| mfspr(SPRN_MCAR);
+		if (mcsr & MCSR_MEA)
+			run->ex.addr_type = KVM_EX_ADDR_VIRTUAL;
+		else
+			run->ex.addr_type = KVM_EX_ADDR_PHYSICAL;
+	} else {
+		run->ex.addr_type = KVM_EX_ADDR_INVALID;
+	}
+
+	run->exit_reason = KVM_EXIT_EXCEPTION;
+
+	mtspr(SPRN_MCSR, mcsr & ~host_mask);
+
+	if (mcsr & host_mask) {
+		/*
+		 * Simply re-enabling MSR[ME] wouldn't work for NMI.
+		 * This function will return with MSR[ME/RI] set.
+		 */
+		kvmppc_invoke_host_mchk_vector(mfspr(SPRN_IVPR) |
+					       mfspr(SPRN_IVOR1));
+	} else {
+		mtmsr(mfmsr() | MSR_ME | MSR_RI);
+	}
+
+	if (mcsr & ~host_mask)
+		return RESUME_HOST;
+
+	return RESUME_GUEST;
+}
+
 void kvmppc_set_pending_interrupt(struct kvm_vcpu *vcpu, enum int_class type)
 {
 	unsigned long msg_type;

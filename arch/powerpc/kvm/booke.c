@@ -742,8 +742,15 @@ int kvmppc_handle_exit(struct kvm_run *run, struct kvm_vcpu *vcpu,
 			 * invoking the guest. */
 			kvmppc_mmu_map(vcpu, eaddr, gpaddr, gtlb_index);
 		} else {
-			/* Guest mapped and leaped at non-RAM! */
-			kvmppc_booke_queue_irqprio(vcpu, BOOKE_IRQPRIO_MACHINE_CHECK);
+			u32 ret;
+
+			ret = kvmppc_get_bad_ifetch_mcsr();
+			run->ex.exception = BOOKE_INTERRUPT_MACHINE_CHECK;
+			run->ex.error_code = ret;
+			run->ex.addr = gpaddr;
+			run->ex.addr_type = KVM_EX_ADDR_PHYSICAL;
+			run->exit_reason = KVM_EXIT_EXCEPTION;
+			r = RESUME_HOST;
 		}
 
 		break;
@@ -894,11 +901,13 @@ static int set_sregs_base(struct kvm_vcpu *vcpu,
 
 	vcpu->arch.csrr0 = sregs->u.e.csrr0;
 	vcpu->arch.csrr1 = sregs->u.e.csrr1;
-	vcpu->arch.mcsr = sregs->u.e.mcsr;
 	vcpu->arch.shared->esr = sregs->u.e.esr;
 	vcpu->arch.shared->dar = sregs->u.e.dear;
 	vcpu->arch.vrsave = sregs->u.e.vrsave;
 	kvmppc_set_tcr(vcpu, sregs->u.e.tcr);
+
+	if (sregs->u.e.update_special & KVM_SREGS_E_UPDATE_MCSR)
+		vcpu->arch.mcsr = sregs->u.e.mcsr;
 
 	if (sregs->u.e.update_special & KVM_SREGS_E_UPDATE_DEC) {
 		vcpu->arch.dec = sregs->u.e.dec;

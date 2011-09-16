@@ -24,6 +24,17 @@
 #define XOP_TLBWE   978
 #define XOP_TLBILX  18
 
+static void kvmppc_set_mcsr(struct kvm_vcpu *vcpu, ulong val)
+{
+#ifndef CONFIG_KVM_E500
+	vcpu->arch.mcsr &= ~val;
+	if (!vcpu->arch.mcsr)
+		kvmppc_core_dequeue_mcheck(vcpu);
+#else
+	vcpu->arch.mcsr = val;
+#endif
+}
+
 int kvmppc_core_emulate_op(struct kvm_run *run, struct kvm_vcpu *vcpu,
                            unsigned int inst, int *advance)
 {
@@ -134,7 +145,8 @@ int kvmppc_core_emulate_mtspr(struct kvm_vcpu *vcpu, int sprn, int rs)
 		emulated = kvmppc_e500_emul_mt_mmucsr0(vcpu_e500,
 				spr_val);
 		break;
-
+	case SPRN_MCSR:
+		kvmppc_set_mcsr(vcpu, spr_val); break;
 	/* extra exceptions */
 	case SPRN_IVOR32:
 		vcpu->arch.ivor[BOOKE_IRQPRIO_SPE_UNAVAIL] = spr_val;
@@ -211,13 +223,16 @@ int kvmppc_core_emulate_mfspr(struct kvm_vcpu *vcpu, int sprn, int rt)
 		kvmppc_set_gpr(vcpu, rt, vcpu_e500->hid1); break;
 	case SPRN_SVR:
 		kvmppc_set_gpr(vcpu, rt, vcpu_e500->svr); break;
-
+	case SPRN_MCAR:
+		kvmppc_set_gpr(vcpu, rt, vcpu_e500->mcar); break;
+	case SPRN_MCARU:
+		kvmppc_set_gpr(vcpu, rt, vcpu_e500->mcar >> 32); break;
 	case SPRN_MMUCSR0:
 		kvmppc_set_gpr(vcpu, rt, 0); break;
-
 	case SPRN_MMUCFG:
 		kvmppc_set_gpr(vcpu, rt, kvmppc_get_mmucfg(vcpu)); break;
-
+	case SPRN_MCSR:
+		kvmppc_set_gpr(vcpu, rt, vcpu->arch.mcsr); break;
 	/* extra exceptions */
 	case SPRN_IVOR32:
 		kvmppc_set_gpr(vcpu, rt, vcpu->arch.ivor[BOOKE_IRQPRIO_SPE_UNAVAIL]);
