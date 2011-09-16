@@ -262,6 +262,16 @@ void kvmppc_core_dequeue_debug(struct kvm_vcpu *vcpu)
 	clear_bit(BOOKE_IRQPRIO_DEBUG, &vcpu->arch.pending_exceptions);
 }
 
+void kvmppc_core_queue_mcheck(struct kvm_vcpu *vcpu)
+{
+	kvmppc_booke_queue_irqprio(vcpu, BOOKE_IRQPRIO_MACHINE_CHECK);
+}
+
+void kvmppc_core_dequeue_mcheck(struct kvm_vcpu *vcpu)
+{
+	clear_bit(BOOKE_IRQPRIO_MACHINE_CHECK, &vcpu->arch.pending_exceptions);
+}
+
 static void set_guest_srr(struct kvm_vcpu *vcpu, unsigned long srr0, u32 srr1)
 {
 #ifdef CONFIG_KVM_BOOKE_HV
@@ -933,7 +943,8 @@ int kvmppc_handle_exit(struct kvm_run *run, struct kvm_vcpu *vcpu,
 	/* restart interrupts if they were meant for the host */
 	kvmppc_restart_interrupt(vcpu, exit_nr);
 
-	local_irq_enable();
+	if (likely(exit_nr != BOOKE_INTERRUPT_MACHINE_CHECK))
+		local_irq_enable();
 
 	run->exit_reason = KVM_EXIT_UNKNOWN;
 	run->ready_for_interrupt_injection = 1;
@@ -1187,18 +1198,27 @@ int kvmppc_handle_exit(struct kvm_run *run, struct kvm_vcpu *vcpu,
 		gpaddr = kvmppc_mmu_xlate(vcpu, gtlb_index, eaddr);
 		gfn = gpaddr >> PAGE_SHIFT;
 
-		if (kvm_is_visible_gfn(vcpu->kvm, gfn)) {
-			/* The guest TLB had a mapping, but the shadow TLB
-			 * didn't. This could be because:
-			 * a) the entry is mapping the host kernel, or
-			 * b) the guest used a large mapping which we're faking
-			 * Either way, we need to satisfy the fault without
-			 * invoking the guest. */
-			kvmppc_mmu_map(vcpu, eaddr, gpaddr, gtlb_index);
-		} else {
+		if (!kvm_is_visible_gfn(vcpu->kvm, gfn)) {
 			/* Guest mapped and leaped at non-RAM! */
-			kvmppc_booke_queue_irqprio(vcpu, BOOKE_IRQPRIO_MACHINE_CHECK);
+			u32 ret;
+
+			ret = kvmppc_get_bad_ifetch_mcsr();
+			run->ex.exception = BOOKE_INTERRUPT_MACHINE_CHECK;
+			run->ex.error_code = ret;
+			run->ex.addr = gpaddr;
+			run->ex.addr_type = KVM_EX_ADDR_PHYSICAL;
+			run->exit_reason = KVM_EXIT_EXCEPTION;
+			r = RESUME_HOST;
+			break;
 		}
+
+		/* The guest TLB had a mapping, but the shadow TLB
+		 * didn't. This could be because:
+		 * a) the entry is mapping the host kernel, or
+		 * b) the guest used a large mapping which we're faking
+		 * Either way, we need to satisfy the fault without
+		 * invoking the guest. */
+		kvmppc_mmu_map(vcpu, eaddr, gpaddr, gtlb_index);
 
 		break;
 	}
@@ -1350,11 +1370,20 @@ static int set_sregs_base(struct kvm_vcpu *vcpu,
 
 	vcpu->arch.csrr0 = sregs->u.e.csrr0;
 	vcpu->arch.csrr1 = sregs->u.e.csrr1;
-	vcpu->arch.mcsr = sregs->u.e.mcsr;
 	set_guest_esr(vcpu, sregs->u.e.esr);
 	set_guest_dear(vcpu, sregs->u.e.dear);
 	vcpu->arch.vrsave = sregs->u.e.vrsave;
 	kvmppc_set_tcr(vcpu, sregs->u.e.tcr);
+
+	if (sregs->u.e.update_special & KVM_SREGS_E_UPDATE_MCSR) {
+		vcpu->arch.mcsr = sregs->u.e.mcsr;
+#ifndef CONFIG_KVM_E500 // FIXME
+		if (vcpu->arch.mcsr)
+			kvmppc_core_queue_mcheck(vcpu);
+		else
+			kvmppc_core_dequeue_mcheck(vcpu);
+#endif
+	}
 
 	if (sregs->u.e.update_special & KVM_SREGS_E_UPDATE_DEC) {
 		vcpu->arch.dec = sregs->u.e.dec;

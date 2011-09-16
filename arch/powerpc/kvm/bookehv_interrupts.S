@@ -718,3 +718,17 @@ skip_pmgc0_restore:
 	PPC_LL	r3, VCPU_GPR(r3)(r4)
 	PPC_LL	r4, VCPU_GPR(r4)(r4)
 	rfi
+
+/* Registers:
+ *  r3: host exception vector
+ */
+_GLOBAL(kvmppc_invoke_host_mchk_vector)
+	mtctr   r3
+	LOAD_REG_IMMEDIATE(r3, kvm_host_excp_return_point)
+	mtspr   SPRN_MCSRR0, r3
+	mfmsr   r3
+	ori     r3, r3, MSR_ME | MSR_RI
+	mtspr   SPRN_MCSRR1, r3
+	bctr
+kvm_host_excp_return_point:
+	blr
