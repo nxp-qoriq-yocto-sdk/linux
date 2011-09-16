@@ -575,8 +575,10 @@ interrupt_base:
 	/* Guest DoorBell */
 	EXCEPTION(0, BOOKE_HV_GUEST_DBELL, GuestDoorBell, unknown_exception, EXC_XFER_EE)
 
-	/* Guest DoorBell Critical -- Not being redirected to KVM currently */
-	CRITICAL_EXCEPTION(0, HV_GUEST_DBELL_CRITICAL, CriticalGuestDoorBell, unknown_exception)
+	/* Guest DoorBell Critical is used by KVM to deliver pending guest critical/
+	 * machine check exceptions
+	 */
+	CRITICAL_EXCEPTION(0, HV_GS_DBELL_CRIT, CriticalGuestDoorBell, unknown_exception)
 
 	/* Hypercall */
 	EXCEPTION(0, BOOKE_HV_SYSCALL, HyperCall, unknown_exception, EXC_XFER_EE)
