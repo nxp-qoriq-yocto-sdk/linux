@@ -134,8 +134,11 @@ void kvmppc_set_msr(struct kvm_vcpu *vcpu, u32 new_msr)
 #ifdef CONFIG_KVM_E500
 	/* Change PMLCA for all counters if MSR_PR or MSR_PMM changes */
 	if (vcpu->arch.pm_is_reserved &&
-	    (old_msr ^ new_msr) & (MSR_PMM | MSR_PR))
+	    (old_msr ^ new_msr) & (MSR_PMM | MSR_PR)) {
 		kvmppc_set_hwpmlca_all(vcpu);
+		vcpu->arch.shadow_msr &= ~MSR_PMM;
+		vcpu->arch.shadow_msr |= vcpu->arch.shared->msr & MSR_PMM;
+	}
 #endif
 
 	if (vcpu->arch.shared->msr & MSR_WE) {
