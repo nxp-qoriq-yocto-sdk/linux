@@ -843,16 +843,11 @@ static int kvmppc_handle_debug(struct kvm_run *run, struct kvm_vcpu *vcpu)
 	else
 		vcpu->arch.pc = mfspr(SPRN_CSRR0);
 #endif
-	dbsr = mfspr(SPRN_DBSR);
-
-	/* Clear events we got in DBSR register */
-	mtspr(SPRN_DBSR, dbsr);
+	dbsr = vcpu->arch.dbsr;
 
 	if (vcpu->guest_debug == 0) {
-		/*
-		 * Event from guest debug facility emulation.
-		 */
-		kvmppc_set_dbsr_bits(vcpu, dbsr);
+		if (dbsr & (vcpu->arch.shared->msr & MSR_DE))
+			kvmppc_core_queue_debug(vcpu);
 
 		/* Inject a program interrupt if trap debug is not allowed */
 		if ((dbsr & DBSR_TIE) && !(vcpu->arch.shared->msr & MSR_DE))
@@ -863,6 +858,7 @@ static int kvmppc_handle_debug(struct kvm_run *run, struct kvm_vcpu *vcpu)
 		/* Event from guest debug */
 		run->debug.arch.pc = vcpu->arch.pc;
 		run->debug.arch.status = 0;
+		vcpu->arch.dbsr = 0;
 
 		if (dbsr & (DBSR_IAC1 | DBSR_IAC2 | DBSR_IAC3 | DBSR_IAC4)) {
 			run->debug.arch.status |= KVMPPC_DEBUG_BREAKPOINT;
@@ -1710,14 +1706,6 @@ int kvmppc_core_set_guest_debug(struct kvm_vcpu *vcpu,
 	}
 
 	return 0;
-}
-
-void kvmppc_set_dbsr_bits(struct kvm_vcpu *vcpu, u32 dbsr_bits)
-{
-	if (dbsr_bits && (vcpu->arch.shared->msr & MSR_DE)) {
-		vcpu->arch.dbsr |= dbsr_bits;
-		kvmppc_core_queue_debug(vcpu);
-	}
 }
 
 void kvmppc_clr_dbsr_bits(struct kvm_vcpu *vcpu, u32 dbsr_bits)
