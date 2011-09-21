@@ -229,6 +229,9 @@ struct kvmppc_debug_reg {
 	u32 dbcr0;
 	u32 dbcr1;
 	u32 dbcr2;
+#ifdef CONFIG_KVM_E500MC
+	u32 dbcr4;
+#endif
 	u32 iac[KVMPPC_IAC_NUM];
 	u32 dac[KVMPPC_DAC_NUM];
 #endif

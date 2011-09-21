@@ -26,6 +26,7 @@
 #define OP_19_XOP_RFI     50
 #define OP_19_XOP_RFCI    51
 #define OP_19_XOP_RFMCI   38
+#define OP_19_XOP_RFDI    39
 
 #define OP_31_XOP_MFMSR   83
 #define OP_31_XOP_WRTEE   131
@@ -46,10 +47,24 @@ static void kvmppc_emul_rfmci(struct kvm_vcpu *vcpu)
 	kvmppc_set_msr(vcpu, vcpu->arch.mcsrr1);
 }
 
+static void kvmppc_emul_rfdi(struct kvm_vcpu *vcpu)
+{
+	vcpu->arch.pc = vcpu->arch.dsrr0;
+	/* Force MSR_DE when guest does not own debug facilities */
+	if (vcpu->guest_debug)
+		kvmppc_set_msr(vcpu, vcpu->arch.dsrr1 | MSR_DE);
+	else
+		kvmppc_set_msr(vcpu, vcpu->arch.dsrr1);
+}
+
 static void kvmppc_emul_rfci(struct kvm_vcpu *vcpu)
 {
 	vcpu->arch.pc = vcpu->arch.csrr0;
-	kvmppc_set_msr(vcpu, vcpu->arch.csrr1);
+	/* Force MSR_DE when guest does not own debug facilities */
+	if (vcpu->guest_debug)
+		kvmppc_set_msr(vcpu, vcpu->arch.csrr1 | MSR_DE);
+	else
+		kvmppc_set_msr(vcpu, vcpu->arch.csrr1);
 }
 
 int kvmppc_booke_emulate_op(struct kvm_run *run, struct kvm_vcpu *vcpu,
@@ -77,6 +92,11 @@ int kvmppc_booke_emulate_op(struct kvm_run *run, struct kvm_vcpu *vcpu,
 		case OP_19_XOP_RFMCI:
 			kvmppc_emul_rfmci(vcpu);
 			kvmppc_set_exit_type(vcpu, EMULATED_RFMCI_EXITS);
+			*advance = 0;
+			break;
+
+		case OP_19_XOP_RFDI:
+			kvmppc_emul_rfdi(vcpu);
 			*advance = 0;
 			break;
 
@@ -161,6 +181,12 @@ int kvmppc_booke_emulate_mtspr(struct kvm_vcpu *vcpu, int sprn, int rs)
 		vcpu->arch.mcsrr0 = spr_val; break;
 	case SPRN_MCSRR1:
 		vcpu->arch.mcsrr1 = spr_val; break;
+	case SPRN_DSRR0:
+		vcpu->arch.dsrr0 = spr_val;
+		break;
+	case SPRN_DSRR1:
+		vcpu->arch.dsrr1 = spr_val;
+		break;
 	case SPRN_IAC1:
 		vcpu->arch.dbg_reg.iac[0] = spr_val;
 		kvmppc_recalc_shadow_ac(vcpu);
@@ -203,6 +229,12 @@ int kvmppc_booke_emulate_mtspr(struct kvm_vcpu *vcpu, int sprn, int rs)
 		vcpu->arch.dbg_reg.dbcr2 = spr_val;
 		kvmppc_recalc_shadow_dbcr(vcpu);
 		break;
+#ifdef CONFIG_KVM_E500MC
+	case SPRN_DBCR4:
+		vcpu->arch.dbg_reg.dbcr4 = spr_val;
+		vcpu->arch.shadow_dbg_reg.dbcr4 = spr_val;
+		break;
+#endif
 	case SPRN_DBSR:
 		kvmppc_clr_dbsr_bits(vcpu, spr_val);
 		break;
@@ -305,6 +337,12 @@ int kvmppc_booke_emulate_mfspr(struct kvm_vcpu *vcpu, int sprn, int rt)
 		kvmppc_set_gpr(vcpu, rt, vcpu->arch.mcsrr0); break;
 	case SPRN_MCSRR1:
 		kvmppc_set_gpr(vcpu, rt, vcpu->arch.mcsrr1); break;
+	case SPRN_DSRR0:
+		kvmppc_set_gpr(vcpu, rt, vcpu->arch.dsrr0);
+		break;
+	case SPRN_DSRR1:
+		kvmppc_set_gpr(vcpu, rt, vcpu->arch.dsrr1);
+		break;
 	case SPRN_IAC1:
 		kvmppc_set_gpr(vcpu, rt, vcpu->arch.dbg_reg.iac[0]);
 		break;
@@ -341,6 +379,11 @@ int kvmppc_booke_emulate_mfspr(struct kvm_vcpu *vcpu, int sprn, int rt)
 		kvmppc_set_gpr(vcpu, rt, vcpu->arch.dbg_reg.dbcr1); break;
 	case SPRN_DBCR2:
 		kvmppc_set_gpr(vcpu, rt, vcpu->arch.dbg_reg.dbcr2); break;
+#ifdef CONFIG_KVM_E500MC
+	case SPRN_DBCR4:
+		kvmppc_set_gpr(vcpu, rt, vcpu->arch.dbg_reg.dbcr4);
+		break;
+#endif
 	case SPRN_DBSR:
 		kvmppc_set_gpr(vcpu, rt, vcpu->arch.dbsr); break;
 	case SPRN_TSR:

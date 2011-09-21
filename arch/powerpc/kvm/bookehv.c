@@ -257,9 +257,16 @@ static int kvmppc_bookehv_irqprio_deliver(struct kvm_vcpu *vcpu,
 		/* fall-through */
 	case BOOKE_IRQPRIO_CRITICAL:
 		allowed = allowed && vcpu->arch.shared->msr & MSR_CE;
-		msr_mask = MSR_GS | MSR_ME;
+		msr_mask = MSR_GS | MSR_ME | MSR_DE;
 		int_class = INT_CLASS_CRIT;
 		break;
+
+	case BOOKE_IRQPRIO_DEBUG:
+		allowed = vcpu->arch.shared->msr & MSR_DE;
+		msr_mask = MSR_GS | MSR_ME;
+		int_class = INT_CLASS_DBG;
+		break;
+
 	case BOOKE_IRQPRIO_MACHINE_CHECK:
 		allowed = allowed && vcpu->arch.shared->msr & MSR_ME;
 		msr_mask = MSR_GS;
@@ -283,8 +290,9 @@ static int kvmppc_bookehv_irqprio_deliver(struct kvm_vcpu *vcpu,
 			vcpu->arch.mcsrr0 = vcpu->arch.pc;
 			vcpu->arch.mcsrr1 = vcpu->arch.shared->msr;
 			break;
-		/* TBD */
 		case INT_CLASS_DBG:
+			vcpu->arch.dsrr0 = vcpu->arch.pc;
+			vcpu->arch.dsrr1 = vcpu->arch.shared->msr;
 			break;
 		}
 
@@ -736,7 +744,11 @@ int kvm_arch_vcpu_ioctl_set_regs(struct kvm_vcpu *vcpu, struct kvm_regs *regs)
 	int i;
 
 	vcpu->arch.pc = regs->pc;
-	kvmppc_set_msr(vcpu, regs->msr);
+	/* Force MSR_DE when guest does not own debug facilities */
+	if (vcpu->guest_debug)
+		kvmppc_set_msr(vcpu, regs->msr | MSR_DE);
+	else
+		kvmppc_set_msr(vcpu, regs->msr);
 	kvmppc_set_cr(vcpu, regs->cr);
 	vcpu->arch.ctr = regs->ctr;
 	vcpu->arch.lr = regs->lr;

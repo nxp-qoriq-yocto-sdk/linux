@@ -224,9 +224,9 @@ int kvmppc_core_vcpu_setup(struct kvm_vcpu *vcpu)
 	if (err)
 		return err;
 
-	vcpu->arch.epcr = EPCR_DSIGS | EPCR_DGTMI | EPCR_DUVD;
+	vcpu->arch.epcr = EPCR_DSIGS | EPCR_DGTMI;
 	vcpu->arch.gpir = 0;
-	vcpu->arch.msrp = MSRP_UCLEP | MSRP_DEP | MSRP_PMMP;
+	vcpu->arch.msrp = MSRP_UCLEP | MSRP_PMMP;
 
 	/* Registers init */
 	vcpu->arch.pvr = mfspr(SPRN_PVR);

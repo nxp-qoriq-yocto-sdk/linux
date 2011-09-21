@@ -197,7 +197,10 @@ void kvmppc_recalc_shadow_dbcr(struct kvm_vcpu *vcpu)
 		                        *greg = &(vcpu->arch.dbg_reg);
 
 		sreg->dbcr0 = greg->dbcr0;
+		sreg->dbcr1 = greg->dbcr1;
+		sreg->dbcr2 = greg->dbcr2;
 
+#ifndef CONFIG_KVM_BOOKE_HV
 		/*
 		 * Some event should not occur if MSR[DE] = 0,
 		 * since MSR[DE] is always set in shadow,
@@ -207,11 +210,10 @@ void kvmppc_recalc_shadow_dbcr(struct kvm_vcpu *vcpu)
 			sreg->dbcr0 = greg->dbcr0 & ~MASK_EVENT;
 
 		/* XXX assume that guest always wants to debug eaddr */
-		sreg->dbcr1 = greg->dbcr1;
-		sreg->dbcr2 = greg->dbcr2;
 		sreg->dbcr1 |= DBCR1_IAC1US | DBCR1_IAC2US |
 		              DBCR1_IAC3US | DBCR1_IAC4US;
 		sreg->dbcr2 |= DBCR2_DAC1US | DBCR2_DAC2US;
+#endif
 	}
 }
 
@@ -220,11 +222,29 @@ int kvmppc_core_set_guest_debug(struct kvm_vcpu *vcpu,
 {
 	if (!(dbg->control & KVM_GUESTDBG_ENABLE)) {
 		vcpu->guest_debug = 0;
+#ifdef CONFIG_KVM_BOOKE_HV
+		/*
+		 * When debug facilities are owned by guest then allow guest
+		 * to write MSR.DE and default clear MSR_DE.
+		 */
+		mtspr(SPRN_MSRP, mfspr(SPRN_MSRP) & ~MSRP_DEP);
+		isync();
+		vcpu->arch.shared->msr &= ~MSR_DE;
+#endif
 		kvmppc_recalc_shadow_ac(vcpu);
 		kvmppc_recalc_shadow_dbcr(vcpu);
 		return 0;
 	}
 
+#ifdef CONFIG_KVM_BOOKE_HV
+	/*
+	 * When debug facilities are not owned by guest then do not allow
+	 * guest to modify MSR.DE and default enable MSR_DE.
+	 */
+	mtspr(SPRN_MSRP, mfspr(SPRN_MSRP) | MSRP_DEP);
+	isync();
+	vcpu->arch.shared->msr |= MSR_DE;
+#endif
 	vcpu->guest_debug = dbg->control;
 	vcpu->arch.shadow_dbg_reg.dbcr0 = 0;
 
@@ -519,10 +539,11 @@ int kvmppc_handle_debug(struct kvm_run *run, struct kvm_vcpu *vcpu)
 		if (dbsr && (vcpu->arch.shared->msr & MSR_DE))
 			kvmppc_core_queue_debug(vcpu);
 
+#ifndef CONFIG_KVM_BOOKE_HV
 		/* Inject a program interrupt if trap debug is not allowed */
 		if ((dbsr & DBSR_TIE) && !(vcpu->arch.shared->msr & MSR_DE))
 			kvmppc_core_queue_program(vcpu, ESR_PTR);
-
+#endif
 		return RESUME_GUEST;
 	} else {
 		/* Event from guest debug */
