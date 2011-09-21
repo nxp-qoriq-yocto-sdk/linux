@@ -324,13 +324,13 @@ _GLOBAL(kvmppc_resume_host)
 	mtpmr	PMRN_PMGC0, r9
 skip_pmgc0_save:
 
-	lwz	r6, VCPU_GUEST_DEBUG(r4)
-	cmpwi	r6, 0
+	lwz	r8, VCPU_GUEST_DEBUG(r4)
+	cmpwi	r8, 0
 	beq	skip_load_host_debug
 	li	r9, 0
 	mtspr	SPRN_DBCR0, r9		/* disable all debug event */
 	addi	r7, r4, VCPU_HOST_DBG - 4
-	lwzu	r6, 4(r7)
+	lwzu	r3, 4(r7)
 	lwzu	r9, 4(r7)
 	mtspr	SPRN_DBCR1, r9
 	lwzu	r9, 4(r7)
@@ -349,7 +349,16 @@ skip_pmgc0_save:
 	mtspr	SPRN_DAC1, r9
 	lwzu	r9, 4(r7)
 	mtspr	SPRN_DAC2, r9
-	mtspr	SPRN_DBCR0, r6
+	/* Clear h/w DBSR and save current(guest) DBSR */
+	mfspr	r8, SPRN_DBSR
+	mtspr	SPRN_DBSR, r8
+	isync
+//	andi.	r9, r6, NEED_DBG_SAVE_REGS // FIXME
+	andi.	r9, r6, 0 // FIXME
+	beq	skip_dbsr_save
+	stw	r8, VCPU_DBSR(r4)
+skip_dbsr_save:
+	mtspr	SPRN_DBCR0, r3
 skip_load_host_debug:
 
 	/* Save remaining volatile guest register state to vcpu. */
