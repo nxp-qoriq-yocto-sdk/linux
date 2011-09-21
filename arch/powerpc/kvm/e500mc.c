@@ -243,9 +243,8 @@ int kvmppc_core_vcpu_setup(struct kvm_vcpu *vcpu)
 {
 	struct kvmppc_vcpu_e500 *vcpu_e500 = to_e500(vcpu);
 
-	vcpu->arch.shadow_epcr = SPRN_EPCR_DSIGS | SPRN_EPCR_DGTMI | \
-				 SPRN_EPCR_DUVD;
-	vcpu->arch.shadow_msrp = MSRP_UCLEP | MSRP_DEP | MSRP_PMMP;
+	vcpu->arch.shadow_epcr = SPRN_EPCR_DSIGS | SPRN_EPCR_DGTMI;
+	vcpu->arch.shadow_msrp = MSRP_UCLEP | MSRP_PMMP;
 	vcpu->arch.eplc = EPC_EGS | (vcpu->kvm->arch.lpid << EPC_ELPID_SHIFT);
 	vcpu->arch.epsc = vcpu->arch.eplc;
 

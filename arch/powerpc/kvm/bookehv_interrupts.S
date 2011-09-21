@@ -209,6 +209,9 @@
 	b	kvmppc_resume_host
 .endm
 
+#define DBCR0_AC_BITS	(DBCR0_IAC1 | DBCR0_IAC2 | DBCR0_IAC3 | DBCR0_IAC4 | \
+			 DBCR0_DAC1R | DBCR0_DAC1W | DBCR0_DAC2R | DBCR0_DAC2W)
+
 /*
  * For input register values, see arch/powerpc/include/asm/kvm_booke_hv_asm.h
  */
@@ -324,17 +327,31 @@ _GLOBAL(kvmppc_resume_host)
 	mtpmr	PMRN_PMGC0, r9
 skip_pmgc0_save:
 
-	lwz	r8, VCPU_GUEST_DEBUG(r4)
-	cmpwi	r8, 0
+	/*
+	 * If guest not used debug facility then hw debug registers
+	 * already have proper host values. If guest used debug
+	 * facility then restore host debug registers.
+	 * No Need to save guest debug registers as they are already intact
+	 * in guest/shadow registers.
+	 */
+	addi	r8, r4, VCPU_SHADOW_DBG
+	lwz	r9, 0(r8)
+	rlwinm	r9, r9, 0, 4, 24
+	cmpwi	r9, 0
 	beq	skip_load_host_debug
-	li	r9, 0
-	mtspr	SPRN_DBCR0, r9		/* disable all debug event */
 	addi	r7, r4, VCPU_HOST_DBG - 4
 	lwzu	r3, 4(r7)
+	lwz	r9, 0(r8)
+	andis.	r9, r9, DBCR0_AC_BITS@h
+	li	r9, 0
+	mtspr	SPRN_DBCR0, r9		/* disable all debug event */
+	beq	..skip_load_hw_bkpts
 	lwzu	r9, 4(r7)
 	mtspr	SPRN_DBCR1, r9
 	lwzu	r9, 4(r7)
 	mtspr	SPRN_DBCR2, r9
+	lwzu	r9, 4(r7)
+	mtspr	SPRN_DBCR4, r9
 	lwzu	r9, 4(r7)
 	mtspr	SPRN_IAC1, r9
 	lwzu	r9, 4(r7)
@@ -349,6 +366,8 @@ skip_pmgc0_save:
 	mtspr	SPRN_DAC1, r9
 	lwzu	r9, 4(r7)
 	mtspr	SPRN_DAC2, r9
+..skip_load_hw_bkpts:
+	isync
 	/* Clear h/w DBSR and save current(guest) DBSR */
 	mfspr	r8, SPRN_DBSR
 	mtspr	SPRN_DBSR, r8
@@ -358,7 +377,13 @@ skip_pmgc0_save:
 	beq	skip_dbsr_save
 	stw	r8, VCPU_DBSR(r4)
 skip_dbsr_save:
+	/* Clear EPCR.DUVD and set host DBCR0 */
+	mfspr	r8, SPRN_EPCR
+	rlwinm	r8, r8, 0, ~SPRN_EPCR_DUVD
+	mtspr	SPRN_EPCR, r8
+	isync
 	mtspr	SPRN_DBCR0, r3
+	isync
 skip_load_host_debug:
 
 	/* Save remaining volatile guest register state to vcpu. */
@@ -616,18 +641,36 @@ lightweight_exit:
 	mtpmr	PMRN_PMGC0, r9
 skip_pmgc0_restore:
 
-	lwz	r6, VCPU_GUEST_DEBUG(r4)
-	cmpwi	r6, 0
-	beq	..skip_load_guest_debug
 	mfmsr	r7
 	rlwinm	r7, r7, 0, ~MSR_DE
 	mtmsr	r7
-	addi	r7, r4, VCPU_HOST_DBG - 4
+	/*
+	 * Load hw debug registers with guest(shadow) debug registers
+	 * if guest is using the debug facility and also set EPCR.DUVD
+	 * to not allow debug events in HV mode. Do not change the
+	 * debug registers if guest is not using the debug facility.
+	 */
+	addi	r5, r4, VCPU_SHADOW_DBG
+	lwz	r6, 0(r5)
+	rlwinm	r6, r6, 0, 4, 24
+	cmpwi	r6, 0
+	beq	..skip_load_guest_debug
+	/* Save host DBCR0 */
+	addi	r7, r4, VCPU_HOST_DBG
 	mfspr	r8, SPRN_DBCR0
-	stwu	r8, 4(r7)
+	stw	r8, 0(r7)
+	/*
+	 * Save host DBCR1/2, IACx and DACx and load guest DBCR1/2,
+	 * IACx and DACx if guest using hw breakpoint/watchpoints.
+	 */
+	lwz	r6, 0(r5)
+	andis.	r3, r6, DBCR0_AC_BITS@h
+	beq	..skip_hw_bkpts
 	mfspr	r8, SPRN_DBCR1
 	stwu	r8, 4(r7)
 	mfspr	r8, SPRN_DBCR2
+	stwu	r8, 4(r7)
+	mfspr	r8, SPRN_DBCR4
 	stwu	r8, 4(r7)
 	mfspr	r8, SPRN_IAC1
 	stwu	r8, 4(r7)
@@ -645,27 +688,39 @@ skip_pmgc0_restore:
 	stwu	r8, 4(r7)
 	li	r8, 0
 	mtspr	SPRN_DBCR0, r8		/* disable all debug event */
-	addi	r7, r4, VCPU_SHADOW_DBG - 4
-	lwzu	r6, 4(r7)
-	lwzu	r8, 4(r7)
+	lwzu	r8, 4(r5)
 	mtspr	SPRN_DBCR1, r8
-	lwzu	r8, 4(r7)
+	lwzu	r8, 4(r5)
 	mtspr	SPRN_DBCR2, r8
-	lwzu	r8, 4(r7)
+	lwzu	r8, 4(r5)
+	mtspr	SPRN_DBCR4, r8
+	lwzu	r8, 4(r5)
 	mtspr	SPRN_IAC1, r8
-	lwzu	r8, 4(r7)
+	lwzu	r8, 4(r5)
 	mtspr	SPRN_IAC2, r8
 #ifndef CONFIG_FSL_BOOKE
-	lwzu	r8, 4(r7)
+	lwzu	r8, 4(r5)
 	mtspr	SPRN_IAC3, r8
-	lwzu	r8, 4(r7)
+	lwzu	r8, 4(r5)
 	mtspr	SPRN_IAC4, r8
 #endif
-	lwzu	r8, 4(r7)
+	lwzu	r8, 4(r5)
 	mtspr	SPRN_DAC1, r8
-	lwzu	r8, 4(r7)
+	lwzu	r8, 4(r5)
 	mtspr	SPRN_DAC2, r8
+..skip_hw_bkpts:
+	/* Set EPCR.DUVD and guest DBCR0 */
+	mfspr	r7, SPRN_EPCR
+	oris	r7, r7, SPRN_EPCR_DUVD@h
+	mtspr	SPRN_EPCR, r7
+	isync
+	/* Clear if any deferred debug event */
+	mfspr	r8, SPRN_DBSR
+	mtspr	SPRN_DBSR, r8
+	isync
+	/* Restore guest DBSR */
 	mtspr	SPRN_DBCR0, r6
+	isync
 ..skip_load_guest_debug:
 
 	/* Load some guest volatiles. */
@@ -716,13 +771,6 @@ skip_pmgc0_restore:
 	PPC_LL	r7, VCPU_GPR(r7)(r4)
 	PPC_LL	r8, VCPU_GPR(r8)(r4)
 	PPC_LL	r9, VCPU_GPR(r9)(r4)
-
-	/* Clear any debug events which occured since we disable MSR[DE]
-	 * XXX This gives us a 3-instruction window in which a spurious
-	 * debug exception could be generated in the guest context. */
-	lis	r3, 0xffff
-	ori	r3, r3, 0xffff
-	mtspr	SPRN_DBSR, r3
 
 	PPC_LL	r3, VCPU_GPR(r3)(r4)
 	PPC_LL	r4, VCPU_GPR(r4)(r4)

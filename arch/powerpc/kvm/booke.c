@@ -135,7 +135,10 @@ void kvmppc_set_msr(struct kvm_vcpu *vcpu, u32 new_msr)
 	u32 old_msr = vcpu->arch.shared->msr;
 
 #ifdef CONFIG_KVM_BOOKE_HV
-	new_msr |= MSR_GS | MSR_DE;
+	new_msr |= MSR_GS;
+
+	if (vcpu->guest_debug)
+		new_msr |= MSR_DE;
 #endif
 
 	vcpu->arch.shared->msr = new_msr;
@@ -1602,6 +1605,11 @@ void kvmppc_booke_vcpu_put(struct kvm_vcpu *vcpu)
 #define WP_NUM	KVMPPC_DAC_NUM
 void kvmppc_recalc_shadow_ac(struct kvm_vcpu *vcpu)
 {
+	/*
+	 * If debug resources are taken by host (say QEMU) then
+	 * debug resources are not available to guest. For Guest
+	 * it is like external debugger have taken the resources.
+	 */
 	if (vcpu->guest_debug == 0) {
 		struct kvmppc_debug_reg *sreg = &(vcpu->arch.shadow_dbg_reg),
 		                        *greg = &(vcpu->arch.dbg_reg);
@@ -1617,12 +1625,20 @@ void kvmppc_recalc_shadow_ac(struct kvm_vcpu *vcpu)
 void kvmppc_recalc_shadow_dbcr(struct kvm_vcpu *vcpu)
 {
 #define MASK_EVENT (DBCR0_IC | DBCR0_BRT)
+	/*
+	 * If debug resources are taken by host (say QEMU) then
+	 * debug resources are not available to guest. For Guest
+	 * it is like external debugger have taken the resources.
+	 */
 	if (vcpu->guest_debug == 0) {
 		struct kvmppc_debug_reg *sreg = &(vcpu->arch.shadow_dbg_reg),
 		                        *greg = &(vcpu->arch.dbg_reg);
 
 		sreg->dbcr0 = greg->dbcr0;
+		sreg->dbcr1 = greg->dbcr1;
+		sreg->dbcr2 = greg->dbcr2;
 
+#ifndef CONFIG_KVM_BOOKE_HV
 		/*
 		 * Some event should not occur if MSR[DE] = 0,
 		 * since MSR[DE] is always set in shadow,
@@ -1632,9 +1648,10 @@ void kvmppc_recalc_shadow_dbcr(struct kvm_vcpu *vcpu)
 			sreg->dbcr0 = greg->dbcr0 & ~MASK_EVENT;
 
 		/* XXX assume that guest always wants to debug eaddr */
-		sreg->dbcr1 = DBCR1_IAC1US | DBCR1_IAC2US |
+		sreg->dbcr1 |= DBCR1_IAC1US | DBCR1_IAC2US |
 		              DBCR1_IAC3US | DBCR1_IAC4US;
-		sreg->dbcr2 = DBCR2_DAC1US | DBCR2_DAC2US;
+		sreg->dbcr2 |= DBCR2_DAC1US | DBCR2_DAC2US;
+#endif
 	}
 }
 
@@ -1643,11 +1660,29 @@ int kvmppc_core_set_guest_debug(struct kvm_vcpu *vcpu,
 {
 	if (!(dbg->control & KVM_GUESTDBG_ENABLE)) {
 		vcpu->guest_debug = 0;
+#ifdef CONFIG_KVM_BOOKE_HV
+		/*
+		 * When debug facilities are owned by guest then allow guest
+		 * to write MSR.DE and default clear MSR_DE.
+		 */
+		mtspr(SPRN_MSRP, mfspr(SPRN_MSRP) & ~MSRP_DEP);
+		isync();
+		vcpu->arch.shared->msr &= ~MSR_DE;
+#endif
 		kvmppc_recalc_shadow_ac(vcpu);
 		kvmppc_recalc_shadow_dbcr(vcpu);
 		return 0;
 	}
 
+#ifdef CONFIG_KVM_BOOKE_HV
+	/*
+	 * When debug facilities are not owned by guest then do not allow
+	 * guest to modify MSR.DE and default enable MSR_DE.
+	 */
+	mtspr(SPRN_MSRP, mfspr(SPRN_MSRP) | MSRP_DEP);
+	isync();
+	vcpu->arch.shared->msr |= MSR_DE;
+#endif
 	vcpu->guest_debug = dbg->control;
 	vcpu->arch.shadow_dbg_reg.dbcr0 = 0;
 
