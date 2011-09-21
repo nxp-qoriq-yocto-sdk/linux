@@ -188,14 +188,20 @@ int kvmppc_booke_emulate_mtspr(struct kvm_vcpu *vcpu, int sprn, int rs)
 		kvmppc_recalc_shadow_ac(vcpu);
 		break;
 	case SPRN_DBCR0:
+		spr_val &= (DBCR0_IDM | DBCR0_IC | DBCR0_BT | DBCR0_TIE |
+			DBCR0_IAC1 | DBCR0_IAC2 | DBCR0_IAC3 | DBCR0_IAC4  |
+			DBCR0_DAC1R | DBCR0_DAC1W | DBCR0_DAC2R | DBCR0_DAC2W);
+
 		vcpu->arch.dbg_reg.dbcr0 = spr_val;
 		kvmppc_recalc_shadow_dbcr(vcpu);
 		break;
 	case SPRN_DBCR1:
 		vcpu->arch.dbg_reg.dbcr1 = spr_val;
+		kvmppc_recalc_shadow_dbcr(vcpu);
 		break;
 	case SPRN_DBCR2:
 		vcpu->arch.dbg_reg.dbcr2 = spr_val;
+		kvmppc_recalc_shadow_dbcr(vcpu);
 		break;
 	case SPRN_DBSR:
 		kvmppc_clr_dbsr_bits(vcpu, spr_val);
@@ -320,7 +326,16 @@ int kvmppc_booke_emulate_mfspr(struct kvm_vcpu *vcpu, int sprn, int rt)
 		kvmppc_set_gpr(vcpu, rt, vcpu->arch.dbg_reg.dac[1]);
 		break;
 	case SPRN_DBCR0:
-		kvmppc_set_gpr(vcpu, rt, vcpu->arch.dbg_reg.dbcr0);
+		/*
+		 * If debug resources are taken by host (say QEMU) then
+		 * debug resources are not available to guest. For Guest
+		 * it is like external debugger have taken the resources.
+		 */
+		if (vcpu->guest_debug)
+			kvmppc_set_gpr(vcpu, rt, vcpu->arch.dbg_reg.dbcr0
+								| DBCR0_EDM);
+		else
+			kvmppc_set_gpr(vcpu, rt, vcpu->arch.dbg_reg.dbcr0);
 		break;
 	case SPRN_DBCR1:
 		kvmppc_set_gpr(vcpu, rt, vcpu->arch.dbg_reg.dbcr1); break;
