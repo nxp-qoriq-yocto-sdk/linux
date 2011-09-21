@@ -1710,9 +1710,11 @@ int kvmppc_core_set_guest_debug(struct kvm_vcpu *vcpu,
 
 void kvmppc_clr_dbsr_bits(struct kvm_vcpu *vcpu, u32 dbsr_bits)
 {
-	vcpu->arch.dbsr &= ~dbsr_bits;
-	if (vcpu->arch.dbsr == 0)
-		kvmppc_core_dequeue_debug(vcpu);
+	if (vcpu->guest_debug == 0) {
+		vcpu->arch.dbsr &= ~dbsr_bits;
+		if (vcpu->arch.dbsr == 0)
+			kvmppc_core_dequeue_debug(vcpu);
+	}
 }
 
 #ifdef CONFIG_KVM_BOOKE206_PERFMON
