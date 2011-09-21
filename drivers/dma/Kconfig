@@ -240,7 +240,7 @@ config MXS_DMA
 
 config FSL_RAID
 	tristate "Freescale RAID Engine Device Driver"
-	depends on FSL_SOC
+	depends on FSL_SOC && !FSL_DMA
 	select DMA_ENGINE
 	select ASYNC_TX_ENABLE_CHANNEL_SWITCH
 	select ASYNC_MEMCPY
