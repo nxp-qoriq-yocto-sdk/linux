@@ -206,13 +206,24 @@ _GLOBAL(kvmppc_resume_host)
 	ori	r9, r9, r8
 	mtpmr	PMRN_PMGC0, r9
 ..skip_pmgc0_save:
-	lwz	r6, VCPU_GUEST_DEBUG(r4)
-	cmpwi	r6, 0
+
+	li	r11, 0
+	li	r6, 1
+	slw	r6, r6, r5
+	or.	r6, r6, r6
+	bne	..skip_upper_mask_check
+	subi	r7, r5, 32
+	li	r11, 1
+	slw	r11, r11, r7
+..skip_upper_mask_check:
+
+	lwz	r8, VCPU_GUEST_DEBUG(r4)
+	cmpwi	r8, 0
 	beq	..skip_load_host_debug
 	li	r9, 0
 	mtspr	SPRN_DBCR0, r9		/* disable all debug event */
 	addi	r7, r4, VCPU_HOST_DBG - 4
-	lwzu	r6, 4(r7)
+	lwzu	r3, 4(r7)
 	lwzu	r9, 4(r7)
 	mtspr	SPRN_DBCR1, r9
 	lwzu	r9, 4(r7)
@@ -231,19 +242,17 @@ _GLOBAL(kvmppc_resume_host)
 	mtspr	SPRN_DAC1, r9
 	lwzu	r9, 4(r7)
 	mtspr	SPRN_DAC2, r9
-	mtspr	SPRN_DBCR0, r6
+	/* Clear h/w DBSR and save current(guest) DBSR */
+	mfspr	r8, SPRN_DBSR
+	mtspr	SPRN_DBSR, r8
+	isync
+	andi.	r9, r6, NEED_DBG_SAVE_REGS
+	beq	..skip_dbsr_save
+	stw	r8, VCPU_DBSR(r4)
+..skip_dbsr_save:
+	mtspr	SPRN_DBCR0, r3
 ..skip_load_host_debug:
 
-	li	r11, 0
-	li	r6, 1
-	slw	r6, r6, r5
-	or.	r6, r6, r6
-	bne	..skip_upper_mask_check
-	subi	r7, r5, 32
-	li	r11, 1
-	slw	r11, r11, r7
-
-..skip_upper_mask_check:
 #ifdef CONFIG_KVM_EXIT_TIMING
 	/* save exit time */
 1:

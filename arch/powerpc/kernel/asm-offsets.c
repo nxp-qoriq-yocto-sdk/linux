@@ -479,6 +479,7 @@ int main(void)
 	DEFINE(VCPU_LAST_INST, offsetof(struct kvm_vcpu, arch.last_inst));
 	DEFINE(VCPU_FAULT_DEAR, offsetof(struct kvm_vcpu, arch.fault_dear));
 	DEFINE(VCPU_FAULT_ESR, offsetof(struct kvm_vcpu, arch.fault_esr));
+	DEFINE(VCPU_DBSR, offsetof(struct kvm_vcpu, arch.dbsr));
 	DEFINE(VCPU_SHADOW_DBG, offsetof(struct kvm_vcpu, arch.shadow_dbg_reg));
 	DEFINE(VCPU_HOST_DBG, offsetof(struct kvm_vcpu, arch.host_dbg_reg));
 	DEFINE(VCPU_GUEST_DEBUG, offsetof(struct kvm_vcpu, guest_debug));

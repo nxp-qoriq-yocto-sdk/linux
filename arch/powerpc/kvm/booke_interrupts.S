@@ -54,6 +54,8 @@
                        (1<<BOOKE_INTERRUPT_PROGRAM) | \
                        (1<<BOOKE_INTERRUPT_DTLB_MISS))
 
+#define NEED_DEBUG_SAVE (1<<BOOKE_INTERRUPT_DEBUG)
+
 #define GET_VCPU_POINT(regd)                 \
 	mfspr   regd, SPRN_SPRG_THREAD;      \
 	lwz	regd, THREAD_KVM_SVCPU(regd)
@@ -225,7 +227,7 @@ _GLOBAL(kvmppc_resume_host)
 
 	addi	r7, r4, VCPU_HOST_DBG
 	mfspr	r9, SPRN_DBCR0
-	lwz	r6, 0(r7)
+	lwz	r8, 0(r7)
 	andis.	r9, r9, DBCR0_AC_BITS@h
 	beq	..skip_load_host_debug
 	li	r9, 0
@@ -249,7 +251,34 @@ _GLOBAL(kvmppc_resume_host)
 	lwzu	r9, 4(r7)
 	mtspr	SPRN_DAC2, r9
 ..skip_load_host_debug:
-	mtspr	SPRN_DBCR0, r6
+	/* Clear h/w DBSR and save current(guest) DBSR */
+	mfspr	r9, SPRN_DBSR
+	mtspr	SPRN_DBSR, r9
+	isync
+	andi.	r7, r6, NEED_DEBUG_SAVE
+	beq	..skip_dbsr_save
+	/*
+	 * If vcpu->guest_debug flag is set then do not check for
+	 * shared->msr.DE as this debugging (say by QEMU) does not
+	 * depends on shared->msr.de. In these scanerios MSR.DE is
+	 * always set using shared_msr and should be handled always.
+	 */
+	lwz	r7, VCPU_GUEST_DEBUG(r4)
+	cmpwi	r7, 0
+	bne	..skip_save_trap_event
+	PPC_LL	r3, VCPU_SHARED(r4)
+#ifndef CONFIG_64BIT
+	lwz	r3, (VCPU_SHARED_MSR + 4)(r3)
+#else
+	ld	r3, (VCPU_SHARED_MSR)(r3)
+#endif
+	andi.	r3, r3, MSR_DE
+	bne	..skip_save_trap_event
+	andis.	r9, r9, DBSR_TIE@h
+..skip_save_trap_event:
+	stw	r9, VCPU_DBSR(r4)
+..skip_dbsr_save:
+	mtspr	SPRN_DBCR0, r8
 
 	/* Save remaining volatile guest register state to vcpu. */
 	stw	r0, VCPU_GPR(r0)(r4)
