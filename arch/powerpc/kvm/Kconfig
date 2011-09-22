@@ -110,14 +110,14 @@ config KVM_BOOKE_HV
 	bool
 
 config KVM_E500MC
-	bool "KVM support for PowerPC E500MC processors"
+	bool "KVM support for PowerPC E500MC/E5500 processors"
 	depends on EXPERIMENTAL && PPC_E500MC
 	select KVM
 	select KVM_BOOKE_HV
 	select KVM_BOOKE206_PERFMON
 	---help---
-	  Support running unmodified E500MC guest kernels in virtual machines on
-	  E500MC host processors.
+	  Support running unmodified E500MC/E5500 (32-bit) guest kernels in
+	  virtual machines on E500MC/E5500 host processors.
 
 	  This module provides access to the hardware capabilities through
 	  a character device node named /dev/kvm.
