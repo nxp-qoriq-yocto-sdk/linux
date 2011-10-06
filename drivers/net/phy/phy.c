@@ -6,7 +6,7 @@
  *
  * Author: Andy Fleming
  *
- * Copyright (c) 2004 Freescale Semiconductor, Inc.
+ * Copyright (c) 2004,2011 Freescale Semiconductor, Inc.
  * Copyright (c) 2006, 2007  Maciej W. Rozycki
  *
  * This program is free software; you can redistribute  it and/or modify it
@@ -479,6 +479,10 @@ static void phy_force_reduction(struct phy_device *phydev)
 
 	idx = phy_find_valid(idx, phydev->supported);
 
+	/* Avoid reaching an invalid speed and duplex combination */
+	if (!(settings[idx].setting & phydev->supported))
+		return;
+
 	phydev->speed = settings[idx].speed;
 	phydev->duplex = settings[idx].duplex;
 
@@ -869,6 +873,8 @@ void phy_state_machine(struct work_struct *work)
 				if (0 == phydev->link_timeout--) {
 					phy_force_reduction(phydev);
 					needs_aneg = 1;
+					phydev->link_timeout =
+						PHY_FORCE_TIMEOUT;
 				}
 			}
 
