@@ -63,6 +63,7 @@
  */
 #define MPIC_TIMER_BASE			0x01100
 #define MPIC_TIMER_STRIDE		0x40
+#define MPIC_TIMER_GROUP_STRIDE		0x1000
 
 #define MPIC_TIMER_CURRENT_CNT		0x00000
 #define MPIC_TIMER_BASE_CNT		0x00010
@@ -112,6 +113,9 @@
 #define 	MPIC_DEST_IRQ_OUT			0x80000000
 #define 	MPIC_DEST_CRIT_CPU0			0x40000000
 #define 	MPIC_DEST_CRIT_CPU1			0x20000000
+
+#define MPIC_FSL_BRR1			0x00000
+#define 	MPIC_FSL_BRR1_VER			0x0000ffff
 
 #define MPIC_MAX_IRQ_SOURCES	2048
 #define MPIC_MAX_CPUS		32
@@ -295,6 +299,7 @@ struct mpic
 	enum mpic_reg_type	reg_type;
 
 	/* The various ioremap'ed bases */
+	struct mpic_reg_bank	thiscpuregs;
 	struct mpic_reg_bank	gregs;
 	struct mpic_reg_bank	tmregs;
 	struct mpic_reg_bank	cpuregs[MPIC_MAX_CPUS];
