@@ -136,12 +136,13 @@ void kvmppc_watchdog_func(unsigned long data)
 	if (tsr & TSR_ENW) {
 		if (tsr & TSR_WIS) {
 			/* watchdog reset control */
+			kvmppc_clr_tsr_bits(vcpu, TCR_WRC_MASK);
+			kvmppc_set_tsr_bits(vcpu, vcpu->arch.tcr & TCR_WRC_MASK);
 			if (vcpu->arch.tcr & TCR_WRC_MASK) {
+				vcpu->arch.tcr &= ~TCR_WRC_MASK;
 				vcpu->arch.wdt_want_action = true;
 				kvmppc_wakeup_vcpu(vcpu);
 			}
-			kvmppc_clr_tsr_bits(vcpu, TCR_WRC_MASK);
-			kvmppc_set_tsr_bits(vcpu, vcpu->arch.tcr & TCR_WRC_MASK);
 		} else {
 			kvmppc_set_tsr_bits(vcpu, TSR_WIS);
 		}
