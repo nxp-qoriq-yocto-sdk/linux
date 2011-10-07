@@ -6,7 +6,7 @@
  *
  * Author: Andy Fleming
  *
- * Copyright (c) 2004-2006, 2008-2010 Freescale Semiconductor, Inc.
+ * Copyright (c) 2004-2006, 2008-2011 Freescale Semiconductor, Inc.
  *
  * This program is free software; you can redistribute  it and/or modify it
  * under  the terms of  the GNU General  Public License as published by the
@@ -637,7 +637,7 @@ EXPORT_SYMBOL(gen10g_config_advert);
  *   to the values in phydev. Assumes that the values are valid.
  *   Please see phy_sanitize_settings().
  */
-static int genphy_setup_forced(struct phy_device *phydev)
+int genphy_setup_forced(struct phy_device *phydev)
 {
 	int err;
 	int ctl = 0;
@@ -656,6 +656,7 @@ static int genphy_setup_forced(struct phy_device *phydev)
 
 	return err;
 }
+EXPORT_SYMBOL(genphy_setup_forced);
 
 int gen10g_setup_forced(struct phy_device *phydev)
 {
