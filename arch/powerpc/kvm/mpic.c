@@ -501,7 +501,7 @@ static int openpic_gbl_read(struct kvm_pic *pic, int addr, uint32_t *val)
 
 	pr_debug("%s: => %08x\n", __func__, retval);
 	*val = retval;
-	return retval;
+	return 0;
 
 err:
 	pr_debug("%s: => unhandled\n", __func__);
@@ -559,7 +559,7 @@ static int mpic_timer_read(struct kvm_pic *pic, int addr, uint32_t *val)
 		goto err;
 
 	idx = (addr >> 6) & 3;
-	idx |= (addr >> 10) & 4;
+	idx |= (addr >> 11) & 4;
 
 	switch (addr & 0x30) {
 	case 0x00: /* gtccr */
@@ -574,7 +574,8 @@ static int mpic_timer_read(struct kvm_pic *pic, int addr, uint32_t *val)
 	}
 	pr_debug("%s: => %08x\n", __func__, retval);
 
-	return retval;
+	*val = retval;
+	return 0;
 
 err:
 	pr_debug("%s: => unhandled\n", __func__);
