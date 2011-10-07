@@ -218,6 +218,8 @@ static inline void kvmppc_wakeup_vcpu(struct kvm_vcpu *vcpu)
 	if (waitqueue_active(&vcpu->wq)) {
 		wake_up_interruptible(&vcpu->wq);
 		vcpu->stat.halt_wakeup++;
+	} else if (vcpu->cpu != -1) {
+		smp_send_reschedule(vcpu->cpu);
 	}
 }
 
