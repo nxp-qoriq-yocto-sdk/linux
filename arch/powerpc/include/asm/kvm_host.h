@@ -404,6 +404,7 @@ struct kvm_vcpu_arch {
 	u32 eplc;
 	u32 epsc;
 	u32 oldpir;
+	ulong sprg8;
 #endif
 
 #ifdef CONFIG_PPC_BOOK3S
