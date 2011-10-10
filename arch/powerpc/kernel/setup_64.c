@@ -35,6 +35,8 @@
 #include <linux/pci.h>
 #include <linux/lockdep.h>
 #include <linux/memblock.h>
+#include <linux/hugetlb.h>
+
 #include <asm/io.h>
 #include <asm/kdump.h>
 #include <asm/prom.h>
@@ -215,6 +217,13 @@ void __init early_setup(unsigned long dt_ptr)
 
 	/* Initialize the hash table or TLB handling */
 	early_init_mmu();
+
+	/*
+	 * Reserve any gigantic pages requested on the command line.
+	 * memblock needs to have been initialized by the time this is
+	 * called since this will reserve memory.
+	 */
+	reserve_hugetlb_gpages();
 
 	DBG(" <- early_setup()\n");
 }
