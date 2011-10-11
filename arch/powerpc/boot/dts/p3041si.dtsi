@@ -71,10 +71,6 @@
 		rtic_c = &rtic_c;
 		rtic_d = &rtic_d;
 		sec_mon = &sec_mon;
-
-/*
-		rio0 = &rapidio0;
- */
 	};
 
 	cpus {
@@ -607,9 +603,25 @@
 		};
 	};
 
-/*
-	rapidio0: rapidio@ffe0c0000
-*/
+	rapidio@ffe0c0000 {
+		compatible = "fsl,srio";
+		interrupts = <16 2 1 11>;
+		#address-cells = <2>;
+		#size-cells = <2>;
+		ranges;
+
+		port1 {
+			#address-cells = <2>;
+			#size-cells = <2>;
+			cell-index = <1>;
+		};
+
+		port2 {
+			#address-cells = <2>;
+			#size-cells = <2>;
+			cell-index = <2>;
+		};
+	};
 
 	localbus@ffe124000 {
 		compatible = "fsl,p3041-elbc", "fsl,elbc", "simple-bus";

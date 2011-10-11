@@ -26,7 +26,6 @@
 		serial1 = &serial1;
 		pci0 = &pci0;
 		pci1 = &pci1;
-		rapidio0 = &rio0;
 	};
 
 	cpus {
@@ -328,6 +327,41 @@
 				clock-frequency = <0>;
 				interrupts = <42 2>;
 				interrupt-parent = <&mpic>;
+			};
+		};
+
+		rmu: rmu@d3000 {
+			#address-cells = <1>;
+			#size-cells = <1>;
+			compatible = "fsl,srio-rmu";
+			reg = <0xd3000 0x500>;
+			ranges = <0x0 0xd3000 0x500>;
+
+			message-unit@0 {
+				compatible = "fsl,srio-msg-unit";
+				reg = <0x0 0x100>;
+				interrupts = <
+					53 2 /* msg1_tx_irq */
+					54 2>;/* msg1_rx_irq */
+			};
+			message-unit@100 {
+				compatible = "fsl,srio-msg-unit";
+				reg = <0x100 0x100>;
+				interrupts = <
+					55 2  /* msg2_tx_irq */
+					56 2>;/* msg2_rx_irq */
+			};
+			doorbell-unit@400 {
+				compatible = "fsl,srio-dbell-unit";
+				reg = <0x400 0x80>;
+				interrupts = <
+					49 2  /* bell_outb_irq */
+					50 2>;/* bell_inb_irq */
+			};
+			port-write-unit@4e0 {
+				compatible = "fsl,srio-port-write-unit";
+				reg = <0x4e0 0x20>;
+				interrupts = <48 2>;
 			};
 		};
 
@@ -638,22 +672,22 @@
 		};
 	};
 
-	rio0: rapidio@e00c00000 {
-		#address-cells = <2>;
-		#size-cells = <2>;
-		compatible = "fsl,mpc8568-rapidio", "fsl,rapidio-delta";
-		reg = <0xe00c0000 0x20000>;
-		ranges = <0x0 0x0 0xc0000000 0x0 0x20000000>;
-		interrupts = <48 2 /* error     */
-			      49 2 /* bell_outb */
-			      50 2 /* bell_inb  */
-			      53 2 /* msg1_tx   */
-			      54 2 /* msg1_rx   */
-			      55 2 /* msg2_tx   */
-			      56 2 /* msg2_rx   */>;
+	rapidio@e00c0000 {
+		reg = <0xe00c0000 0x11000>;
+		compatible = "fsl,srio";
 		interrupt-parent = <&mpic>;
-		sleep = <&pmc 0x00080000   /* controller */
-			 &pmc 0x00040000>; /* message unit */
+		interrupts = <48 2>;
+		#address-cells = <1>;
+		#size-cells = <1>;
+		fsl,srio-rmu-handle = <&rmu>;
+		ranges;
+
+		port1 {
+			#address-cells = <2>;
+			#size-cells = <2>;
+			cell-index = <1>;
+			ranges = <0x0 0x0 0xc0000000 0x0 0x20000000>;
+		};
 	};
 
 	leds {

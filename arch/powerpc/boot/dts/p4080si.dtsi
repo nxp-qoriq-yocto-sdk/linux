@@ -70,8 +70,6 @@
 		rtic_c = &rtic_c;
 		rtic_d = &rtic_d;
 		sec_mon = &sec_mon;
-
-		rio0 = &rapidio0;
 	};
 
 	cpus {
@@ -345,6 +343,41 @@
 				0xf5 0 0 0
 				0xf6 0 0 0
 				0xf7 0 0 0>;
+		};
+
+		rmu: rmu@d3000 {
+			#address-cells = <1>;
+			#size-cells = <1>;
+			compatible = "fsl,srio-rmu";
+			reg = <0xd3000 0x500>;
+			ranges = <0x0 0xd3000 0x500>;
+
+			message-unit@0 {
+				compatible = "fsl,srio-msg-unit";
+				reg = <0x0 0x100>;
+				interrupts = <
+					60 2 0 0  /* msg1_tx_irq */
+					61 2 0 0>;/* msg1_rx_irq */
+			};
+			message-unit@100 {
+				compatible = "fsl,srio-msg-unit";
+				reg = <0x100 0x100>;
+				interrupts = <
+					62 2 0 0  /* msg2_tx_irq */
+					63 2 0 0>;/* msg2_rx_irq */
+			};
+			doorbell-unit@400 {
+				compatible = "fsl,srio-dbell-unit";
+				reg = <0x400 0x80>;
+				interrupts = <
+					56 2 0 0  /* bell_outb_irq */
+					57 2 0 0>;/* bell_inb_irq */
+			};
+			port-write-unit@4e0 {
+				compatible = "fsl,srio-port-write-unit";
+				reg = <0x4e0 0x20>;
+				interrupts = <16 2 1 11>;
+			};
 		};
 
 		guts: global-utilities@e0000 {
@@ -651,18 +684,25 @@
 		};
 	};
 
-	rapidio0: rapidio@ffe0c0000 {
+	rapidio@ffe0c0000 {
+		compatible = "fsl,srio";
+		interrupts = <16 2 1 11>;
 		#address-cells = <2>;
 		#size-cells = <2>;
-		compatible = "fsl,rapidio-delta";
-		interrupts = <
-			16 2 1 11 /* err_irq */
-			56 2 0 0  /* bell_outb_irq */
-			57 2 0 0  /* bell_inb_irq */
-			60 2 0 0  /* msg1_tx_irq */
-			61 2 0 0  /* msg1_rx_irq */
-			62 2 0 0  /* msg2_tx_irq */
-			63 2 0 0>; /* msg2_rx_irq */
+		fsl,srio-rmu-handle = <&rmu>;
+		ranges;
+
+		port1 {
+			#address-cells = <2>;
+			#size-cells = <2>;
+			cell-index = <1>;
+		};
+
+		port2 {
+			#address-cells = <2>;
+			#size-cells = <2>;
+			cell-index = <2>;
+		};
 	};
 
 	localbus@ffe124000 {
