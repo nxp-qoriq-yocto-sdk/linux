@@ -23,6 +23,7 @@
 #include <asm/hw_irq.h>
 #include <asm/ppc-pci.h>
 #include <asm/mpic.h>
+#include <asm/fsl_hcalls.h>
 #include "fsl_msi.h"
 #include "fsl_pci.h"
 
@@ -232,6 +233,9 @@ static void fsl_msi_cascade(unsigned int irq, struct irq_desc *desc)
 	case FSL_PIC_IP_IPIC:
 		msir_value = fsl_msi_read(msi_data->msi_regs, msir_index * 0x4);
 		break;
+	case FSL_PIC_IP_VMPIC:
+		fh_vmpic_get_msir(virq_to_hw(irq), &msir_value);
+		break;
 	}
 
 	while (msir_value) {
@@ -249,6 +253,7 @@ static void fsl_msi_cascade(unsigned int irq, struct irq_desc *desc)
 
 	switch (msi_data->feature & FSL_PIC_IP_MASK) {
 	case FSL_PIC_IP_MPIC:
+	case FSL_PIC_IP_VMPIC:
 		chip->irq_eoi(idata);
 		break;
 	case FSL_PIC_IP_IPIC:
@@ -350,25 +355,26 @@ static int __devinit fsl_of_msi_probe(struct platform_device *dev)
 		goto error_out;
 	}
 
-	/* Get the MSI reg base */
-	err = of_address_to_resource(dev->dev.of_node, 0, &res);
-	if (err) {
-		dev_err(&dev->dev, "%s resource error!\n",
-				dev->dev.of_node->full_name);
-		goto error_out;
-	}
+	if ((features->fsl_pic_ip & FSL_PIC_IP_MASK) != FSL_PIC_IP_VMPIC) {
+		/* Get the MSI reg base */
+		err = of_address_to_resource(dev->dev.of_node, 0, &res);
+		if (err) {
+			dev_err(&dev->dev, "%s resource error!\n",
+					dev->dev.of_node->full_name);
+			goto error_out;
+		}
 
-	msi->msi_regs = ioremap(res.start, res.end - res.start + 1);
-	if (!msi->msi_regs) {
-		dev_err(&dev->dev, "ioremap problem failed\n");
-		goto error_out;
+		msi->msi_regs = ioremap(res.start, res.end - res.start + 1);
+		if (!msi->msi_regs) {
+			dev_err(&dev->dev, "ioremap problem failed\n");
+			goto error_out;
+		}
+		msi->msiir_offset = features->msiir_offset + (res.start & 0xfffff);
 	}
 
 	msi->feature = features->fsl_pic_ip;
 
 	msi->irqhost->host_data = msi;
-
-	msi->msiir_offset = features->msiir_offset + (res.start & 0xfffff);
 
 	rc = fsl_msi_init_allocator(msi);
 	if (rc) {
@@ -435,10 +441,19 @@ static const struct fsl_msi_feature ipic_msi_feature = {
 	.msiir_offset = 0x38,
 };
 
+static const struct fsl_msi_feature vmpic_msi_feature = {
+	.fsl_pic_ip = FSL_PIC_IP_VMPIC,
+	.msiir_offset = 0,
+};
+
 static const struct of_device_id fsl_of_msi_ids[] = {
 	{
 		.compatible = "fsl,mpic-msi",
 		.data = (void *)&mpic_msi_feature,
+	},
+	{
+		.compatible = "fsl,vmpic-msi",
+		.data = (void *)&vmpic_msi_feature,
 	},
 	{
 		.compatible = "fsl,ipic-msi",
