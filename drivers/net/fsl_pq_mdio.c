@@ -319,6 +319,7 @@ static int fsl_pq_mdio_probe(struct platform_device *ofdev)
 
 	if (of_device_is_compatible(np, "fsl,gianfar-mdio") ||
 			of_device_is_compatible(np, "fsl,gianfar-tbi") ||
+			of_device_is_compatible(np, "fsl,fman-mdio") ||
 			of_device_is_compatible(np, "fsl,ucc-mdio") ||
 			of_device_is_compatible(np, "ucc_geth_phy"))
 		map -= offsetof(struct fsl_pq_mdio, miimcfg);
@@ -369,6 +370,13 @@ static int fsl_pq_mdio_probe(struct platform_device *ofdev)
 		err = -ENODEV;
 		goto err_free_irqs;
 #endif
+	} else if (of_device_is_compatible(np, "fsl,fman-mdio")) {
+#ifdef CONFIG_FSL_FMAN
+		tbiaddr = 5;
+#else
+		err = -ENODEV;
+		goto err_free_irqs;
+#endif
 	} else {
 		err = -ENODEV;
 		goto err_free_irqs;
@@ -387,7 +395,9 @@ static int fsl_pq_mdio_probe(struct platform_device *ofdev)
 	}
 
 	if (tbiaddr == -1) {
+#ifndef CONFIG_FSL_FMAN
 		out_be32(tbipa, 0);
+#endif
 
 		tbiaddr = fsl_pq_mdio_find_free(new_bus);
 	}
@@ -402,7 +412,9 @@ static int fsl_pq_mdio_probe(struct platform_device *ofdev)
 		goto err_free_irqs;
 	}
 
+#ifndef CONFIG_FSL_FMAN
 	out_be32(tbipa, tbiaddr);
+#endif
 
 	err = of_mdiobus_register(new_bus, np);
 	if (err) {
@@ -466,6 +478,9 @@ static struct of_device_id fsl_pq_mdio_match[] = {
 	},
 	{
 		.compatible = "fsl,etsec2-mdio",
+	},
+	{
+		.compatible = "fsl,fman-mdio",
 	},
 	{},
 };
