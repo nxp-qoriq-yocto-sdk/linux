@@ -1141,6 +1141,7 @@
 				compatible = "fsl,p3041-fman-1g-mac", "fsl,fman-1g-mac";
 				reg = <0xe6000 0x1000>;
 				fsl,port-handles = <&fman0_rx3 &fman0_tx3>;
+				ptimer-handle = <&ptp_timer0>;
 			};
 
 			mdio@e7120 {
