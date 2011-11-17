@@ -624,11 +624,8 @@
 	};
 
 	localbus@ffe124000 {
-		compatible = "fsl,p3041-rev1.0-elbc", "simple-bus";
-		interrupts = <
-			25 2 0 0
-			16 2 1 19
-			>;
+		compatible = "fsl,p3041-elbc", "fsl,elbc", "simple-bus";
+		interrupts = <25 2 0 0>;
 		#address-cells = <2>;
 		#size-cells = <1>;
 	};
