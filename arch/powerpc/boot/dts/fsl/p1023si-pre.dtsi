@@ -55,19 +55,23 @@
 		rtic_b = &rtic_b;
 		rtic_c = &rtic_c;
 		rtic_d = &rtic_d;
+
+		bman = &bman;
+		qman = &qman;
+		fman0 = &fman0;
 	};
 
 	cpus {
 		#address-cells = <1>;
 		#size-cells = <0>;
 
-		PowerPC,P1023@0 {
+		cpu0: PowerPC,P1023@0 {
 			device_type = "cpu";
 			reg = <0x0>;
 			next-level-cache = <&L2>;
 		};
 
-		PowerPC,P1023@1 {
+		cpu1: PowerPC,P1023@1 {
 			device_type = "cpu";
 			reg = <0x1>;
 			next-level-cache = <&L2>;
