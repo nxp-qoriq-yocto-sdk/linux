@@ -43,8 +43,48 @@
 	#size-cells = <2>;
 	interrupt-parent = <&mpic>;
 
+	aliases {
+		ethernet0 = &enet0;
+		ethernet1 = &enet1;
+	};
+
 	memory {
 		device_type = "memory";
+	};
+
+	qportals: qman-portals@ff000000 {
+		ranges = <0x0 0xf 0xff000000 0x200000>;
+		qportal0: qman-portal@0 {
+			cpu-handle = <&cpu0>;
+			fsl,qman-pool-channels = <&qpool1 &qpool2 &qpool3>;
+		};
+
+		qportal1: qman-portal@4000 {
+			cpu-handle = <&cpu1>;
+			fsl,qman-pool-channels = <&qpool1 &qpool2 &qpool3>;
+		};
+
+		qportal2: qman-portal@8000 {
+			fsl,qman-pool-channels = <&qpool1 &qpool2 &qpool3>;
+		};
+	};
+
+	bportals: bman-portals@ff200000 {
+		ranges = <0x0 0xf 0xff200000 0x200000>;
+		bman-portal@0 {
+			cpu-handle = <&cpu0>;
+		};
+		bman-portal@4000 {
+			cpu-handle = <&cpu1>;
+		};
+		bman-portal@8000 {
+		};
+
+		buffer-pool@0 {
+			compatible = "fsl,p1023-bpool", "fsl,bpool";
+			fsl,bpid = <0>;
+			fsl,bpool-cfg = <0 0x100 0 1 0 0x100>;
+		};
 	};
 
 	soc: soc@ff600000 {
@@ -82,6 +122,25 @@
 		usb@22000 {
 			dr_mode = "host";
 			phy_type = "ulpi";
+		};
+
+		fman0: fman@100000 {
+			enet0: ethernet@e0000 {
+				phy-handle = <&phy0>;
+				phy-connection-type = "rgmii";
+			};
+			enet1: ethernet@e2000 {
+				phy-handle = <&phy1>;
+				phy-connection-type = "rgmii";
+			};
+			mdio0: mdio@e1120 {
+				phy0: ethernet-phy@2 {
+					reg = <0x02>;
+				};
+				phy1: ethernet-phy@7 {
+					reg = <0x07>;
+				};
+			};
 		};
 	};
 
@@ -212,6 +271,21 @@
 				  0x1000000 0x0 0x0
 				  0x1000000 0x0 0x0
 				  0x0 0x100000>;
+		};
+	};
+
+	fsl,dpaa {
+		compatible = "fsl,p1023-dpaa", "fsl,dpaa";
+
+		ethernet@0 {
+			compatible = "fsl,p1023-dpa-ethernet", "fsl,dpa-ethernet";
+			fsl,qman-channel = <&qpool1>;
+			fsl,fman-mac = <&enet0>;
+		};
+		ethernet@1 {
+			compatible = "fsl,p1023-dpa-ethernet", "fsl,dpa-ethernet";
+			fsl,qman-channel = <&qpool1>;
+			fsl,fman-mac = <&enet1>;
 		};
 	};
 };
