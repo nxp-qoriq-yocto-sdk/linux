@@ -65,6 +65,7 @@
 #include <asm/kexec.h>
 #include <asm/mmu_context.h>
 #include <asm/code-patching.h>
+#include <asm/hugetlb.h>
 
 #include "setup.h"
 
