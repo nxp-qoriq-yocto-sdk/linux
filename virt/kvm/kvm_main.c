@@ -623,6 +623,19 @@ static int kvm_create_dirty_bitmap(struct kvm_memory_slot *memslot)
 }
 #endif /* !CONFIG_S390 */
 
+void update_memslots(struct kvm_memslots *slots, struct kvm_memory_slot *new)
+{
+	if (new) {
+		int id = new->id;
+
+		slots->memslots[id] = *new;
+		if (id >= slots->nmemslots)
+			slots->nmemslots = id + 1;
+	}
+
+	slots->generation++;
+}
+
 /*
  * Allocate some memory and give it an address in the guest physical address
  * space.
@@ -773,10 +786,8 @@ skip_lpage:
 		if (!slots)
 			goto out_free;
 		memcpy(slots, kvm->memslots, sizeof(struct kvm_memslots));
-		if (mem->slot >= slots->nmemslots)
-			slots->nmemslots = mem->slot + 1;
-		slots->generation++;
 		slots->memslots[mem->slot].flags |= KVM_MEMSLOT_INVALID;
+		update_memslots(slots, NULL);
 
 		old_memslots = kvm->memslots;
 		rcu_assign_pointer(kvm->memslots, slots);
@@ -809,9 +820,6 @@ skip_lpage:
 	if (!slots)
 		goto out_free;
 	memcpy(slots, kvm->memslots, sizeof(struct kvm_memslots));
-	if (mem->slot >= slots->nmemslots)
-		slots->nmemslots = mem->slot + 1;
-	slots->generation++;
 
 	/* actual memory is freed via old in kvm_free_physmem_slot below */
 	if (!npages) {
@@ -821,7 +829,7 @@ skip_lpage:
 			new.lpage_info[i] = NULL;
 	}
 
-	slots->memslots[mem->slot] = new;
+	update_memslots(slots, &new);
 	old_memslots = kvm->memslots;
 	rcu_assign_pointer(kvm->memslots, slots);
 	synchronize_srcu_expedited(&kvm->srcu);
