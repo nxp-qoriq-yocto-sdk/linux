@@ -441,7 +441,7 @@ static void kvm_init_memslots_id(struct kvm *kvm)
 	struct kvm_memslots *slots = kvm->memslots;
 
 	for (i = 0; i < KVM_MEM_SLOTS_NUM; i++)
-		slots->memslots[i].id = i;
+		slots->id_to_index[i] = slots->memslots[i].id = i;
 }
 
 static struct kvm *kvm_create_vm(void)
@@ -668,8 +668,13 @@ static int cmp_memslot(const void *slot1, const void *slot2)
  */
 static void sort_memslots(struct kvm_memslots *slots)
 {
+	int i;
+
 	sort(slots->memslots, KVM_MEM_SLOTS_NUM,
 	      sizeof(struct kvm_memory_slot), cmp_memslot, NULL);
+
+	for (i = 0; i < KVM_MEM_SLOTS_NUM; i++)
+		slots->id_to_index[slots->memslots[i].id] = i;
 }
 
 void update_memslots(struct kvm_memslots *slots, struct kvm_memory_slot *new)
