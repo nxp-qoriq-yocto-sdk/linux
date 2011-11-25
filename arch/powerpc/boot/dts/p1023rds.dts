@@ -602,7 +602,7 @@
 				#size-cells = <0>;
 				compatible = "fsl,fman-mdio";
 				reg = <0xe1120 0xee0>;
-				interrupts = <26 1 0 0>;
+				interrupts = <26 1>;
 
 				phy0: ethernet-phy@2 {
 					reg = <0x02>;
