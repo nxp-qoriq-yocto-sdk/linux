@@ -472,7 +472,8 @@ static int kvmppc_booke_irqprio_deliver(struct kvm_vcpu *vcpu,
 		/* FIXME: nicer interface, vcpu, guest-requested */
 		if (priority == BOOKE_IRQPRIO_EXTERNAL &&
 		    vcpu->arch.magic_page_ea)
-			vcpu->arch.shared->epr = kvmppc_mpic_iack(vcpu->kvm, 0);
+			vcpu->arch.shared->epr =
+			    kvmppc_mpic_iack(vcpu->kvm, vcpu->vcpu_id);
 #endif
 	}
 
