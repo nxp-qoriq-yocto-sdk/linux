@@ -60,7 +60,7 @@ enum {
 };
 
 /* MPIC */
-#define MAX_CPU      1
+#define MAX_CPU      15
 #define MAX_EXT      16
 #define MAX_INT      240 /* Includes message and MSI interrupts */
 #define MAX_TMR      8
@@ -72,7 +72,7 @@ enum {
 #define MPIC_SPECIAL_IRQ  (MPIC_INT_IRQ + MAX_INT)
 #define MPIC_TMR_IRQ      MPIC_SPECIAL_IRQ
 #define MPIC_IPI_IRQ      (MPIC_TMR_IRQ + MAX_TMR)
-#define MAX_IRQ           (MPIC_IPI_IRQ + MAX_IPI * MAX_CPU)
+#define MAX_IRQ           (MPIC_IPI_IRQ + MAX_IPI)
 
 struct irq_queue {
 	unsigned long queue[BITS_TO_LONGS(MAX_IRQ)];
@@ -124,6 +124,12 @@ struct openpic {
 
 	int num_cpus;
 };
+
+static int get_current_vcpuid(void)
+{
+	struct kvm_vcpu *vcpu = current->thread.kvm_vcpu;
+	return vcpu->vcpu_id;
+}
 
 static void IRQ_setbit(struct irq_queue *q, int n_IRQ)
 {
@@ -398,7 +404,7 @@ static void mpic_reset(struct openpic *mpp)
 	int i;
 
 	/* Initialise controller registers */
-	mpp->frep = (MAX_IRQ << 16) | 2;
+	mpp->frep = (MAX_IRQ << 16) | 2 | ((MAX_CPU - 1) << 8);
 	mpp->veni = 0x00000000;
 	mpp->spve = 0x0000FFFF;
 	/* Initialise IRQ sources */
@@ -407,6 +413,13 @@ static void mpic_reset(struct openpic *mpp)
 		mpp->src[i].ide  = 0x00000001;
 		mpp->src[i].num  = i;
 	}
+
+	/*
+	 * We use IDE of IPIs to track which CPUs have pending IPIs.
+	 * So set IDE for IPIs to 0 so we don't get spurious interrupts.
+	 */
+	for (i = MPIC_IPI_IRQ; i < (MPIC_IPI_IRQ + MAX_IPI); i++)
+		mpp->src[i].ide = 0;
 
 	kvm_for_each_vcpu(i, vcpu, mpp->kvm)
 		mpic_reset_cpu(mpp, vcpu);
@@ -444,6 +457,9 @@ static int openpic_gbl_write(struct kvm_pic *pic, int addr, uint32_t val)
 	case 0xD0: {
 		int idx;
 		idx = (addr - 0xA0) >> 4;
+		/* Clear unvalid bits for IPI_IPVR */
+		val &= MPIC_VECPRI_MASK | MPIC_VECPRI_ACTIVITY |
+		       MPIC_VECPRI_PRIORITY_MASK | MPIC_VECPRI_VECTOR_MASK;
 		write_IRQreg(opp, MPIC_IPI_IRQ + idx, IRQ_IPVP, val);
 
 		break;
@@ -647,13 +663,24 @@ static int openpic_cpu_write(struct kvm_pic *pic, int addr, uint32_t val)
 		addr &= 0x1FFF0;
 		idx = addr / 0x1000;
 	} else {
-		idx = 0; /* FIXME: current vcpu index */
+		idx = get_current_vcpuid();
 	}
 
 	dst = &opp->dst[idx];
 	addr &= 0xFF0;
 
 	switch (addr) {
+	case 0x40:
+	case 0x50:
+	case 0x60:
+	case 0x70:
+		idx = (addr - 0x40) >> 4;
+		/* Save pending IPIs to wchich CPUs in IDE */
+		val = read_IRQreg(opp, MPIC_IPI_IRQ + idx, IRQ_IDE) | val;
+		write_IRQreg(opp, MPIC_IPI_IRQ + idx, IRQ_IDE, val);
+		openpic_set_irq(opp, &opp->src[MPIC_IPI_IRQ + idx], 1);
+
+		break;
 	case 0x80: /* PCTP */
 		dst->shared->mpic_ctpr = val & 0x0000000F;
 
@@ -760,10 +787,21 @@ static u32 iack_nolock(struct openpic *opp, struct irq_dest *dst)
 	IRQ_check(opp, &dst->raised);
 
 	if (!(src->ipvp & MPIC_VECPRI_SENSE_LEVEL)) {
-		pr_debug("lowering edge %d\n", n_IRQ);
 		/* edge-sensitive IRQ */
-		src->ipvp &= ~MPIC_VECPRI_ACTIVITY;
-		src->pending = 0;
+		int clear_pending = 1;
+
+		if ((n_IRQ >= MPIC_IPI_IRQ) &&
+		    (n_IRQ < (MPIC_IPI_IRQ + MAX_IPI))) {
+			src->ide &= ~(1 << dst->vcpu->vcpu_id);
+			if (src->ide)
+				clear_pending = 0;
+		}
+
+		if (clear_pending) {
+			pr_debug("lowering edge %d\n", n_IRQ);
+			src->ipvp &= ~MPIC_VECPRI_ACTIVITY;
+			src->pending = 0;
+		}
 	}
 
 	update_prio_pending(dst);
@@ -808,7 +846,7 @@ static uint32_t openpic_cpu_read(struct kvm_pic *pic, int addr, u32 *valp)
 		addr &= 0x1FFF0;
 		idx = addr / 0x1000;
 	} else {
-		idx = 0; /* FIXME: current vcpu index */
+		idx = get_current_vcpuid();
 	}
 
 	dst = &opp->dst[idx];
@@ -969,6 +1007,7 @@ int kvm_arch_irqchip_add_vcpu(struct kvm_vcpu *vcpu)
 
 	priv->dst[vcpu->vcpu_id].vcpu = vcpu;
 	priv->dst[vcpu->vcpu_id].shared = vcpu->arch.shared;
+	priv->num_cpus++;
 	mpic_reset_cpu(priv, vcpu);
 
 	spin_unlock_irqrestore(&pic->lock, flags);
@@ -1015,7 +1054,7 @@ struct kvm_pic *kvm_create_pic(struct kvm *kvm)
 	if (!priv)
 		goto out;
 
-	priv->num_cpus = 1; /* for now */
+	priv->num_cpus = 0;
 	priv->kvm = kvm;
 
 	mpic_reset(priv);
