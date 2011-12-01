@@ -664,6 +664,9 @@ static void kvm_check_ins(u32 *inst, u32 features)
 	}
 }
 
+extern u32 kvm_template_start[];
+extern u32 kvm_template_end[];
+
 static void kvm_use_magic_page(void)
 {
 	u32 *p;
@@ -691,8 +694,14 @@ static void kvm_use_magic_page(void)
 	 */
 	local_irq_disable();
 
-	for (p = start; p < end; p++)
+	for (p = start; p < end; p++) {
+		/* Avoid patching the template code */
+		if (p >= kvm_template_start && p < kvm_template_end) {
+			p = kvm_template_end - 1;
+			continue;
+		}
 		kvm_check_ins(p, features);
+	}
 
 	local_irq_enable();
 
