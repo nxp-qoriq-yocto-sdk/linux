@@ -839,4 +839,4 @@ free_tmp:
 	return 0;
 }
 
-early_initcall(kvm_guest_init);
+postcore_initcall(kvm_guest_init);
