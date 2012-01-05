@@ -236,7 +236,6 @@
 	};
 
 /include/ "pq3-esdhc-0.dtsi"
-
 	sdhc@2e000 {
 		compatible = "fsl,mpc8536-esdhc", "fsl,esdhc";
 	};
