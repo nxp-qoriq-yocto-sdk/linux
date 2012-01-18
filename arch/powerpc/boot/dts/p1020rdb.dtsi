@@ -190,6 +190,7 @@
 
 	usb@22000 {
 		phy_type = "ulpi";
+		dr_mode = "host";
 	};
 
 	/* USB2 is shared with localbus, so it must be disabled
@@ -199,6 +200,7 @@
 	   when there isn't any. So, just comment it out.
 	usb@23000 {
 		phy_type = "ulpi";
+		dr_mode = "host";
 	};
 	*/
 
