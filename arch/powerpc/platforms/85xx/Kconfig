@@ -272,3 +272,12 @@ config FSL_HYDRA_DS_MDIO
 
 config TQM85xx
 	bool
+
+config FSL_85XX_CACHE_SRAM
+	bool
+	select PPC_LIB_RHEAP
+	help
+	  This option enables L2 SRAM cache for memory
+	  allocation. cache-sram-size and cache-sram-offset
+	  kernel command line parameters should be passed when
+	  this option is enabled.
