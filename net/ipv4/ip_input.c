@@ -265,7 +265,10 @@ int ip_local_deliver(struct sk_buff *skb)
 		       ip_local_deliver_finish);
 }
 
-static inline int ip_rcv_options(struct sk_buff *skb)
+#ifndef CONFIG_AS_FASTPATH
+static
+#endif
+int ip_rcv_options(struct sk_buff *skb)
 {
 	struct ip_options *opt;
 	const struct iphdr *iph;
@@ -313,6 +316,9 @@ static inline int ip_rcv_options(struct sk_buff *skb)
 drop:
 	return -1;
 }
+#ifdef CONFIG_AS_FASTPATH
+EXPORT_SYMBOL(ip_rcv_options);
+#endif
 
 static int ip_rcv_finish(struct sk_buff *skb)
 {
