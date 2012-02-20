@@ -4,7 +4,7 @@
  * Authors: Jeff Brown
  *          Timur Tabi <timur@freescale.com>
  *
- * Copyright 2004,2007 Freescale Semiconductor, Inc
+ * Copyright 2004,2007,2012 Freescale Semiconductor, Inc
  *
  * This program is free software; you can redistribute  it and/or modify it
  * under  the terms of  the GNU General  Public License as published by the
@@ -103,6 +103,9 @@ struct ccsr_guts {
 /* For backwards-compatibility */
 #define ccsr_guts_85xx ccsr_guts
 #define ccsr_guts_86xx ccsr_guts
+
+/* Alternate function signal multiplex control */
+#define MPC85xx_PMUXCR_QE(x) (0x8000 >> (x))
 
 #ifdef CONFIG_PPC_86xx
 
