@@ -26,6 +26,9 @@
 #include <asm/prom.h>
 #include <asm/udbg.h>
 #include <asm/mpic.h>
+#include <asm/qe.h>
+#include <asm/qe_ic.h>
+#include <asm/fsl_guts.h>
 
 #include <sysdev/fsl_soc.h>
 #include <sysdev/fsl_pci.h>
@@ -70,6 +73,16 @@ void __init mpc85xx_rdb_pic_init(void)
 
 	mpic_init(mpic);
 
+#ifdef CONFIG_QUICC_ENGINE
+	np = of_find_compatible_node(NULL, NULL, "fsl,qe-ic");
+	if (np) {
+		qe_ic_init(np, 0, qe_ic_cascade_low_mpic,
+				qe_ic_cascade_high_mpic);
+		of_node_put(np);
+
+	} else
+		pr_err("%s: Could not find qe-ic node\n", __func__);
+#endif
 }
 
 /*
@@ -80,7 +93,7 @@ extern void __init mpc85xx_smp_init(void);
 #endif
 static void __init mpc85xx_rdb_setup_arch(void)
 {
-#ifdef CONFIG_PCI
+#if defined(CONFIG_PCI) || defined(CONFIG_QUICC_ENGINE)
 	struct device_node *np;
 #endif
 
@@ -95,6 +108,61 @@ static void __init mpc85xx_rdb_setup_arch(void)
 #ifdef CONFIG_SMP
 	mpc85xx_smp_init();
 #endif
+
+#ifdef CONFIG_QUICC_ENGINE
+	np = of_find_compatible_node(NULL, NULL, "fsl,qe");
+	if (!np) {
+		pr_err("%s: Could not find Quicc Engine node\n", __func__);
+		goto qe_fail;
+	}
+
+	qe_reset();
+	of_node_put(np);
+
+	np = of_find_node_by_name(NULL, "par_io");
+	if (np) {
+		struct device_node *ucc;
+
+		par_io_init(np);
+		of_node_put(np);
+
+		for_each_node_by_name(ucc, "ucc")
+			par_io_of_config(ucc);
+
+	}
+#if defined(CONFIG_UCC_GETH) || defined(CONFIG_SERIAL_QE)
+	if (machine_is(p1025_rdb)) {
+
+		struct ccsr_guts_85xx __iomem *guts;
+
+		np = of_find_node_by_name(NULL, "global-utilities");
+		if (np) {
+			guts = of_iomap(np, 0);
+			if (!guts) {
+
+				pr_err("mpc85xx-rdb: could not map global utilities register\n");
+
+			} else {
+			/* P1025 has pins muxed for QE and other functions. To
+			* enable QE UEC mode, we need to set bit QE0 for UCC1
+			* in Eth mode, QE0 and QE3 for UCC5 in Eth mode, QE9
+			* and QE12 for QE MII management singals in PMUXCR
+			* register.
+			*/
+				setbits32(&guts->pmuxcr, MPC85xx_PMUXCR_QE(0) |
+						MPC85xx_PMUXCR_QE(3) |
+						MPC85xx_PMUXCR_QE(9) |
+						MPC85xx_PMUXCR_QE(12));
+				iounmap(guts);
+			}
+			of_node_put(np);
+		}
+
+	}
+#endif
+
+qe_fail:
+#endif	/* CONFIG_QUICC_ENGINE */
 
 	printk(KERN_INFO "MPC85xx RDB board from Freescale Semiconductor\n");
 }
@@ -122,6 +190,7 @@ static struct of_device_id __initdata mpc85xxrdb_ids[] = {
 	{ .type = "soc", },
 	{ .compatible = "soc", },
 	{ .compatible = "simple-bus", },
+	{ .compatible = "fsl,qe", },
 	{ .compatible = "gianfar", },
 	{},
 };
