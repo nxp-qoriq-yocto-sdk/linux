@@ -8,12 +8,40 @@
  */
 
 #include <linux/threads.h>
+#include <asm/epapr_hcalls.h>
 #include <asm/reg.h>
 #include <asm/page.h>
 #include <asm/cputable.h>
 #include <asm/thread_info.h>
 #include <asm/ppc_asm.h>
+#include <asm/asm-compat.h>
 #include <asm/asm-offsets.h>
+
+.global epapr_ev_idle
+epapr_ev_idle:
+	rlwinm	r3, r1, 0, 0, 31-THREAD_SHIFT	/* current thread_info */
+	PPC_LL	r4, TI_LOCAL_FLAGS(r3)	/* set napping bit */
+	ori	r4, r4,_TLF_NAPPING	/* so when we take an exception */
+	PPC_STL	r4, TI_LOCAL_FLAGS(r3)	/* it will return to our caller */
+
+	wrteei	1
+
+idle_loop:
+	LOAD_REG_IMMEDIATE(r11, EV_HCALL_TOKEN(EV_IDLE))
+
+.global epapr_ev_idle_start
+epapr_ev_idle_start:
+	li	r3, -1
+	nop
+	nop
+	nop
+
+	/*
+	 * Guard against spurious wakeups from a hypervisor --
+	 * only interrupt will cause us to return to LR due to
+	 * _TLF_NAPPING.
+	 */
+	b	idle_loop
 
 /* Hypercall entry point. Will be patched with device tree instructions. */
 .global epapr_hypercall_start
