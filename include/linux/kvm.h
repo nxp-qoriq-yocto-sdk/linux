@@ -438,6 +438,8 @@ struct kvm_ppc_pvinfo {
 	__u8  pad[108];
 };
 
+#define KVM_PPC_PVINFO_FLAGS_EV_IDLE   (1<<0)
+
 #define KVMIO 0xAE
 
 /*

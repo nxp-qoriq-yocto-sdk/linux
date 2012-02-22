@@ -48,8 +48,7 @@ static unsigned int perfmon_refcount;
 
 int kvm_arch_vcpu_runnable(struct kvm_vcpu *v)
 {
-	bool ret = !(v->arch.shared->msr & MSR_WE) ||
-		   !!(v->arch.pending_exceptions) ||
+	bool ret = !!(v->arch.pending_exceptions) ||
 		   v->requests;
 
 #ifdef CONFIG_BOOKE
@@ -99,6 +98,11 @@ int kvmppc_kvm_pv(struct kvm_vcpu *vcpu)
 #endif
 
 		/* Second return value is in r4 */
+		break;
+	case _EV_HCALL_TOKEN(EV_EPAPR_VENDOR_ID, EV_IDLE):
+		r = 0;  /* success */
+		kvm_vcpu_block(vcpu);
+		clear_bit(KVM_REQ_UNHALT, &vcpu->requests);
 		break;
 	default:
 		r = EV_UNIMPLEMENTED;
@@ -877,9 +881,16 @@ out:
 
 static int kvm_vm_ioctl_get_pvinfo(struct kvm_ppc_pvinfo *pvinfo)
 {
+	u32 inst_nop = 0x60000000;
+#ifdef CONFIG_KVM_BOOKE_HV
+	u32 inst_sc1 = 0x44000022;
+	pvinfo->hcall[0] = inst_sc1;
+	pvinfo->hcall[1] = inst_nop;
+	pvinfo->hcall[2] = inst_nop;
+	pvinfo->hcall[3] = inst_nop;
+#else
 	u32 inst_lis = 0x3c000000;
 	u32 inst_ori = 0x60000000;
-	u32 inst_nop = 0x60000000;
 	u32 inst_sc = 0x44000002;
 	u32 inst_imm_mask = 0xffff;
 
@@ -896,6 +907,9 @@ static int kvm_vm_ioctl_get_pvinfo(struct kvm_ppc_pvinfo *pvinfo)
 	pvinfo->hcall[1] = inst_ori | (KVM_SC_MAGIC_R0 & inst_imm_mask);
 	pvinfo->hcall[2] = inst_sc;
 	pvinfo->hcall[3] = inst_nop;
+#endif
+
+	pvinfo->flags = KVM_PPC_PVINFO_FLAGS_EV_IDLE;
 
 	return 0;
 }
