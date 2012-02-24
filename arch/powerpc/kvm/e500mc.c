@@ -15,7 +15,7 @@
 #include <linux/kvm_host.h>
 #include <linux/slab.h>
 #include <linux/err.h>
-#include <linux/export.h>
+#include <linux/module.h>
 
 #include <asm/reg.h>
 #include <asm/cputable.h>
