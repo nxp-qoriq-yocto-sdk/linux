@@ -434,7 +434,7 @@ static int kvmppc_booke_irqprio_deliver(struct kvm_vcpu *vcpu,
 		allowed = vcpu->arch.shared->msr & MSR_DE;
 		allowed = allowed && !crit;
 		msr_mask = MSR_ME;
-		int_class = INT_CLASS_CRIT;
+		int_class = INT_CLASS_DBG;
 		break;
 	}
 
@@ -850,7 +850,7 @@ static int kvmppc_handle_debug(struct kvm_run *run, struct kvm_vcpu *vcpu)
 	dbsr = vcpu->arch.dbsr;
 
 	if (vcpu->guest_debug == 0) {
-		if (dbsr & (vcpu->arch.shared->msr & MSR_DE))
+		if (dbsr && (vcpu->arch.shared->msr & MSR_DE))
 			kvmppc_core_queue_debug(vcpu);
 
 		/* Inject a program interrupt if trap debug is not allowed */
