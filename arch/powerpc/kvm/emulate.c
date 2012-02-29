@@ -259,6 +259,7 @@ int kvmppc_emulate_instruction(struct kvm_run *run, struct kvm_vcpu *vcpu)
 
 #ifdef CONFIG_KVM_BOOKE206_PERFMON
 		case OP_31_XOP_MFPMR:
+			rt = get_rt(inst);
 			/* If PerfMon not reserved by guest then return ZERO */
 			if (!vcpu->arch.pm_is_reserved) {
 				kvmppc_set_gpr(vcpu, rt, 0);
@@ -266,7 +267,6 @@ int kvmppc_emulate_instruction(struct kvm_run *run, struct kvm_vcpu *vcpu)
 			}
 
 			pmrn = get_pmrn(inst);
-			rt = get_rt(inst);
 
 			switch (pmrn) {
 			case PMRN_PMGC0:
