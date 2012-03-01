@@ -6,7 +6,7 @@
  *  with various broken implementations of this HW.
  *
  *  Copyright (C) 2004 Benjamin Herrenschmidt, IBM Corp.
- *  Copyright 2010-2011 Freescale Semiconductor, Inc.
+ *  Copyright 2010-2012 Freescale Semiconductor, Inc.
  *
  *  This file is subject to the terms and conditions of the GNU General Public
  *  License.  See the file COPYING in the main directory of this archive
@@ -1184,7 +1184,10 @@ struct mpic * __init mpic_alloc(struct device_node *node,
 	mpic->irq_count = irq_count;
 	mpic->num_sources = 0; /* so far */
 
-	if (flags & MPIC_LARGE_VECTORS)
+	if (node && of_device_is_compatible(node, "fsl,mpic"))
+		mpic->flags |= MPIC_FSL | MPIC_LARGE_VECTORS;
+
+	if (mpic->flags & MPIC_LARGE_VECTORS)
 		intvec_top = 2047;
 	else
 		intvec_top = 255;
@@ -1206,8 +1209,6 @@ struct mpic * __init mpic_alloc(struct device_node *node,
 	/* Check for "big-endian" in device-tree */
 	if (node && of_get_property(node, "big-endian", NULL) != NULL)
 		mpic->flags |= MPIC_BIG_ENDIAN;
-	if (node && of_device_is_compatible(node, "fsl,mpic"))
-		mpic->flags |= MPIC_FSL;
 
 	if (node && of_get_property(node, "fsl,mpic-no-readback", NULL) != NULL)
 		mpic->flags |= MPIC_NO_READBACK;
@@ -1347,7 +1348,8 @@ struct mpic * __init mpic_alloc(struct device_node *node,
 	mpic->irqhost = irq_alloc_host(node, IRQ_HOST_MAP_LINEAR,
 				       isu_size ? isu_size : mpic->num_sources,
 				       &mpic_host_ops,
-				       flags & MPIC_LARGE_VECTORS ? 2048 : 256);
+				       mpic->flags & MPIC_LARGE_VECTORS ?
+				       2048 : 256);
 	if (mpic->irqhost == NULL)
 		return NULL;
 
