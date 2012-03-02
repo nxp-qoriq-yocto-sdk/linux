@@ -352,69 +352,51 @@ int kvmppc_emulate_instruction(struct kvm_run *run, struct kvm_vcpu *vcpu)
 			case PMRN_PMGC0:
 				reg = kvmppc_get_gpr(vcpu, rs);
 				vcpu->arch.pm_reg.pmgc0 = reg;
-#ifdef CONFIG_KVM_BOOKE_HV
-				if (!(reg & PMGC0_PMIE))
-					mtspr(SPRN_MSRP, mfspr(SPRN_MSRP) & ~MSRP_PMMP);
-
-				reg &= ~PMGC0_PMIE;
-				vcpu->arch.shadow_pm_reg.pmgc0 = reg;
-#else
-				mtpmr(PMRN_PMGC0, reg);
-#endif
-				if (!(reg & PMGC0_PMIE))
-					kvmppc_core_dequeue_perfmon(vcpu);
+				kvmppc_update_perfmon_ints(vcpu);
 				break;
 			case PMRN_PMC0:
 				vcpu->arch.pm_reg.pmc[0] = kvmppc_get_gpr(vcpu, rs);
 				mtpmr(PMRN_PMC0, vcpu->arch.pm_reg.pmc[0]);
-				if (kvmppc_core_pending_perfmon(vcpu))
-					kvmppc_clear_pending_perfmon(vcpu);
+				kvmppc_update_perfmon_ints(vcpu);
 				break;
 			case PMRN_PMC1:
 				vcpu->arch.pm_reg.pmc[1] = kvmppc_get_gpr(vcpu, rs);
 				mtpmr(PMRN_PMC1, vcpu->arch.pm_reg.pmc[1]);
-				if (kvmppc_core_pending_perfmon(vcpu))
-					kvmppc_clear_pending_perfmon(vcpu);
+				kvmppc_update_perfmon_ints(vcpu);
 				break;
 			case PMRN_PMC2:
 				vcpu->arch.pm_reg.pmc[2] = kvmppc_get_gpr(vcpu, rs);
 				mtpmr(PMRN_PMC2, vcpu->arch.pm_reg.pmc[2]);
-				if (kvmppc_core_pending_perfmon(vcpu))
-					kvmppc_clear_pending_perfmon(vcpu);
+				kvmppc_update_perfmon_ints(vcpu);
 				break;
 			case PMRN_PMC3:
 				vcpu->arch.pm_reg.pmc[3] = kvmppc_get_gpr(vcpu, rs);
 				mtpmr(PMRN_PMC3, vcpu->arch.pm_reg.pmc[3]);
-				if (kvmppc_core_pending_perfmon(vcpu))
-					kvmppc_clear_pending_perfmon(vcpu);
+				kvmppc_update_perfmon_ints(vcpu);
 				break;
 			case PMRN_PMLCA0:
 				reg = kvmppc_get_gpr(vcpu, rs);
 				vcpu->arch.pm_reg.pmlca[0] = reg;
 				kvmppc_set_hwpmlca(0, vcpu);
-				if (kvmppc_core_pending_perfmon(vcpu))
-					kvmppc_clear_pending_perfmon(vcpu);
+				kvmppc_update_perfmon_ints(vcpu);
 				break;
 			case PMRN_PMLCA1:
 				reg = kvmppc_get_gpr(vcpu, rs);
 				vcpu->arch.pm_reg.pmlca[1] = reg;
 				kvmppc_set_hwpmlca(1, vcpu);
-				if (kvmppc_core_pending_perfmon(vcpu))
-					kvmppc_clear_pending_perfmon(vcpu);
+				kvmppc_update_perfmon_ints(vcpu);
 				break;
 			case PMRN_PMLCA2:
 				reg = kvmppc_get_gpr(vcpu, rs);
 				vcpu->arch.pm_reg.pmlca[2] = reg;
 				kvmppc_set_hwpmlca(2, vcpu);
-				if (kvmppc_core_pending_perfmon(vcpu))
-					kvmppc_clear_pending_perfmon(vcpu);
+				kvmppc_update_perfmon_ints(vcpu);
 				break;
 			case PMRN_PMLCA3:
 				reg = kvmppc_get_gpr(vcpu, rs);
 				vcpu->arch.pm_reg.pmlca[3] = reg;
 				kvmppc_set_hwpmlca(3, vcpu);
-				if (kvmppc_core_pending_perfmon(vcpu))
-					kvmppc_clear_pending_perfmon(vcpu);
+				kvmppc_update_perfmon_ints(vcpu);
 				break;
 			case PMRN_PMLCB0:
 				vcpu->arch.pm_reg.pmlcb[0] = kvmppc_get_gpr(vcpu, rs);

@@ -758,21 +758,10 @@ static void kvm_perfmon_interrupt_handler(struct pt_regs *regs)
 
 #ifdef CONFIG_KVM_BOOKE_HV
 	vcpu->arch.pm_reg.pmgc0 = vcpu->arch.shadow_pm_reg.pmgc0;
-	vcpu->arch.shadow_pm_reg.pmgc0 &= ~PMGC0_PMIE;
-	mtpmr(PMRN_PMGC0, vcpu->arch.shadow_pm_reg.pmgc0 | PMGC0_FAC);
-	if (vcpu->arch.pm_reg.pmgc0 & PMGC0_FCECE)
-		vcpu->arch.shadow_pm_reg.pmgc0 |= PMGC0_FAC;
-
-	/* Do not allow PMR access and MSR.PMM update till PMIE is either
-	 * cleared by guest or perfmon interrupt condition is disabled
-	 * ( OV cleared, CE cleared
-	 */
-	mtspr(SPRN_MSRP, mfspr(SPRN_MSRP) | MSRP_PMMP);
-#else
-	mtpmr(PMRN_PMGC0, mfpmr(PMRN_PMGC0) & ~PMGC0_PMIE);
 #endif
 
 	if (!vcpu || !vcpu->arch.pm_is_reserved) {
+		mtpmr(PMRN_PMGC0, mfpmr(PMRN_PMGC0) & ~PMGC0_PMIE);
 		pr_warning("%s KVM: Guest PerfMon Interrupt taken"
 			" in kernel\n", __func__);
 		return;
@@ -781,7 +770,7 @@ static void kvm_perfmon_interrupt_handler(struct pt_regs *regs)
 	if (vcpu->arch.pm_reg.pmgc0 & PMGC0_FCECE)
 		vcpu->arch.pm_reg.pmgc0 |= PMGC0_FAC;
 
-	kvmppc_core_queue_perfmon(vcpu);
+	kvmppc_update_perfmon_ints(vcpu);
 }
 #endif
 
