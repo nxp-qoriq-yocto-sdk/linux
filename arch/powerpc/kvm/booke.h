@@ -137,7 +137,7 @@ void kvmppc_set_hwpmlca(unsigned int idx, struct kvm_vcpu *vcpu);
 void kvmppc_core_dequeue_perfmon(struct kvm_vcpu *vcpu);
 int kvmppc_core_pending_perfmon(struct kvm_vcpu *vcpu);
 void kvmppc_core_queue_perfmon(struct kvm_vcpu *vcpu);
-void kvmppc_clear_pending_perfmon(struct kvm_vcpu *vcpu);
+void kvmppc_update_perfmon_ints(struct kvm_vcpu *vcpu);
 void kvmppc_load_perfmon_regs(struct kvm_vcpu *vcpu);
 void kvmppc_save_perfmon_regs(struct kvm_vcpu *vcpu);
 

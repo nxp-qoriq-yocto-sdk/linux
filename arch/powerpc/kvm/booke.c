@@ -398,10 +398,6 @@ static int kvmppc_booke_irqprio_deliver(struct kvm_vcpu *vcpu,
 	case BOOKE_IRQPRIO_PERFORMANCE_MONITOR:
 		allowed = vcpu->arch.shared->msr & MSR_EE;
 		allowed = allowed && !crit;
-		if ((!(vcpu->arch.pm_reg.pmgc0 & PMGC0_PMIE))) {
-			allowed = 0;
-			// FIXME dequeue
-		}
 		msr_mask = MSR_CE|MSR_ME|MSR_DE;
 		int_class = INT_CLASS_NONCRIT;
 		keep_irq = true;
@@ -1855,10 +1851,14 @@ void kvmppc_write_hwpmr(unsigned int pmr, u32 val)
 	isync();
 }
 
-void kvmppc_clear_pending_perfmon(struct kvm_vcpu *vcpu)
+/* Check whether perfmon interrupt condition exists */
+static bool kvmppc_perfmon_int_active(struct kvm_vcpu *vcpu)
 {
 	u32 pmr;
 	int i;
+
+	if (!(vcpu->arch.pm_reg.pmgc0 & PMGC0_PMIE))
+		return false;
 
 	for (i = 0; i < PERFMON_COUNTERS; i++) {
 		/* If not enabled, can't be the cause of pending interrupt */
@@ -1869,16 +1869,44 @@ void kvmppc_clear_pending_perfmon(struct kvm_vcpu *vcpu)
 		/* If PMC.OV set, then interrupt handling is still pending */
 		kvmppc_read_hwpmr(PMRN_PMC0 + i, &pmr);
 		if (pmr & 0x80000000)
-			return;
+			return true;
 	}
-	kvmppc_core_dequeue_perfmon(vcpu);
+	return false;
+}
+
+void kvmppc_update_perfmon_ints(struct kvm_vcpu *vcpu)
+{
+	if (kvmppc_perfmon_int_active(vcpu)) {
+		/* Enque if not already enqueued */
+		if (!kvmppc_core_pending_perfmon(vcpu)) {
+			kvmppc_core_queue_perfmon(vcpu);
 #ifdef CONFIG_KVM_BOOKE_HV
-	mtspr(SPRN_MSRP, mfspr(SPRN_MSRP) & ~MSRP_PMMP);
-	vcpu->arch.shadow_pm_reg.pmgc0 = vcpu->arch.pm_reg.pmgc0;
+			/*
+			 * Do not allow PMR access and MSR.PMM update till
+			 * perfmon interrupt condition is cleared by guest
+			 * (PMIE cleared or OV cleared or CE cleared).
+			 */
+			mtspr(SPRN_MSRP, mfspr(SPRN_MSRP) | MSRP_PMMP);
+			vcpu->arch.shadow_pm_reg.pmgc0 &= ~PMGC0_PMIE;
+			vcpu->arch.shadow_pm_reg.pmgc0 |= PMGC0_FAC;
+			mtpmr(PMRN_PMGC0, vcpu->arch.shadow_pm_reg.pmgc0);
 #else
-	mtpmr(PMRN_PMGC0, vcpu->arch.pm_reg.pmgc0);
+			mtpmr(PMRN_PMGC0, mfpmr(PMRN_PMGC0) & ~PMGC0_PMIE);
 #endif
-	isync();
+		}
+	} else {
+		/* Interrupt condition goes away, so clear interrupt */
+		if (kvmppc_core_pending_perfmon(vcpu)) {
+			kvmppc_core_dequeue_perfmon(vcpu);
+#ifdef CONFIG_KVM_BOOKE_HV
+			/* Allow Guest access to PMRs now */
+			mtspr(SPRN_MSRP, mfspr(SPRN_MSRP) & ~MSRP_PMMP);
+			vcpu->arch.shadow_pm_reg.pmgc0 = vcpu->arch.pm_reg.pmgc0;
+#else
+			mtpmr(PMRN_PMGC0, vcpu->arch.pm_reg.pmgc0);
+#endif
+		}
+	}
 }
 
 void kvmppc_set_hwpmlca(unsigned int idx, struct kvm_vcpu *vcpu)
