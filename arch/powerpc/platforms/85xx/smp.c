@@ -248,6 +248,13 @@ void __init mpc85xx_smp_init(void)
 		smp_85xx_ops.cause_ipi = doorbell_cause_ipi;
 	}
 
+	/* When running under a hypervisor, we can not modify tb */
+	np = of_find_node_by_path("/hypervisor");
+	if (np) {
+		smp_85xx_ops.give_timebase = NULL;
+		smp_85xx_ops.take_timebase = NULL;
+	}
+
 	smp_ops = &smp_85xx_ops;
 
 #ifdef CONFIG_KEXEC
