@@ -549,6 +549,9 @@ drop:
 	kfree_skb(skb);
 	return -EINVAL;
 }
+#ifdef CONFIG_AS_FASTPATH
+EXPORT_SYMBOL(ip6_forward);
+#endif
 
 static void ip6_copy_metadata(struct sk_buff *to, struct sk_buff *from)
 {
