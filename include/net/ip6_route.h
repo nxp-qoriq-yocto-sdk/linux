@@ -190,4 +190,11 @@ static inline int ip6_skb_dst_mtu(struct sk_buff *skb)
 	       skb_dst(skb)->dev->mtu : dst_mtu(skb_dst(skb));
 }
 
+#ifdef CONFIG_AS_FASTPATH
+typedef void ipv6_route_flush_hook(void);
+
+void ipv6_route_hook_fn_register(ipv6_route_flush_hook *flush);
+void ipv6_route_hook_fn_unregister(void);
+#endif
+
 #endif

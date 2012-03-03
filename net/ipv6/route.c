@@ -72,6 +72,10 @@
 #define RT6_TRACE(x...) do { ; } while (0)
 #endif
 
+#ifdef CONFIG_AS_FASTPATH
+static ipv6_route_flush_hook *ipv6_route_flush_fn;
+#endif
+
 static struct rt6_info * ip6_rt_copy(struct rt6_info *ort);
 static struct dst_entry	*ip6_dst_check(struct dst_entry *dst, u32 cookie);
 static unsigned int	 ip6_default_advmss(const struct dst_entry *dst);
@@ -683,6 +687,11 @@ static int __ip6_ins_rt(struct rt6_info *rt, struct nl_info *info)
 	err = fib6_add(&table->tb6_root, rt, info);
 	write_unlock_bh(&table->tb6_lock);
 
+#ifdef CONFIG_AS_FASTPATH
+	if ((!err) && ipv6_route_flush_fn)
+		ipv6_route_flush_fn();
+#endif
+
 	return err;
 }
 
@@ -870,6 +879,9 @@ void ip6_route_input(struct sk_buff *skb)
 
 	skb_dst_set(skb, fib6_rule_lookup(net, &fl6, flags, ip6_pol_route_input));
 }
+#ifdef CONFIG_AS_FASTPATH
+EXPORT_SYMBOL(ip6_route_input);
+#endif
 
 static struct rt6_info *ip6_pol_route_output(struct net *net, struct fib6_table *table,
 					     struct flowi6 *fl6, int flags)
@@ -1413,6 +1425,12 @@ static int __ip6_del_rt(struct rt6_info *rt, struct nl_info *info)
 
 out:
 	dst_release(&rt->dst);
+
+#ifdef CONFIG_AS_FASTPATH
+	if ((!err) && ipv6_route_flush_fn)
+		ipv6_route_flush_fn();
+#endif
+
 	return err;
 }
 
@@ -2998,3 +3016,17 @@ void ip6_route_cleanup(void)
 	dst_entries_destroy(&ip6_dst_blackhole_ops);
 	kmem_cache_destroy(ip6_dst_ops_template.kmem_cachep);
 }
+
+#ifdef CONFIG_AS_FASTPATH
+void ipv6_route_hook_fn_register(ipv6_route_flush_hook *flush)
+{
+	ipv6_route_flush_fn = flush;
+}
+EXPORT_SYMBOL(ipv6_route_hook_fn_register);
+
+void ipv6_route_hook_fn_unregister(void)
+{
+	ipv6_route_flush_fn = NULL;
+}
+EXPORT_SYMBOL(ipv6_route_hook_fn_unregister);
+#endif
