@@ -1012,7 +1012,8 @@ static int mpic_host_map(struct irq_host *h, unsigned int virq,
 		return 0;
 	}
 
-	if (hw >= mpic->timer_vecs[0] && hw <= mpic->timer_vecs[7]) {
+	if (hw >= mpic->timer_vecs[0] &&
+	    hw <= mpic->timer_vecs[MPIC_MAX_TIMER - 1]) {
 		WARN_ON(!(mpic->flags & MPIC_PRIMARY));
 
 		DBG("mpic: mapping as timer\n");
@@ -1138,6 +1139,20 @@ static int mpic_reset_prohibited(struct device_node *node)
 	return node && of_get_property(node, "pic-no-reset", NULL);
 }
 
+static void mpic_alloc_int_sources(struct mpic *mpic, int intvec_top)
+{
+	int		i;
+	int		intvec;
+
+	intvec = intvec_top;
+
+	for (i = MPIC_MAX_IPI - 1; i >= 0; i--)
+		mpic->ipi_vecs[i] = --intvec;
+
+	for (i = MPIC_MAX_TIMER - 1; i >= 0; i--)
+		mpic->timer_vecs[i] = --intvec;
+}
+
 /*
  * Exported functions
  */
@@ -1192,18 +1207,6 @@ struct mpic * __init mpic_alloc(struct device_node *node,
 	else
 		intvec_top = 255;
 
-	mpic->timer_vecs[0] = intvec_top - 12;
-	mpic->timer_vecs[1] = intvec_top - 11;
-	mpic->timer_vecs[2] = intvec_top - 10;
-	mpic->timer_vecs[3] = intvec_top - 9;
-	mpic->timer_vecs[4] = intvec_top - 8;
-	mpic->timer_vecs[5] = intvec_top - 7;
-	mpic->timer_vecs[6] = intvec_top - 6;
-	mpic->timer_vecs[7] = intvec_top - 5;
-	mpic->ipi_vecs[0]   = intvec_top - 4;
-	mpic->ipi_vecs[1]   = intvec_top - 3;
-	mpic->ipi_vecs[2]   = intvec_top - 2;
-	mpic->ipi_vecs[3]   = intvec_top - 1;
 	mpic->spurious_vec  = intvec_top;
 
 	/* Check for "big-endian" in device-tree */
@@ -1344,6 +1347,8 @@ struct mpic * __init mpic_alloc(struct device_node *node,
 	}
 	mpic->isu_shift = 1 + __ilog2(mpic->isu_size - 1);
 	mpic->isu_mask = (1 << mpic->isu_shift) - 1;
+
+	mpic_alloc_int_sources(mpic, intvec_top);
 
 	mpic->irqhost = irq_alloc_host(node, IRQ_HOST_MAP_LINEAR,
 				       isu_size ? isu_size : mpic->num_sources,
