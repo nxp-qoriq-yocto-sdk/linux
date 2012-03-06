@@ -17,6 +17,10 @@
  *		Jos Vos		:	Call forward firewall after routing
  *					(always use output device).
  *		Mike McLagan	:	Routing by source
+ *		Jianhua Xie	:	Add a cache path before call
+ *					ip_forward_finish.
+ *
+ *		Copyright 2009-2012 Freescale Semiconductor, Inc.
  */
 
 #include <linux/types.h>
@@ -38,6 +42,7 @@
 #include <linux/route.h>
 #include <net/route.h>
 #include <net/xfrm.h>
+#include <linux/l3_firewall_cache.h>
 
 static int ip_forward_finish(struct sk_buff *skb)
 {
@@ -56,6 +61,9 @@ int ip_forward(struct sk_buff *skb)
 	struct iphdr *iph;	/* Our header */
 	struct rtable *rt;	/* Route we use */
 	struct ip_options * opt	= &(IPCB(skb)->opt);
+#ifdef CONFIG_L3_FIREWALL_CACHE
+	int verdict;
+#endif
 
 	if (skb_warn_if_lro(skb))
 		goto drop;
@@ -120,6 +128,28 @@ int ip_forward(struct sk_buff *skb)
 
 	skb->priority = rt_tos2priority(iph->tos);
 
+#ifdef CONFIG_L3_FIREWALL_CACHE
+	verdict = search_from_firewall_cache(NFPROTO_IPV4, NF_INET_FORWARD, skb,
+				skb->dev, rt->dst.dev,	p_l3_firewall_cache);
+
+	if (NF_NOTFOUND == verdict) {
+		/* if not found or acceleration disabled,
+		 * go along the old path */
+		return NF_HOOK(NFPROTO_IPV4, NF_INET_FORWARD, skb,
+				skb->dev, rt->dst.dev, ip_forward_finish);
+
+	} else if (verdict == NF_ACCEPT || verdict == NF_STOP) {
+		/* skip to the filtering patch */
+		return ip_forward_finish(skb);
+	} else {
+		/* We only recorded 3 kinds of results,
+		 * NF_ACCEPT, NF_STOP, NF DROP.
+		 * NF_DROP will be processed.
+		 * we don't accelorate NF_QUEUE
+		 */
+		goto drop;
+	}
+#endif  /* end CONFIG_L3_FIREWALL_CACHE */
 	return NF_HOOK(NFPROTO_IPV4, NF_INET_FORWARD, skb, skb->dev,
 		       rt->dst.dev, ip_forward_finish);
 

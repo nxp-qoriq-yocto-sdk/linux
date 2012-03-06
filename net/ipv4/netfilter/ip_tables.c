@@ -3,6 +3,7 @@
  *
  * Copyright (C) 1999 Paul `Rusty' Russell & Michael J. Neuling
  * Copyright (C) 2000-2005 Netfilter Core Team <coreteam@netfilter.org>
+ * Copyright (C) 2012 Freescale Semiconductor, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -29,6 +30,7 @@
 #include <linux/netfilter_ipv4/ip_tables.h>
 #include <net/netfilter/nf_log.h>
 #include "../../netfilter/xt_repldata.h"
+#include <linux/l3_firewall_cache.h>
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Netfilter Core Team <coreteam@netfilter.org>");
@@ -1870,6 +1872,9 @@ compat_do_ipt_set_ctl(struct sock *sk,	int cmd, void __user *user,
 	switch (cmd) {
 	case IPT_SO_SET_REPLACE:
 		ret = compat_do_replace(sock_net(sk), user, len);
+#ifdef CONFIG_L3_FIREWALL_CACHE
+		init_l3_firewall_cache();
+#endif  /* endif CONFIG_L3_FIREWALL_CACHE */
 		break;
 
 	case IPT_SO_SET_ADD_COUNTERS:
@@ -2007,6 +2012,10 @@ do_ipt_set_ctl(struct sock *sk, int cmd, void __user *user, unsigned int len)
 	switch (cmd) {
 	case IPT_SO_SET_REPLACE:
 		ret = do_replace(sock_net(sk), user, len);
+#ifdef CONFIG_L3_FIREWALL_CACHE
+		init_l3_firewall_cache();
+#endif  /* endif CONFIG_L3_FIREWALL_CACHE */
+
 		break;
 
 	case IPT_SO_SET_ADD_COUNTERS:
