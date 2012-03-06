@@ -5,6 +5,7 @@
  * way.
  *
  * Rusty Russell (C)2000 -- This code is GPL.
+ * Copyright (C) 2012 Freescale Semiconductor, Inc.
  */
 #include <linux/kernel.h>
 #include <linux/netfilter.h>
@@ -23,6 +24,7 @@
 #include <linux/locallock.h>
 #include <net/net_namespace.h>
 #include <net/sock.h>
+#include <linux/l3_firewall_cache.h>
 
 #include "nf_internals.h"
 
@@ -181,6 +183,16 @@ next_hook:
 	if (verdict == NF_ACCEPT || verdict == NF_STOP) {
 		ret = 1;
 	} else if ((verdict & NF_VERDICT_MASK) == NF_DROP) {
+#ifdef CONFIG_L3_FIREWALL_CACHE
+		/* I am only interested in IPV4 and FORWARD infomations,
+		 * others go the old path pls.
+		 * DROP action should be cached as well.
+		 */
+		if ((pf == NFPROTO_IPV4) && (hook == NF_INET_FORWARD)) {
+			update_l3_firewall_cache(pf, hook, skb,	indev,
+					outdev, p_l3_firewall_cache, verdict);
+		}
+#endif  /* end CONFIG_L3_FIREWALL_CACHE */
 		kfree_skb(skb);
 		ret = NF_DROP_GETERR(verdict);
 		if (ret == 0)
@@ -198,6 +210,17 @@ next_hook:
 		}
 		ret = 0;
 	}
+#ifdef CONFIG_L3_FIREWALL_CACHE
+	/* I am only interested in IPV4 and FORWARD
+	 * informations, others go the old path.
+	 * here, we record NF_STOP||NF_ACCEPT action
+	 */
+	if ((pf == NFPROTO_IPV4) &&
+		(hook == NF_INET_FORWARD) && (ret != -EPERM)) {
+		update_l3_firewall_cache(pf, hook, skb, indev,
+					outdev,	p_l3_firewall_cache, verdict);
+	}
+#endif  /* end CONFIG_L3_FIREWALL_CACHE */
 	rcu_read_unlock();
 	return ret;
 }

@@ -63,7 +63,7 @@
 #include <net/ip_fib.h>
 #include <net/rtnetlink.h>
 #include <net/net_namespace.h>
-
+#include <linux/l3_firewall_cache.h>
 #include "fib_lookup.h"
 
 static struct ipv4_devconf ipv4_devconf = {
@@ -1532,6 +1532,9 @@ static int devinet_sysctl_forward(ctl_table *ctl, int write,
 			}
 			if (valp == &IPV4_DEVCONF_ALL(net, FORWARDING)) {
 				inet_forward_change(net);
+#ifdef CONFIG_L3_FIREWALL_CACHE
+				init_l3_firewall_cache();
+#endif  /* endif CONFIG_L3_FIREWALL_CACHE */
 			} else if (*valp) {
 				struct ipv4_devconf *cnf = ctl->extra1;
 				struct in_device *idev =

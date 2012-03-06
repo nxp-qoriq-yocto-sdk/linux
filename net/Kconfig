@@ -169,6 +169,36 @@ config NETFILTER_ADVANCED
 
 	  If unsure, say Y.
 
+config L3_FIREWALL_CACHE
+	bool "The 3rd level firewall cache configuration"
+	depends on FSL_SOC &&	IP_NF_FILTER && (!AS_FASTPATH)
+	default n
+	help
+	  This feature is added by Freescale.
+	  This module adds a soft cache to NAT/Firewall in order to
+	  improve the performance of L3 NAT/Firewall with rule-set
+	  basic filtering features. And now, it supports the following
+	  acceleration features:
+	  Ethernet Source MAC filtering,
+	  IPv4 Source IP/Destination IP filtering,
+	  TCP over IPv4 source port/destination port filtering,
+	  UDP over IPv4 source port/destination port filtering.
+	  This module does not accelerate IPv6 NAT/Firewall and
+	  remains all of the original IPv6 NAT/Firewall functions.
+	  The module works well with all kinds of Ethernet NICs,
+	  such as:
+	  ETSEC/vETSEC/DPAA-eth, PCIe NICs, USB NICs, Wireless NICs.
+	  If this feature has already been selected, in order to
+	  enable or disable the acceleration function dynamically
+	  at runtime, please refer to the following commands:
+	  enable:
+	  sysctl -w net.l3_firewall_cache_ctrl.ipv4_l3_firewall_cache_enable=1
+	  disable:
+	  sysctl -w net.l3_firewall_cache_ctrl.ipv4_l3_firewall_cache_enable=0
+	  or
+
+	  If unsure, say N.
+
 config BRIDGE_NETFILTER
 	bool "Bridged IP/ARP packets filtering"
 	depends on BRIDGE && NETFILTER && INET
