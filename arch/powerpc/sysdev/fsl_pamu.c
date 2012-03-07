@@ -39,6 +39,7 @@
 #include <linux/of_platform.h>
 #include <linux/io.h>
 #include <asm/fsl_guts.h>
+#include <asm/fsl_hcalls.h>
 
 /* PAMU CCSR space */
 #define PAMU_PGC 0x00000000     /* Allows all peripheral accesses */
@@ -335,6 +336,9 @@ struct ome {
 static struct ppaace *ppaact;
 static phys_addr_t ppaact_phys;
 
+/* TRUE if we're running under the Freescale hypervisor */
+bool has_fsl_hypervisor;
+
 #define PAACT_SIZE              (sizeof(struct ppaace) * PAACE_NUMBER_ENTRIES)
 #define OMT_SIZE                (sizeof(struct ome) * OME_NUMBER_ENTRIES)
 
@@ -437,6 +441,27 @@ int pamu_set_stash_dest(struct device_node *node, unsigned int index,
 	int liodn;
 	const u32 *prop;
 	unsigned int i;
+
+	/* If we're running under a support hypervisor, make an hcall instead */
+	if (has_fsl_hypervisor) {
+		struct fh_dma_attr_stash attr;
+		phys_addr_t paddr = virt_to_phys(&attr);
+		int handle;
+
+		handle = of_read_indexed_number(node, "fsl,hv-dma-handle",
+						index);
+
+		if (handle < 0)
+			return -EINVAL;
+
+		attr.vcpu = cpu;
+		attr.cache = cache_level;
+
+		if (fh_dma_attr_set(handle, FSL_PAMU_ATTR_STASH, paddr))
+			return -EINVAL;
+
+		return 0;
+	}
 
 	liodn = of_read_indexed_number(node, "fsl,liodn", index);
 	if (liodn < 0)
@@ -850,6 +875,25 @@ static struct platform_driver fsl_of_pamu_driver = {
 	.probe = fsl_pamu_probe,
 };
 
+static bool is_fsl_hypervisor(void)
+{
+	struct device_node *np;
+	struct property *prop;
+
+	np = of_find_node_by_path("/hypervisor");
+	if (!np)
+		return false;
+
+	prop = of_find_property(np, "fsl,has-stash-attr-hcall", NULL);
+	of_node_put(np);
+
+	if (!prop)
+		pr_notice("fsl-pamu: this hypervisor does not support the "
+			"stash attribute hypercall\n");
+
+	return !!prop;
+}
+
 static __init int fsl_pamu_init(void)
 {
 	struct platform_device *pdev = NULL;
@@ -877,6 +921,13 @@ static __init int fsl_pamu_init(void)
 
 	np = of_find_compatible_node(NULL, NULL, "fsl,pamu");
 	if (!np) {
+		/* No PAMU nodes, so check for a hypervisor */
+		if (is_fsl_hypervisor()) {
+			has_fsl_hypervisor = true;
+			/* Remain resident, but we don't need a platform */
+			return 0;
+		}
+
 		pr_err("fsl-pamu: could not find a PAMU node\n");
 		return -ENODEV;
 	}
