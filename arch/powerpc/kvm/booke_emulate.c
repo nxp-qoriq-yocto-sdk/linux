@@ -13,7 +13,6 @@
  * Foundation, 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  * Copyright IBM Corp. 2008
- * Copyright 2011 Freescale Semiconductor, Inc.
  *
  * Authors: Hollis Blanchard <hollisb@us.ibm.com>
  */
@@ -116,14 +115,10 @@ int kvmppc_booke_emulate_mtspr(struct kvm_vcpu *vcpu, int sprn, int rs)
 	case SPRN_DBSR:
 		vcpu->arch.dbsr &= ~spr_val; break;
 	case SPRN_TSR:
-		kvmppc_clr_tsr_bits(vcpu, spr_val);
-		break;
+		vcpu->arch.tsr &= ~spr_val; break;
 	case SPRN_TCR:
-		/* WRC can only be programmed when WRC=0 */
-		if (TCR_WRC_MASK & vcpu->arch.tcr)
-			spr_val &= ~TCR_WRC_MASK;
-		kvmppc_set_tcr(vcpu,
-		               spr_val | (TCR_WRC_MASK & vcpu->arch.tcr));
+		vcpu->arch.tcr = spr_val;
+		kvmppc_emulate_dec(vcpu);
 		break;
 
 	/* Note: SPRG4-7 are user-readable. These values are
@@ -214,10 +209,6 @@ int kvmppc_booke_emulate_mfspr(struct kvm_vcpu *vcpu, int sprn, int rt)
 		kvmppc_set_gpr(vcpu, rt, vcpu->arch.dbcr1); break;
 	case SPRN_DBSR:
 		kvmppc_set_gpr(vcpu, rt, vcpu->arch.dbsr); break;
-	case SPRN_TSR:
-		kvmppc_set_gpr(vcpu, rt, vcpu->arch.tsr); break;
-	case SPRN_TCR:
-		kvmppc_set_gpr(vcpu, rt, vcpu->arch.tcr); break;
 
 	case SPRN_IVOR0:
 		kvmppc_set_gpr(vcpu, rt, vcpu->arch.ivor[BOOKE_IRQPRIO_CRITICAL]);
