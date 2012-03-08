@@ -128,11 +128,6 @@ void kvmppc_core_dequeue_dec(struct kvm_vcpu *vcpu)
 	clear_bit(BOOKE_IRQPRIO_DECREMENTER, &vcpu->arch.pending_exceptions);
 }
 
-void kvmppc_set_msr(struct kvm_vcpu *vcpu, u32 new_msr)
-{
-	vcpu->arch.shared->msr = new_msr;
-}
-
 void kvmppc_core_queue_external(struct kvm_vcpu *vcpu,
                                 struct kvm_interrupt *irq)
 {
@@ -277,7 +272,7 @@ static int kvmppc_bookehv_irqprio_deliver(struct kvm_vcpu *vcpu,
 			mtspr(SPRN_GESR, vcpu->arch.queued_esr);
 		if (update_dear == true)
 			mtspr(SPRN_GDEAR, vcpu->arch.queued_dear);
-		kvmppc_set_msr(vcpu, vcpu->arch.shared->msr & msr_mask);
+		vcpu->arch.shared->msr &= msr_mask;
 
 #ifdef CONFIG_KVM_MPIC
 		/* Set the guest exception proxy register */
@@ -727,7 +722,7 @@ int kvm_arch_vcpu_ioctl_set_regs(struct kvm_vcpu *vcpu, struct kvm_regs *regs)
 	int i;
 
 	vcpu->arch.pc = regs->pc;
-	kvmppc_set_msr(vcpu, regs->msr);
+	vcpu->arch.shared->msr = regs->msr;
 	kvmppc_set_cr(vcpu, regs->cr);
 	vcpu->arch.ctr = regs->ctr;
 	vcpu->arch.lr = regs->lr;
