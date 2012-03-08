@@ -242,6 +242,7 @@ struct kvm_vcpu_arch {
 	ulong mcsrr0;
 	ulong mcsrr1;
 	ulong mcsr;
+	ulong esr;
 	u32 dec;
 	u32 decar;
 	u32 tbl;
@@ -250,6 +251,7 @@ struct kvm_vcpu_arch {
 	u32 tsr;
 	u32 ivor[64];
 	ulong ivpr;
+	u32 pir;
 	u32 pvr;
 
 	u32 shadow_pid;
