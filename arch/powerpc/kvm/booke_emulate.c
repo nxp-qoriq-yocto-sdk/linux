@@ -174,10 +174,6 @@ int kvmppc_booke_emulate_mtspr(struct kvm_vcpu *vcpu, int sprn, int rs)
 	case SPRN_SPRG7:
 		vcpu->arch.sprg7 = spr_val; break;
 #endif
-#ifdef CONFIG_KVM_BOOKE_HV
-	case SPRN_SPRG8:
-		vcpu->arch.sprg8 = spr_val; break;
-#endif
 	case SPRN_CSRR0:
 		vcpu->arch.csrr0 = spr_val; break;
 	case SPRN_CSRR1:
@@ -333,10 +329,6 @@ int kvmppc_booke_emulate_mfspr(struct kvm_vcpu *vcpu, int sprn, int rt)
 		kvmppc_set_gpr(vcpu, rt, vcpu->arch.shared->dar); break;
 	case SPRN_ESR:
 		kvmppc_set_gpr(vcpu, rt, vcpu->arch.shared->esr); break;
-#endif
-#ifdef CONFIG_KVM_BOOKE_HV
-	case SPRN_SPRG8:
-		kvmppc_set_gpr(vcpu, rt, vcpu->arch.sprg8); break;
 #endif
 	case SPRN_CSRR0:
 		kvmppc_set_gpr(vcpu, rt, vcpu->arch.csrr0); break;
