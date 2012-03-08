@@ -12,7 +12,6 @@
  * published by the Free Software Foundation.
  */
 
-#include <linux/kernel.h>
 #include <linux/types.h>
 #include <linux/slab.h>
 #include <linux/string.h>
@@ -27,7 +26,7 @@
 #include "trace.h"
 #include "timing.h"
 
-#define to_htlb1_esel(esel) (tlb_host_entries[1] - (esel) - 1)
+#define to_htlb1_esel(esel) (tlb1_entry_num - (esel) - 1)
 
 struct id {
 	unsigned long val;
@@ -64,9 +63,7 @@ static DEFINE_PER_CPU(struct pcpu_id_table, pcpu_sids);
  * The valid range of shadow ID is [1..255] */
 static DEFINE_PER_CPU(unsigned long, pcpu_last_used_sid);
 
-static unsigned int tlb_host_entries[2];
-static unsigned int tlb_host_ways[2];
-static unsigned int tlb_host_sets[2];
+static unsigned int tlb1_entry_num;
 
 /*
  * Allocate a free shadow id and setup a valid sid mapping in given entry.
@@ -240,7 +237,7 @@ void kvmppc_dump_tlbs(struct kvm_vcpu *vcpu)
 	}
 }
 
-static inline unsigned int gtlb0_get_next_victim(
+static inline unsigned int tlb0_get_next_victim(
 		struct kvmppc_vcpu_e500 *vcpu_e500)
 {
 	unsigned int victim;
@@ -255,7 +252,7 @@ static inline unsigned int gtlb0_get_next_victim(
 static inline unsigned int tlb1_max_shadow_size(void)
 {
 	/* reserve one entry for magic page */
-	return tlb_host_entries[1] - tlbcam_index - 1;
+	return tlb1_entry_num - tlbcam_index - 1;
 }
 
 static inline int tlbe_is_writable(struct tlbe *tlbe)
@@ -305,12 +302,13 @@ static inline void __write_host_tlbe(struct tlbe *stlbe, uint32_t mas0)
 	local_irq_restore(flags);
 }
 
-/* esel is index into set, not whole array */
 static inline void write_host_tlbe(struct kvmppc_vcpu_e500 *vcpu_e500,
 		int tlbsel, int esel, struct tlbe *stlbe)
 {
 	if (tlbsel == 0) {
-		__write_host_tlbe(stlbe, MAS0_TLBSEL(0) | MAS0_ESEL(esel));
+		__write_host_tlbe(stlbe,
+				  MAS0_TLBSEL(0) |
+				  MAS0_ESEL(esel & (KVM_E500_TLB0_WAY_NUM - 1)));
 	} else {
 		__write_host_tlbe(stlbe,
 				  MAS0_TLBSEL(1) |
@@ -357,8 +355,8 @@ void kvmppc_e500_tlb_put(struct kvm_vcpu *vcpu)
 {
 }
 
-static void inval_gtlbe_on_host(struct kvmppc_vcpu_e500 *vcpu_e500,
-				int tlbsel, int esel)
+static void kvmppc_e500_stlbe_invalidate(struct kvmppc_vcpu_e500 *vcpu_e500,
+					 int tlbsel, int esel)
 {
 	struct tlbe *gtlbe = &vcpu_e500->gtlb_arch[tlbsel][esel];
 	struct vcpu_id_table *idt = vcpu_e500->idt;
@@ -414,52 +412,18 @@ static void inval_gtlbe_on_host(struct kvmppc_vcpu_e500 *vcpu_e500,
 	preempt_enable();
 }
 
-static int tlb0_set_base(gva_t addr, int sets, int ways)
-{
-	int set_base;
-
-	set_base = (addr >> PAGE_SHIFT) & (sets - 1);
-	set_base *= ways;
-
-	return set_base;
-}
-
-static int gtlb0_set_base(struct kvmppc_vcpu_e500 *vcpu_e500, gva_t addr)
-{
-	int sets = KVM_E500_TLB0_SIZE / KVM_E500_TLB0_WAY_NUM;
-
-	return tlb0_set_base(addr, sets, KVM_E500_TLB0_WAY_NUM);
-}
-
-static int htlb0_set_base(gva_t addr)
-{
-	return tlb0_set_base(addr, tlb_host_sets[0], tlb_host_ways[0]);
-}
-
-static unsigned int get_tlb_esel(struct kvmppc_vcpu_e500 *vcpu_e500, int tlbsel)
-{
-	unsigned int esel = get_tlb_esel_bit(vcpu_e500);
-
-	if (tlbsel == 0) {
-		esel &= KVM_E500_TLB0_WAY_NUM_MASK;
-		esel += gtlb0_set_base(vcpu_e500, vcpu_e500->mas2);
-	} else {
-		esel &= vcpu_e500->gtlb_size[tlbsel] - 1;
-	}
-
-	return esel;
-}
-
 /* Search the guest TLB for a matching entry. */
 static int kvmppc_e500_tlb_index(struct kvmppc_vcpu_e500 *vcpu_e500,
 		gva_t eaddr, int tlbsel, unsigned int pid, int as)
 {
 	int size = vcpu_e500->gtlb_size[tlbsel];
-	unsigned int set_base;
+	int set_base;
 	int i;
 
 	if (tlbsel == 0) {
-		set_base = gtlb0_set_base(vcpu_e500, eaddr);
+		int mask = size / KVM_E500_TLB0_WAY_NUM - 1;
+		set_base = (eaddr >> PAGE_SHIFT) & mask;
+		set_base *= KVM_E500_TLB0_WAY_NUM;
 		size = KVM_E500_TLB0_WAY_NUM;
 	} else {
 		set_base = 0;
@@ -491,53 +455,27 @@ static int kvmppc_e500_tlb_index(struct kvmppc_vcpu_e500 *vcpu_e500,
 	return -1;
 }
 
-static inline void kvmppc_e500_ref_setup(struct tlbe_ref *ref,
-					 struct tlbe *gtlbe,
-					 pfn_t pfn)
+static inline void kvmppc_e500_priv_setup(struct tlbe_priv *priv,
+					  struct tlbe *gtlbe,
+					  pfn_t pfn)
 {
-	ref->pfn = pfn;
-	ref->flags = E500_TLB_VALID;
+	priv->pfn = pfn;
+	priv->flags = E500_TLB_VALID;
 
 	if (tlbe_is_writable(gtlbe))
-		ref->flags |= E500_TLB_DIRTY;
+		priv->flags |= E500_TLB_DIRTY;
 }
 
-static inline void kvmppc_e500_ref_release(struct tlbe_ref *ref)
+static inline void kvmppc_e500_priv_release(struct tlbe_priv *priv)
 {
-	if (ref->flags & E500_TLB_VALID) {
-		if (ref->flags & E500_TLB_DIRTY)
-			kvm_release_pfn_dirty(ref->pfn);
+	if (priv->flags & E500_TLB_VALID) {
+		if (priv->flags & E500_TLB_DIRTY)
+			kvm_release_pfn_dirty(priv->pfn);
 		else
-			kvm_release_pfn_clean(ref->pfn);
+			kvm_release_pfn_clean(priv->pfn);
 
-		ref->flags = 0;
+		priv->flags = 0;
 	}
-}
-
-static void clear_tlb_privs(struct kvmppc_vcpu_e500 *vcpu_e500)
-{
-	int tlbsel = 0;
-	int i;
-
-	for (i = 0; i < vcpu_e500->gtlb_size[tlbsel]; i++) {
-		struct tlbe_ref *ref =
-			&vcpu_e500->gtlb_priv[tlbsel][i].ref;
-		kvmppc_e500_ref_release(ref);
-	}
-}
-
-static void clear_tlb_refs(struct kvmppc_vcpu_e500 *vcpu_e500)
-{
-	int stlbsel = 1;
-	int i;
-
-	for (i = 0; i < tlb_host_entries[stlbsel]; i++) {
-		struct tlbe_ref *ref =
-			&vcpu_e500->tlb_refs[stlbsel][i];
-		kvmppc_e500_ref_release(ref);
-	}
-
-	clear_tlb_privs(vcpu_e500);
 }
 
 static inline void kvmppc_e500_deliver_tlb_miss(struct kvm_vcpu *vcpu,
@@ -549,7 +487,7 @@ static inline void kvmppc_e500_deliver_tlb_miss(struct kvm_vcpu *vcpu,
 
 	/* since we only have two TLBs, only lower bit is used. */
 	tlbsel = (vcpu_e500->mas4 >> 28) & 0x1;
-	victim = (tlbsel == 0) ? gtlb0_get_next_victim(vcpu_e500) : 0;
+	victim = (tlbsel == 0) ? tlb0_get_next_victim(vcpu_e500) : 0;
 	pidsel = (vcpu_e500->mas4 >> 16) & 0xf;
 	tsized = (vcpu_e500->mas4 >> 7) & 0x1f;
 
@@ -570,12 +508,10 @@ static inline void kvmppc_e500_deliver_tlb_miss(struct kvm_vcpu *vcpu,
 /* TID must be supplied by the caller */
 static inline void kvmppc_e500_setup_stlbe(struct kvmppc_vcpu_e500 *vcpu_e500,
 					   struct tlbe *gtlbe, int tsize,
-					   struct tlbe_ref *ref,
+					   struct tlbe_priv *priv,
 					   u64 gvaddr, struct tlbe *stlbe)
 {
-	pfn_t pfn = ref->pfn;
-
-	BUG_ON(!(ref->flags & E500_TLB_VALID));
+	pfn_t pfn = priv->pfn;
 
 	/* Force TS=1 IPROT=0 for all guest mappings. */
 	stlbe->mas1 = MAS1_TSIZE(tsize) | MAS1_TS | MAS1_VALID;
@@ -588,15 +524,16 @@ static inline void kvmppc_e500_setup_stlbe(struct kvmppc_vcpu_e500 *vcpu_e500,
 	stlbe->mas7 = (pfn >> (32 - PAGE_SHIFT)) & MAS7_RPN;
 }
 
-/* sesel is an index into the entire array, not just the set */
+
 static inline void kvmppc_e500_shadow_map(struct kvmppc_vcpu_e500 *vcpu_e500,
-	u64 gvaddr, gfn_t gfn, struct tlbe *gtlbe, int tlbsel, int sesel,
-	struct tlbe *stlbe, struct tlbe_ref *ref)
+	u64 gvaddr, gfn_t gfn, struct tlbe *gtlbe, int tlbsel, int esel,
+	struct tlbe *stlbe)
 {
 	struct kvm_memory_slot *slot;
 	unsigned long pfn, hva;
 	int pfnmap = 0;
 	int tsize = BOOK3E_PAGESZ_4K;
+	struct tlbe_priv *priv;
 
 	/*
 	 * Translate guest physical to true physical, acquiring
@@ -692,11 +629,12 @@ static inline void kvmppc_e500_shadow_map(struct kvmppc_vcpu_e500 *vcpu_e500,
 		}
 	}
 
-	/* Drop old ref and setup new one. */
-	kvmppc_e500_ref_release(ref);
-	kvmppc_e500_ref_setup(ref, gtlbe, pfn);
+	/* Drop old priv and setup new one. */
+	priv = &vcpu_e500->gtlb_priv[tlbsel][esel];
+	kvmppc_e500_priv_release(priv);
+	kvmppc_e500_priv_setup(priv, gtlbe, pfn);
 
-	kvmppc_e500_setup_stlbe(vcpu_e500, gtlbe, tsize, ref, gvaddr, stlbe);
+	kvmppc_e500_setup_stlbe(vcpu_e500, gtlbe, tsize, priv, gvaddr, stlbe);
 }
 
 /* XXX only map the one-one case, for now use TLB0 */
@@ -704,22 +642,14 @@ static int kvmppc_e500_tlb0_map(struct kvmppc_vcpu_e500 *vcpu_e500,
 				int esel, struct tlbe *stlbe)
 {
 	struct tlbe *gtlbe;
-	struct tlbe_ref *ref;
-	int sesel = esel & (tlb_host_ways[0] - 1);
-	int sesel_base;
-	gva_t ea;
 
 	gtlbe = &vcpu_e500->gtlb_arch[0][esel];
-	ref = &vcpu_e500->gtlb_priv[0][esel].ref;
-
-	ea = get_tlb_eaddr(gtlbe);
-	sesel_base = htlb0_set_base(ea);
 
 	kvmppc_e500_shadow_map(vcpu_e500, get_tlb_eaddr(gtlbe),
 			get_tlb_raddr(gtlbe) >> PAGE_SHIFT,
-			gtlbe, 0, sesel_base + sesel, stlbe, ref);
+			gtlbe, 0, esel, stlbe);
 
-	return sesel;
+	return esel;
 }
 
 /* Caller must ensure that the specified guest TLB entry is safe to insert into
@@ -728,17 +658,14 @@ static int kvmppc_e500_tlb0_map(struct kvmppc_vcpu_e500 *vcpu_e500,
 static int kvmppc_e500_tlb1_map(struct kvmppc_vcpu_e500 *vcpu_e500,
 		u64 gvaddr, gfn_t gfn, struct tlbe *gtlbe, struct tlbe *stlbe)
 {
-	struct tlbe_ref *ref;
 	unsigned int victim;
 
-	victim = vcpu_e500->host_tlb1_nv++;
+	victim = vcpu_e500->gtlb_nv[1]++;
 
-	if (unlikely(vcpu_e500->host_tlb1_nv >= tlb1_max_shadow_size()))
-		vcpu_e500->host_tlb1_nv = 0;
+	if (unlikely(vcpu_e500->gtlb_nv[1] >= tlb1_max_shadow_size()))
+		vcpu_e500->gtlb_nv[1] = 0;
 
-	ref = &vcpu_e500->tlb_refs[1][victim];
-	kvmppc_e500_shadow_map(vcpu_e500, gvaddr, gfn, gtlbe, 1,
-			       victim, stlbe, ref);
+	kvmppc_e500_shadow_map(vcpu_e500, gvaddr, gfn, gtlbe, 1, victim, stlbe);
 
 	return victim;
 }
@@ -868,7 +795,7 @@ int kvmppc_e500_emul_tlbsx(struct kvm_vcpu *vcpu, int rb)
 
 		/* since we only have two TLBs, only lower bit is used. */
 		tlbsel = vcpu_e500->mas4 >> 28 & 0x1;
-		victim = (tlbsel == 0) ? gtlb0_get_next_victim(vcpu_e500) : 0;
+		victim = (tlbsel == 0) ? tlb0_get_next_victim(vcpu_e500) : 0;
 
 		vcpu_e500->mas0 = MAS0_TLBSEL(tlbsel) | MAS0_ESEL(victim)
 			| MAS0_NV(vcpu_e500->gtlb_nv[tlbsel]);
@@ -915,7 +842,7 @@ int kvmppc_e500_emul_tlbwe(struct kvm_vcpu *vcpu)
 	gtlbe = &vcpu_e500->gtlb_arch[tlbsel][esel];
 
 	if (get_tlb_v(gtlbe))
-		inval_gtlbe_on_host(vcpu_e500, tlbsel, esel);
+		kvmppc_e500_stlbe_invalidate(vcpu_e500, tlbsel, esel);
 
 	gtlbe->mas1 = vcpu_e500->mas1;
 	gtlbe->mas2 = vcpu_e500->mas2;
@@ -1026,11 +953,11 @@ void kvmppc_mmu_map(struct kvm_vcpu *vcpu, u64 eaddr, gpa_t gpaddr,
 	switch (tlbsel) {
 	case 0:
 		stlbsel = 0;
-		sesel = esel & (tlb_host_ways[0] - 1);
-		priv = &vcpu_e500->gtlb_priv[tlbsel][esel];
+		sesel = esel;
+		priv = &vcpu_e500->gtlb_priv[stlbsel][sesel];
 
 		kvmppc_e500_setup_stlbe(vcpu_e500, gtlbe, BOOK3E_PAGESZ_4K,
-					&priv->ref, eaddr, &stlbe);
+					priv, eaddr, &stlbe);
 		break;
 
 	case 1: {
@@ -1096,73 +1023,32 @@ void kvmppc_e500_tlb_setup(struct kvmppc_vcpu_e500 *vcpu_e500)
 
 int kvmppc_e500_tlb_init(struct kvmppc_vcpu_e500 *vcpu_e500)
 {
-	tlb_host_entries[0] = mfspr(SPRN_TLB0CFG) & TLBnCFG_N_ENTRY;
-	tlb_host_entries[1] = mfspr(SPRN_TLB1CFG) & TLBnCFG_N_ENTRY;
-
-	/*
-	 * This should never happen on real e500 hardware, but is
-	 * architecturally possible -- e.g. in some weird nested
-	 * virtualization case.
-	 */
-	if (tlb_host_entries[0] == 0 || tlb_host_entries[1] == 0) {
-		pr_err("%s: need to know host tlb size\n", __func__);
-		return -ENODEV;
-	}
-
-	tlb_host_ways[0] = (mfspr(SPRN_TLB0CFG) & TLBnCFG_ASSOC) >>
-			   TLBnCFG_ASSOC_SHIFT;
-	tlb_host_ways[1] = tlb_host_entries[1];
-
-	if (!is_power_of_2(tlb_host_entries[0]) ||
-	    !is_power_of_2(tlb_host_ways[0]) ||
-	    tlb_host_entries[0] < tlb_host_ways[0] ||
-	    tlb_host_ways[0] == 0) {
-		pr_err("%s: bad tlb0 host config: %u entries %u ways\n",
-		       __func__, tlb_host_entries[0], tlb_host_ways[0]);
-		return -ENODEV;
-	}
-
-	tlb_host_sets[0] = tlb_host_entries[0] / tlb_host_ways[0];
-	tlb_host_sets[1] = 1;
+	tlb1_entry_num = mfspr(SPRN_TLB1CFG) & 0xFFF;
 
 	vcpu_e500->gtlb_size[0] = KVM_E500_TLB0_SIZE;
 	vcpu_e500->gtlb_arch[0] =
 		kzalloc(sizeof(struct tlbe) * KVM_E500_TLB0_SIZE, GFP_KERNEL);
 	if (vcpu_e500->gtlb_arch[0] == NULL)
-		goto err;
+		goto err_out;
 
 	vcpu_e500->gtlb_size[1] = KVM_E500_TLB1_SIZE;
 	vcpu_e500->gtlb_arch[1] =
 		kzalloc(sizeof(struct tlbe) * KVM_E500_TLB1_SIZE, GFP_KERNEL);
 	if (vcpu_e500->gtlb_arch[1] == NULL)
-		goto err;
+		goto err_out_guest0;
 
-	vcpu_e500->tlb_refs[0] =
-		kzalloc(sizeof(struct tlbe_ref) * tlb_host_entries[0],
-			GFP_KERNEL);
-	if (!vcpu_e500->tlb_refs[0])
-		goto err;
+	vcpu_e500->gtlb_priv[0] = (struct tlbe_priv *)
+		kzalloc(sizeof(struct tlbe_priv) * KVM_E500_TLB0_SIZE, GFP_KERNEL);
+	if (vcpu_e500->gtlb_priv[0] == NULL)
+		goto err_out_guest1;
+	vcpu_e500->gtlb_priv[1] = (struct tlbe_priv *)
+		kzalloc(sizeof(struct tlbe_priv) * KVM_E500_TLB1_SIZE, GFP_KERNEL);
 
-	vcpu_e500->tlb_refs[1] =
-		kzalloc(sizeof(struct tlbe_ref) * tlb_host_entries[1],
-			GFP_KERNEL);
-	if (!vcpu_e500->tlb_refs[1])
-		goto err;
-
-	vcpu_e500->gtlb_priv[0] =
-		kzalloc(sizeof(struct tlbe_ref) * vcpu_e500->gtlb_size[0],
-			GFP_KERNEL);
-	if (!vcpu_e500->tlb_refs[0])
-		goto err;
-
-	vcpu_e500->gtlb_priv[1] =
-		kzalloc(sizeof(struct tlbe_ref) * vcpu_e500->gtlb_size[1],
-			GFP_KERNEL);
-	if (!vcpu_e500->tlb_refs[1])
-		goto err;
+	if (vcpu_e500->gtlb_priv[1] == NULL)
+		goto err_out_priv0;
 
 	if (kvmppc_e500_id_table_alloc(vcpu_e500) == NULL)
-		goto err;
+		goto err_out_priv1;
 
 	/* Init TLB configuration register */
 	vcpu_e500->tlb0cfg = mfspr(SPRN_TLB0CFG) & ~0xfffUL;
@@ -1172,26 +1058,31 @@ int kvmppc_e500_tlb_init(struct kvmppc_vcpu_e500 *vcpu_e500)
 
 	return 0;
 
-err:
-	kfree(vcpu_e500->tlb_refs[0]);
-	kfree(vcpu_e500->tlb_refs[1]);
-	kfree(vcpu_e500->gtlb_priv[0]);
+err_out_priv1:
 	kfree(vcpu_e500->gtlb_priv[1]);
-	kfree(vcpu_e500->gtlb_arch[0]);
+err_out_priv0:
+	kfree(vcpu_e500->gtlb_priv[0]);
+err_out_guest1:
 	kfree(vcpu_e500->gtlb_arch[1]);
+err_out_guest0:
+	kfree(vcpu_e500->gtlb_arch[0]);
+err_out:
 	return -1;
 }
 
 void kvmppc_e500_tlb_uninit(struct kvmppc_vcpu_e500 *vcpu_e500)
 {
-	clear_tlb_refs(vcpu_e500);
+	int stlbsel, i;
+
+	/* release all privs */
+	for (stlbsel = 0; stlbsel < 2; stlbsel++)
+		for (i = 0; i < vcpu_e500->gtlb_size[stlbsel]; i++) {
+			struct tlbe_priv *priv =
+				&vcpu_e500->gtlb_priv[stlbsel][i];
+			kvmppc_e500_priv_release(priv);
+		}
 
 	kvmppc_e500_id_table_free(vcpu_e500);
-
-	kfree(vcpu_e500->tlb_refs[0]);
-	kfree(vcpu_e500->tlb_refs[1]);
-	kfree(vcpu_e500->gtlb_priv[0]);
-	kfree(vcpu_e500->gtlb_priv[1]);
 	kfree(vcpu_e500->gtlb_arch[1]);
 	kfree(vcpu_e500->gtlb_arch[0]);
 }
