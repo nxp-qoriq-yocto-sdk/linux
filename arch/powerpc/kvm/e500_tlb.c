@@ -113,9 +113,6 @@ static inline void __write_host_tlbe(struct kvm_book3e_206_tlb_entry *stlbe,
 	isync();
 #endif
 	local_irq_restore(flags);
-
-	trace_kvm_booke206_stlb_write(mas0, stlbe->mas8, stlbe->mas1,
-	                              stlbe->mas2, stlbe->mas7_3);
 }
 
 /* esel is index into set, not whole array */
@@ -130,6 +127,8 @@ static inline void write_host_tlbe(struct kvmppc_vcpu_e500 *vcpu_e500,
 				  MAS0_TLBSEL(1) |
 				  MAS0_ESEL(to_htlb1_esel(esel)));
 	}
+	trace_kvm_stlb_write(index_of(tlbsel, esel), stlbe->mas1, stlbe->mas2,
+			     (u32)stlbe->mas7_3, (u32)(stlbe->mas7_3 >> 32));
 }
 
 #ifdef CONFIG_KVM_E500
@@ -856,8 +855,8 @@ int kvmppc_e500_emul_tlbwe(struct kvm_vcpu *vcpu)
 	gtlbe->mas2 = vcpu->arch.shared->mas2;
 	gtlbe->mas7_3 = vcpu->arch.shared->mas7_3;
 
-	trace_kvm_booke206_gtlb_write(vcpu->arch.shared->mas0, gtlbe->mas1,
-	                              gtlbe->mas2, gtlbe->mas7_3);
+	trace_kvm_gtlb_write(vcpu->arch.shared->mas0, gtlbe->mas1, gtlbe->mas2,
+			     (u32)gtlbe->mas7_3, (u32)(gtlbe->mas7_3 >> 32));
 
 	/* Invalidate shadow mappings for the about-to-be-clobbered TLBE. */
 	if (tlbe_is_host_safe(vcpu, gtlbe)) {
