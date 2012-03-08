@@ -37,11 +37,6 @@ static inline unsigned int get_sprn(u32 inst)
 	return ((inst >> 16) & 0x1f) | ((inst >> 6) & 0x3e0);
 }
 
-static inline unsigned int get_pmrn(u32 inst)
-{
-	return ((inst >> 16) & 0x1f) | ((inst >> 6) & 0x3e0);
-}
-
 static inline unsigned int get_dcrn(u32 inst)
 {
 	return ((inst >> 16) & 0x1f) | ((inst >> 6) & 0x3e0);
