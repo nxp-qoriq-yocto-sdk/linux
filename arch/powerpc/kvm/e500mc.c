@@ -91,12 +91,6 @@ void kvmppc_core_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
 	struct kvmppc_vcpu_e500 *vcpu_e500 = to_e500(vcpu);
 
 	local_irq_disable();
-       current->thread.kvm_shadow_vcpu = vcpu;
-
-       /* Retore the PM Registers on VCPU load */
-       if (vcpu->arch.pm_is_reserved)
-		kvmppc_load_perfmon_regs(vcpu);
-
 	mtspr(SPRN_LPID, vcpu->arch.lpid);
 	mtspr(SPRN_EPCR, vcpu->arch.epcr);
 	mtspr(SPRN_GPIR, vcpu->arch.gpir);
@@ -131,7 +125,6 @@ void kvmppc_core_vcpu_put(struct kvm_vcpu *vcpu)
 	vcpu->arch.shared->sprg1 = mfspr(SPRN_GSPRG1);
 	vcpu->arch.shared->sprg2 = mfspr(SPRN_GSPRG2);
 	vcpu->arch.shared->sprg3 = mfspr(SPRN_GSPRG3);
-	vcpu->arch.msrp = mfspr(SPRN_MSRP);
 
 	vcpu->arch.shared->srr0 = mfspr(SPRN_GSRR0);
 	vcpu->arch.shared->srr1 = mfspr(SPRN_GSRR1);
@@ -141,11 +134,6 @@ void kvmppc_core_vcpu_put(struct kvm_vcpu *vcpu)
 	vcpu->arch.shared->esr = mfspr(SPRN_GESR);
 
 	vcpu->arch.oldpir = mfspr(SPRN_PIR);
-
-       if (vcpu->arch.pm_is_reserved)
-		kvmppc_save_perfmon_regs(vcpu);
-
-       current->thread.kvm_shadow_vcpu = NULL;
 }
 
 int kvmppc_core_check_processor_compat(void)
@@ -171,11 +159,7 @@ int kvmppc_core_vcpu_setup(struct kvm_vcpu *vcpu)
 
 	vcpu->arch.epcr = EPCR_DSIGS | EPCR_DGTMI | EPCR_DUVD;
 	vcpu->arch.gpir = 0;
-
-	if (vcpu->arch.pm_is_reserved)
-		vcpu->arch.msrp = MSRP_UCLEP | MSRP_DEP;
-	else
-		vcpu->arch.msrp = MSRP_UCLEP | MSRP_DEP | MSRP_PMMP;
+	vcpu->arch.msrp = MSRP_UCLEP | MSRP_DEP | MSRP_PMMP;
 
 	/* Registers init */
 	vcpu->arch.pvr = mfspr(SPRN_PVR);
