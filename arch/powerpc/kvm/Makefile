@@ -23,7 +23,6 @@ AFLAGS_booke_interrupts.o := -I$(obj)
 kvm-440-objs := \
 	$(common-objs-y) \
 	booke.o \
-	booke_common.o \
 	booke_emulate.o \
 	booke_interrupts.o \
 	44x.o \
@@ -34,7 +33,6 @@ kvm-objs-$(CONFIG_KVM_440) := $(kvm-440-objs)
 kvm-e500-objs := \
 	$(common-objs-y) \
 	booke.o \
-	booke_common.o \
 	booke_emulate.o \
 	booke_interrupts.o \
 	e500.o \
@@ -45,7 +43,6 @@ kvm-objs-$(CONFIG_KVM_E500) := $(kvm-e500-objs)
 kvm-e500mc-objs := \
 	$(common-objs-y) \
 	bookehv.o \
-	booke_common.o \
 	bookehv_emulate.o \
 	bookehv_interrupts.o \
 	e500mc.o \
