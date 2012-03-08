@@ -139,9 +139,9 @@ static u32 get_host_mas0(unsigned long eaddr)
 	return mas0;
 }
 
-/* sesel is for tlb1 only */
+/* esel is index into set, not whole array */
 static inline void write_host_tlbe(struct kvmppc_vcpu_e500 *vcpu_e500,
-		int tlbsel, int sesel, struct kvm_book3e_206_tlb_entry *stlbe)
+		int tlbsel, int esel, struct kvm_book3e_206_tlb_entry *stlbe)
 {
 	unsigned long mas0;
 
@@ -151,7 +151,7 @@ static inline void write_host_tlbe(struct kvmppc_vcpu_e500 *vcpu_e500,
 	} else {
 		__write_host_tlbe(stlbe,
 				  MAS0_TLBSEL(1) |
-				  MAS0_ESEL(to_htlb1_esel(sesel)));
+				  MAS0_ESEL(to_htlb1_esel(esel)));
 	}
 }
 
@@ -229,6 +229,11 @@ static int gtlb0_set_base(struct kvmppc_vcpu_e500 *vcpu_e500, gva_t addr)
 {
 	return tlb0_set_base(addr, vcpu_e500->gtlb0_sets,
 			     vcpu_e500->gtlb0_ways);
+}
+
+static int htlb0_set_base(gva_t addr)
+{
+	return tlb0_set_base(addr, tlb_host_sets[0], tlb_host_ways[0]);
 }
 
 static unsigned int get_tlb_esel(struct kvm_vcpu *vcpu, int tlbsel)
@@ -401,13 +406,14 @@ static inline void kvmppc_e500_setup_stlbe(
 }
 
 #ifdef CONFIG_KVM_BOOKE_HV
-static inline void kvmppc_book3e_setup_virt_mmio(
+static inline int kvmppc_book3e_setup_virt_mmio(
 	struct kvmppc_vcpu_e500 *vcpu_e500, int esel,
 	struct kvm_book3e_206_tlb_entry *stlbe)
 {
 	struct kvm_book3e_206_tlb_entry *gtlbe = get_entry(vcpu_e500, 0, esel);
 	struct kvm_vcpu *vcpu = &(vcpu_e500->vcpu);
 	struct tlbe_ref *ref;
+	unsigned long mas0;
 
 	/* Force GS=1 IPROT=0, 4K Page size for all virt. mmio mappings. */
 	stlbe->mas1 = MAS1_TSIZE(BOOK3E_PAGESZ_4K) | MAS1_VALID |
@@ -421,12 +427,16 @@ static inline void kvmppc_book3e_setup_virt_mmio(
 
 	ref = &vcpu_e500->gtlb_priv[0][esel].ref;
 	kvmppc_e500_ref_release(ref);
+
+	mas0 = get_host_mas0(stlbe->mas2);
+	return (mas0 & MAS0_ESEL_MASK) >> MAS0_ESEL_SHIFT;
 }
 #endif
 
+/* sesel is an index into the entire array, not just the set */
 static inline void kvmppc_e500_shadow_map(struct kvmppc_vcpu_e500 *vcpu_e500,
 	u64 gvaddr, gfn_t gfn, struct kvm_book3e_206_tlb_entry *gtlbe,
-	int tlbsel, struct kvm_book3e_206_tlb_entry *stlbe,
+	int tlbsel, int sesel, struct kvm_book3e_206_tlb_entry *stlbe,
 	struct tlbe_ref *ref)
 {
 	struct kvm_memory_slot *slot;
@@ -536,19 +546,27 @@ static inline void kvmppc_e500_shadow_map(struct kvmppc_vcpu_e500 *vcpu_e500,
 }
 
 /* XXX only map the one-one case, for now use TLB0 */
-static void kvmppc_e500_tlb0_map(struct kvmppc_vcpu_e500 *vcpu_e500,
-				 int esel,
-				 struct kvm_book3e_206_tlb_entry *stlbe)
+static int kvmppc_e500_tlb0_map(struct kvmppc_vcpu_e500 *vcpu_e500,
+				int esel,
+				struct kvm_book3e_206_tlb_entry *stlbe)
 {
 	struct kvm_book3e_206_tlb_entry *gtlbe;
 	struct tlbe_ref *ref;
+	int sesel = esel & (tlb_host_ways[0] - 1);
+	int sesel_base;
+	gva_t ea;
 
 	gtlbe = get_entry(vcpu_e500, 0, esel);
 	ref = &vcpu_e500->gtlb_priv[0][esel].ref;
 
+	ea = get_tlb_eaddr(gtlbe);
+	sesel_base = htlb0_set_base(ea);
+
 	kvmppc_e500_shadow_map(vcpu_e500, get_tlb_eaddr(gtlbe),
 			get_tlb_raddr(gtlbe) >> PAGE_SHIFT,
-			gtlbe, 0, stlbe, ref);
+			gtlbe, 0, sesel_base + sesel, stlbe, ref);
+
+	return sesel;
 }
 
 /* Caller must ensure that the specified guest TLB entry is safe to insert into
@@ -567,7 +585,8 @@ static int kvmppc_e500_tlb1_map(struct kvmppc_vcpu_e500 *vcpu_e500,
 		vcpu_e500->host_tlb1_nv = 0;
 
 	ref = &vcpu_e500->tlb_refs[1][victim];
-	kvmppc_e500_shadow_map(vcpu_e500, gvaddr, gfn, gtlbe, 1, stlbe, ref);
+	kvmppc_e500_shadow_map(vcpu_e500, gvaddr, gfn, gtlbe, 1,
+			       victim, stlbe, ref);
 
 	vcpu_e500->g2h_tlb1_map[esel] |= (u64)1 << victim;
 	vcpu_e500->gtlb_priv[1][esel].ref.flags |= E500_TLB_BITMAP;
@@ -817,7 +836,7 @@ int kvmppc_e500_emul_tlbsx(struct kvm_vcpu *vcpu, int rb)
 	return EMULATE_DONE;
 }
 
-/* sesel is for tlb1 only */
+/* sesel is index into the set, not the whole array */
 static void write_stlbe(struct kvmppc_vcpu_e500 *vcpu_e500,
 			struct kvm_book3e_206_tlb_entry *gtlbe,
 			struct kvm_book3e_206_tlb_entry *stlbe,
@@ -866,8 +885,7 @@ int kvmppc_e500_emul_tlbwe(struct kvm_vcpu *vcpu)
 			gtlbe->mas1 |= MAS1_TSIZE(BOOK3E_PAGESZ_4K);
 
 			stlbsel = 0;
-			kvmppc_e500_tlb0_map(vcpu_e500, esel, &stlbe);
-			sesel = 0; /* unused */
+			sesel = kvmppc_e500_tlb0_map(vcpu_e500, esel, &stlbe);
 
 			break;
 
@@ -896,8 +914,8 @@ int kvmppc_e500_emul_tlbwe(struct kvm_vcpu *vcpu)
 		gtlbe->mas1 &= ~MAS1_TSIZE(~0);
 		gtlbe->mas1 |= MAS1_TSIZE(BOOK3E_PAGESZ_4K);
 
-		kvmppc_book3e_setup_virt_mmio(vcpu_e500, esel, &stlbe);
-		write_stlbe(vcpu_e500, gtlbe, &stlbe, 0, 0);
+		sesel = kvmppc_book3e_setup_virt_mmio(vcpu_e500, esel, &stlbe);
+		write_stlbe(vcpu_e500, gtlbe, &stlbe, 0, sesel);
 #endif
 	}
 
