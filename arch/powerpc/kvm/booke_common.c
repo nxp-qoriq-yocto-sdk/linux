@@ -167,11 +167,6 @@ void kvmppc_decrementer_func(unsigned long data)
 #define WP_NUM	KVMPPC_DAC_NUM
 void kvmppc_recalc_shadow_ac(struct kvm_vcpu *vcpu)
 {
-	/*
-	 * If debug resources are taken by host (say QEMU) then
-	 * debug resources are not available to guest. For Guest
-	 * it is like external debugger have taken the resources.
-	 */
 	if (vcpu->guest_debug == 0) {
 		struct kvmppc_debug_reg *sreg = &(vcpu->arch.shadow_dbg_reg),
 		                        *greg = &(vcpu->arch.dbg_reg);
@@ -187,11 +182,6 @@ void kvmppc_recalc_shadow_ac(struct kvm_vcpu *vcpu)
 void kvmppc_recalc_shadow_dbcr(struct kvm_vcpu *vcpu)
 {
 #define MASK_EVENT (DBCR0_IC | DBCR0_BRT)
-	/*
-	 * If debug resources are taken by host (say QEMU) then
-	 * debug resources are not available to guest. For Guest
-	 * it is like external debugger have taken the resources.
-	 */
 	if (vcpu->guest_debug == 0) {
 		struct kvmppc_debug_reg *sreg = &(vcpu->arch.shadow_dbg_reg),
 		                        *greg = &(vcpu->arch.dbg_reg);
@@ -207,11 +197,9 @@ void kvmppc_recalc_shadow_dbcr(struct kvm_vcpu *vcpu)
 			sreg->dbcr0 = greg->dbcr0 & ~MASK_EVENT;
 
 		/* XXX assume that guest always wants to debug eaddr */
-		sreg->dbcr1 = greg->dbcr1;
-		sreg->dbcr2 = greg->dbcr2;
-		sreg->dbcr1 |= DBCR1_IAC1US | DBCR1_IAC2US |
+		sreg->dbcr1 = DBCR1_IAC1US | DBCR1_IAC2US |
 		              DBCR1_IAC3US | DBCR1_IAC4US;
-		sreg->dbcr2 |= DBCR2_DAC1US | DBCR2_DAC2US;
+		sreg->dbcr2 = DBCR2_DAC1US | DBCR2_DAC2US;
 	}
 }
 
@@ -504,11 +492,9 @@ void kvmppc_load_perfmon_regs(struct kvm_vcpu *vcpu)
 
 void kvmppc_clr_dbsr_bits(struct kvm_vcpu *vcpu, u32 dbsr_bits)
 {
-	if (vcpu->guest_debug == 0) {
-		vcpu->arch.dbsr &= ~dbsr_bits;
-		if (vcpu->arch.dbsr == 0)
-			kvmppc_core_dequeue_debug(vcpu);
-	}
+	vcpu->arch.dbsr &= ~dbsr_bits;
+	if (vcpu->arch.dbsr == 0)
+		kvmppc_core_dequeue_debug(vcpu);
 }
 
 int kvmppc_handle_debug(struct kvm_run *run, struct kvm_vcpu *vcpu)
