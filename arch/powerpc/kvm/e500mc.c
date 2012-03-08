@@ -23,14 +23,15 @@
 #include <asm/tlbflush.h>
 #include <asm/kvm_ppc.h>
 #include <asm/doorbell.h>
+#include <asm/kvm_e500mc.h>
 
 #include "booke.h"
-#include "e500_tlb.h"
+#include "e500mc_tlb.h"
 
 static DEFINE_SPINLOCK(lpid_idr_lock);
 static struct idr lpid_id_ns;
 
-int alloc_lpid(struct kvm_vcpu *vcpu)
+int alloc_lpid(struct kvmppc_vcpu_e500mc *vcpu_e500mc)
 {
 	int err, lpid;
 
@@ -40,7 +41,7 @@ retry:
 
 	spin_lock(&lpid_idr_lock);
 	/* Allocate guest lpid's >= 1 */
-	err = idr_get_new_above(&lpid_id_ns, vcpu, 1, &lpid);
+	err = idr_get_new_above(&lpid_id_ns, vcpu_e500mc, 1, &lpid);
 	spin_unlock(&lpid_idr_lock);
 
 	if (err) {
@@ -50,12 +51,13 @@ retry:
 		return err;
 	}
 
-	vcpu->arch.lpid = lpid;
+	vcpu_e500mc->lpid = lpid;
 	return 0;
 }
 
 void kvmppc_set_pending_interrupt(struct kvm_vcpu *vcpu, enum int_class type)
 {
+	struct kvmppc_vcpu_e500mc *vcpu_e500mc = to_e500mc(vcpu);
 	unsigned long msg_type;
 	unsigned long msg;
 
@@ -73,7 +75,7 @@ void kvmppc_set_pending_interrupt(struct kvm_vcpu *vcpu, enum int_class type)
 		return;
 	}
 
-	msg = msg_type | (vcpu->arch.lpid << 14) | vcpu->arch.gpir;
+	msg = msg_type | (vcpu_e500mc->lpid << 14) | vcpu_e500mc->gpir;
 	send_doorbell_msg(msg);
 }
 
@@ -88,13 +90,13 @@ void kvmppc_core_load_guest_debugstate(struct kvm_vcpu *vcpu)
 
 void kvmppc_core_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
 {
-	struct kvmppc_vcpu_e500 *vcpu_e500 = to_e500(vcpu);
+	struct kvmppc_vcpu_e500mc *vcpu_e500mc = to_e500mc(vcpu);
 
 	local_irq_disable();
-	mtspr(SPRN_LPID, vcpu->arch.lpid);
-	mtspr(SPRN_EPCR, vcpu->arch.epcr);
-	mtspr(SPRN_GPIR, vcpu->arch.gpir);
-	mtspr(SPRN_MSRP, vcpu->arch.msrp);
+	mtspr(SPRN_LPID, vcpu_e500mc->lpid);
+	mtspr(SPRN_EPCR, vcpu_e500mc->epcr);
+	mtspr(SPRN_GPIR, vcpu_e500mc->gpir);
+	mtspr(SPRN_MSRP, vcpu_e500mc->msrp);
 
 	mtspr(SPRN_GIVPR, vcpu->arch.ivpr);
 	mtspr(SPRN_GIVOR2, vcpu->arch.ivor[BOOKE_IRQPRIO_DATA_STORAGE]);
@@ -111,9 +113,7 @@ void kvmppc_core_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
 	mtspr(SPRN_GDEAR, vcpu->arch.shared->dar);
 	mtspr(SPRN_GESR, vcpu->arch.shared->esr);
 
-	if (vcpu->arch.oldpir != mfspr(SPRN_PIR))
-		kvmppc_core_tlbil_all(vcpu_e500);
-
+	kvmppc_e500mc_tlb_load(vcpu, cpu);
 	local_irq_enable();
 
 	kvmppc_load_guest_fp(vcpu);
@@ -133,7 +133,7 @@ void kvmppc_core_vcpu_put(struct kvm_vcpu *vcpu)
 	vcpu->arch.shared->dar = mfspr(SPRN_GDEAR);
 	vcpu->arch.shared->esr = mfspr(SPRN_GESR);
 
-	vcpu->arch.oldpir = mfspr(SPRN_PIR);
+	kvmppc_e500mc_tlb_put(vcpu);
 }
 
 int kvmppc_core_check_processor_compat(void)
@@ -150,20 +150,27 @@ int kvmppc_core_check_processor_compat(void)
 
 int kvmppc_core_vcpu_setup(struct kvm_vcpu *vcpu)
 {
-	struct kvmppc_vcpu_e500 *vcpu_e500 = to_e500(vcpu);
+	struct kvmppc_vcpu_e500mc *vcpu_e500mc = to_e500mc(vcpu);
 	int err;
 
-	err = alloc_lpid(vcpu);
+	kvmppc_e500mc_tlb_setup(vcpu_e500mc);
+
+	err = alloc_lpid(vcpu_e500mc);
 	if (err)
 		return err;
 
-	vcpu->arch.epcr = EPCR_DSIGS | EPCR_DGTMI | EPCR_DUVD;
-	vcpu->arch.gpir = 0;
-	vcpu->arch.msrp = MSRP_UCLEP | MSRP_DEP | MSRP_PMMP;
+	vcpu_e500mc->epcr = EPCR_DSIGS | EPCR_DGTMI | EPCR_DUVD;
+	vcpu_e500mc->gpir = 0;
+	vcpu_e500mc->msrp = MSRP_UCLEP | MSRP_DEP | MSRP_PMMP;
+
+	mtspr(SPRN_LPID, vcpu_e500mc->lpid);
+	mtspr(SPRN_EPCR, vcpu_e500mc->epcr);
+	mtspr(SPRN_GPIR, vcpu_e500mc->gpir);
+	mtspr(SPRN_MSRP, vcpu_e500mc->msrp);
 
 	/* Registers init */
 	vcpu->arch.pvr = mfspr(SPRN_PVR);
-	vcpu_e500->svr = mfspr(SPRN_SVR);
+	vcpu_e500mc->svr = mfspr(SPRN_SVR);
 
 	/* Since booke kvm only support one core, update all vcpus' PIR to 0 */
 	vcpu->vcpu_id = 0;
@@ -180,16 +187,16 @@ int kvmppc_core_vcpu_translate(struct kvm_vcpu *vcpu,
 
 void kvmppc_core_get_sregs(struct kvm_vcpu *vcpu, struct kvm_sregs *sregs)
 {
-	struct kvmppc_vcpu_e500 *vcpu_e500 = to_e500(vcpu);
+	struct kvmppc_vcpu_e500mc *vcpu_e500mc = to_e500mc(vcpu);
 
 	sregs->u.e.features |= KVM_SREGS_E_ARCH206_MMU | KVM_SREGS_E_PM |
 	                       KVM_SREGS_E_PC;
 	sregs->u.e.impl_id = KVM_SREGS_E_IMPL_FSL;
 
 	sregs->u.e.impl.fsl.features = 0;
-	sregs->u.e.impl.fsl.svr = vcpu_e500->svr;
-	sregs->u.e.impl.fsl.hid0 = vcpu_e500->hid0;
-	sregs->u.e.impl.fsl.mcar = vcpu_e500->mcar;
+	sregs->u.e.impl.fsl.svr = vcpu_e500mc->svr;
+	sregs->u.e.impl.fsl.hid0 = vcpu_e500mc->hid0;
+	sregs->u.e.impl.fsl.mcar = vcpu_e500mc->mcar;
 
 	sregs->u.e.mas0 = vcpu->arch.shared->mas0;
 	sregs->u.e.mas1 = vcpu->arch.shared->mas1;
@@ -199,8 +206,8 @@ void kvmppc_core_get_sregs(struct kvm_vcpu *vcpu, struct kvm_sregs *sregs)
 	sregs->u.e.mas6 = vcpu->arch.shared->mas6;
 
 	sregs->u.e.mmucfg = kvmppc_get_mmucfg(vcpu);
-	sregs->u.e.tlbcfg[0] = vcpu->arch.tlbcfg[0];
-	sregs->u.e.tlbcfg[1] = vcpu->arch.tlbcfg[1];
+	sregs->u.e.tlbcfg[0] = vcpu_e500mc->tlb0cfg;
+	sregs->u.e.tlbcfg[1] = vcpu_e500mc->tlb1cfg;
 	sregs->u.e.tlbcfg[2] = 0;
 	sregs->u.e.tlbcfg[3] = 0;
 
@@ -214,12 +221,12 @@ void kvmppc_core_get_sregs(struct kvm_vcpu *vcpu, struct kvm_sregs *sregs)
 
 int kvmppc_core_set_sregs(struct kvm_vcpu *vcpu, struct kvm_sregs *sregs)
 {
-	struct kvmppc_vcpu_e500 *vcpu_e500 = to_e500(vcpu);
+	struct kvmppc_vcpu_e500mc *vcpu_e500mc = to_e500mc(vcpu);
 
 	if (sregs->u.e.impl_id == KVM_SREGS_E_IMPL_FSL) {
-		vcpu_e500->svr = sregs->u.e.impl.fsl.svr;
-		vcpu_e500->hid0 = sregs->u.e.impl.fsl.hid0;
-		vcpu_e500->mcar = sregs->u.e.impl.fsl.mcar;
+		vcpu_e500mc->svr = sregs->u.e.impl.fsl.svr;
+		vcpu_e500mc->hid0 = sregs->u.e.impl.fsl.hid0;
+		vcpu_e500mc->mcar = sregs->u.e.impl.fsl.mcar;
 	}
 
 	if (sregs->u.e.features & KVM_SREGS_E_ARCH206_MMU) {
@@ -251,25 +258,25 @@ int kvmppc_core_set_sregs(struct kvm_vcpu *vcpu, struct kvm_sregs *sregs)
 
 struct kvm_vcpu *kvmppc_core_vcpu_create(struct kvm *kvm, unsigned int id)
 {
-	struct kvmppc_vcpu_e500 *vcpu_e500;
+	struct kvmppc_vcpu_e500mc *vcpu_e500mc;
 	struct kvm_vcpu *vcpu;
 	int err;
 
-	vcpu_e500 = kmem_cache_zalloc(kvm_vcpu_cache, GFP_KERNEL);
-	if (!vcpu_e500) {
+	vcpu_e500mc = kmem_cache_zalloc(kvm_vcpu_cache, GFP_KERNEL);
+	if (!vcpu_e500mc) {
 		err = -ENOMEM;
 		goto out;
 	}
-	vcpu = &vcpu_e500->vcpu;
 
 	/* Invalid PIR value -- this LPID dosn't have valid state on any cpu */
-	vcpu->arch.oldpir = 0xffffffff;
+	vcpu_e500mc->oldpir = 0xffffffff;
 
+	vcpu = &vcpu_e500mc->vcpu;
 	err = kvm_vcpu_init(vcpu, kvm, id);
 	if (err)
 		goto free_vcpu;
 
-	err = kvmppc_e500_tlb_init(vcpu_e500);
+	err = kvmppc_e500mc_tlb_init(vcpu_e500mc);
 	if (err)
 		goto uninit_vcpu;
 
@@ -280,27 +287,27 @@ struct kvm_vcpu *kvmppc_core_vcpu_create(struct kvm *kvm, unsigned int id)
 	return vcpu;
 
 uninit_tlb:
-	kvmppc_e500_tlb_uninit(vcpu_e500);
+	kvmppc_e500mc_tlb_uninit(vcpu_e500mc);
 uninit_vcpu:
 	kvm_vcpu_uninit(vcpu);
 
 free_vcpu:
-	kmem_cache_free(kvm_vcpu_cache, vcpu_e500);
+	kmem_cache_free(kvm_vcpu_cache, vcpu_e500mc);
 out:
 	return ERR_PTR(err);
 }
 
 void kvmppc_core_vcpu_free(struct kvm_vcpu *vcpu)
 {
-	struct kvmppc_vcpu_e500 *vcpu_e500 = to_e500(vcpu);
+	struct kvmppc_vcpu_e500mc *vcpu_e500mc = to_e500mc(vcpu);
 
 	free_page((unsigned long)vcpu->arch.shared);
-	kvmppc_e500_tlb_uninit(vcpu_e500);
 	kvm_vcpu_uninit(vcpu);
-	kmem_cache_free(kvm_vcpu_cache, vcpu_e500);
+	kvmppc_e500mc_tlb_uninit(vcpu_e500mc);
+	kmem_cache_free(kvm_vcpu_cache, vcpu_e500mc);
 
 	spin_lock(&lpid_idr_lock);
-	idr_remove(&lpid_id_ns, vcpu->arch.lpid);
+	idr_remove(&lpid_id_ns, vcpu_e500mc->lpid);
 	spin_unlock(&lpid_idr_lock);
 }
 
@@ -314,7 +321,7 @@ static int __init kvmppc_e500mc_init(void)
 
 	idr_init(&lpid_id_ns);
 
-	return kvm_init(NULL, sizeof(struct kvmppc_vcpu_e500), 0, THIS_MODULE);
+	return kvm_init(NULL, sizeof(struct kvmppc_vcpu_e500mc), 0, THIS_MODULE);
 }
 
 static void __exit kvmppc_e500mc_exit(void)
