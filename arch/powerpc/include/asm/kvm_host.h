@@ -270,7 +270,6 @@ struct kvm_vcpu_arch {
 
 	ulong xer;
 	u32 cr;
-	u32 tlbcfg[4];
 #endif
 
 #ifdef CONFIG_KVM_BOOKE_HV
