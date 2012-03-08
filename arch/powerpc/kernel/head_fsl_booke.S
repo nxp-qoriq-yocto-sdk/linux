@@ -386,7 +386,7 @@ interrupt_base:
 	stw	r13, THREAD_NORMSAVE(2)(r10)
 	mfcr	r13
 	stw	r13, THREAD_NORMSAVE(3)(r10)
-	DO_KVM	BOOKE_INTERRUPT_DTLB_MISS SPRN_SRR1
+	DO_KVM	BOOKE_INTERRUPT_DTLB_MISS
 	mfspr	r10, SPRN_DEAR		/* Get faulting address */
 
 	/* If we are faulting a kernel address, we have to use the
@@ -475,7 +475,7 @@ interrupt_base:
 	stw	r13, THREAD_NORMSAVE(2)(r10)
 	mfcr	r13
 	stw	r13, THREAD_NORMSAVE(3)(r10)
-	DO_KVM	BOOKE_INTERRUPT_ITLB_MISS SPRN_SRR1
+	DO_KVM	BOOKE_INTERRUPT_ITLB_MISS
 	mfspr	r10, SPRN_SRR0		/* Get faulting address */
 
 	/* If we are faulting a kernel address, we have to use the
