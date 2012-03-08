@@ -222,7 +222,6 @@ static int kvmppc_booke_irqprio_deliver(struct kvm_vcpu *vcpu,
                                         unsigned int priority)
 {
 	int allowed = 1;
-	int dequeue = 0;
 	ulong uninitialized_var(msr_mask);
 	bool update_esr = false, update_dear = false;
 	ulong crit_raw = vcpu->arch.shared->critical;
@@ -269,10 +268,7 @@ static int kvmppc_booke_irqprio_deliver(struct kvm_vcpu *vcpu,
 		int_class = INT_CLASS_NONCRIT;
 		break;
 	case BOOKE_IRQPRIO_WATCHDOG:
-		if (!(vcpu->arch.tcr & TCR_WIE)) {
-			allowed = 0;
-			dequeue = 1;
-		}
+		allowed = vcpu->arch.tcr & TCR_WIE;
 		/* fall through */
 	case BOOKE_IRQPRIO_CRITICAL:
 		allowed = allowed && vcpu->arch.shared->msr & MSR_CE;
@@ -285,10 +281,7 @@ static int kvmppc_booke_irqprio_deliver(struct kvm_vcpu *vcpu,
 		int_class = INT_CLASS_MC;
 		break;
 	case BOOKE_IRQPRIO_DECREMENTER:
-		if (!(vcpu->arch.tcr & TCR_DIE)) {
-			allowed = 0;
-			dequeue = 1;
-		}
+		allowed = vcpu->arch.tcr & TCR_DIE;
 		/* fall through */
 	case BOOKE_IRQPRIO_EXTERNAL:
 	case BOOKE_IRQPRIO_FIT:
@@ -335,9 +328,6 @@ static int kvmppc_booke_irqprio_deliver(struct kvm_vcpu *vcpu,
 		    vcpu->arch.magic_page_ea)
 			vcpu->arch.shared->epr = kvmppc_mpic_iack(vcpu->kvm, 0);
 #endif
-	} else if (dequeue) {
-		/* Should only happen due to races with masking */
-		clear_bit(priority, &vcpu->arch.pending_exceptions);
 	}
 
 	return allowed;
