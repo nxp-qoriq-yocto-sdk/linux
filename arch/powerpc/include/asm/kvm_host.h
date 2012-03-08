@@ -84,10 +84,6 @@ struct kvm_vcpu_stat {
 	u32 dec_exits;
 	u32 ext_intr_exits;
 	u32 halt_wakeup;
-#ifdef CONFIG_KVM_BOOKE_HV
-	u32 dbell_exits;
-	u32 gdbell_exits;
-#endif
 #ifdef CONFIG_PPC_BOOK3S
 	u32 pf_storage;
 	u32 pf_instruc;
@@ -130,10 +126,6 @@ enum kvm_exit_types {
 	DEBUG_EXITS,
 	TIMEINGUEST,
 	PRG_INT_EXITS,
-#ifdef CONFIG_KVM_BOOKE_HV
-	DBELL_EXITS,
-	GDBELL_EXITS,
-#endif
 	__NUMBER_OF_KVM_EXIT_TYPES
 };
 
