@@ -37,7 +37,6 @@
 	    (\ivor_nr == BOOKE_HV_PRIV) ||				\
 	    (\ivor_nr == BOOKE_INTERRUPT_DEBUG) ||			\
 	    (\ivor_nr == BOOKE_INTERRUPT_PERFORMANCE_MONITOR) ||	\
-	    (\ivor_nr == BOOKE_INTERRUPT_MACHINE_CHECK) ||		\
 	    (\ivor_nr == BOOKE_INTERRUPT_HV_GS_DBELL_CRIT)
 
 BEGIN_FTR_SECTION
@@ -57,7 +56,8 @@ BEGIN_FTR_SECTION
 END_FTR_SECTION_IFSET(CPU_FTR_EMB_HV)
 kvmppc_resume_\ivor_nr\excp_srr1:
 	.elseif (\ivor_nr == BOOKE_INTERRUPT_CRITCAL) ||        	\
-		(\ivor_nr == BOOKE_INTERRUPT_WATCHDOG)
+		(\ivor_nr == BOOKE_INTERRUPT_WATCHDOG) ||		\
+		(\ivor_nr == BOOKE_INTERRUPT_MACHINE_CHECK)
 BEGIN_FTR_SECTION
 	mfspr	r11, \excp_srr1
 	andis. 	r11, r11, MSR_GS@h
