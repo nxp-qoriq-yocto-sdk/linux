@@ -20,9 +20,13 @@
 #include <asm/tlb.h>
 #include <asm/kvm_e500.h>
 
-/* This geometry is the legacy default -- can be overridden by userspace */
-#define KVM_E500_TLB0_WAY_SIZE		128
-#define KVM_E500_TLB0_WAY_NUM		2
+#define KVM_E500_TLB0_WAY_SIZE_BIT	7	/* Fixed */
+#define KVM_E500_TLB0_WAY_SIZE		(1UL << KVM_E500_TLB0_WAY_SIZE_BIT)
+#define KVM_E500_TLB0_WAY_SIZE_MASK	(KVM_E500_TLB0_WAY_SIZE - 1)
+
+#define KVM_E500_TLB0_WAY_NUM_BIT	1	/* No greater than 7 */
+#define KVM_E500_TLB0_WAY_NUM		(1UL << KVM_E500_TLB0_WAY_NUM_BIT)
+#define KVM_E500_TLB0_WAY_NUM_MASK	(KVM_E500_TLB0_WAY_NUM - 1)
 
 #define KVM_E500_TLB0_SIZE  (KVM_E500_TLB0_WAY_SIZE * KVM_E500_TLB0_WAY_NUM)
 #define KVM_E500_TLB1_SIZE  16
@@ -54,54 +58,50 @@ extern void kvmppc_e500_tlb_setup(struct kvmppc_vcpu_e500 *);
 extern void kvmppc_e500_recalc_shadow_pid(struct kvmppc_vcpu_e500 *);
 
 /* TLB helper functions */
-static inline unsigned int
-get_tlb_size(const struct kvm_book3e_206_tlb_entry *tlbe)
+static inline unsigned int get_tlb_size(const struct tlbe *tlbe)
 {
 	return (tlbe->mas1 >> 7) & 0x1f;
 }
 
-static inline gva_t get_tlb_eaddr(const struct kvm_book3e_206_tlb_entry *tlbe)
+static inline gva_t get_tlb_eaddr(const struct tlbe *tlbe)
 {
 	return tlbe->mas2 & 0xfffff000;
 }
 
-static inline u64 get_tlb_bytes(const struct kvm_book3e_206_tlb_entry *tlbe)
+static inline u64 get_tlb_bytes(const struct tlbe *tlbe)
 {
 	unsigned int pgsize = get_tlb_size(tlbe);
 	return 1ULL << 10 << pgsize;
 }
 
-static inline gva_t get_tlb_end(const struct kvm_book3e_206_tlb_entry *tlbe)
+static inline gva_t get_tlb_end(const struct tlbe *tlbe)
 {
 	u64 bytes = get_tlb_bytes(tlbe);
 	return get_tlb_eaddr(tlbe) + bytes - 1;
 }
 
-static inline u64 get_tlb_raddr(const struct kvm_book3e_206_tlb_entry *tlbe)
+static inline u64 get_tlb_raddr(const struct tlbe *tlbe)
 {
-	return tlbe->mas7_3 & ~0xfffULL;
+	u64 rpn = tlbe->mas7;
+	return (rpn << 32) | (tlbe->mas3 & 0xfffff000);
 }
 
-static inline unsigned int
-get_tlb_tid(const struct kvm_book3e_206_tlb_entry *tlbe)
+static inline unsigned int get_tlb_tid(const struct tlbe *tlbe)
 {
 	return (tlbe->mas1 >> 16) & 0xff;
 }
 
-static inline unsigned int
-get_tlb_ts(const struct kvm_book3e_206_tlb_entry *tlbe)
+static inline unsigned int get_tlb_ts(const struct tlbe *tlbe)
 {
 	return (tlbe->mas1 >> 12) & 0x1;
 }
 
-static inline unsigned int
-get_tlb_v(const struct kvm_book3e_206_tlb_entry *tlbe)
+static inline unsigned int get_tlb_v(const struct tlbe *tlbe)
 {
 	return (tlbe->mas1 >> 31) & 0x1;
 }
 
-static inline unsigned int
-get_tlb_iprot(const struct kvm_book3e_206_tlb_entry *tlbe)
+static inline unsigned int get_tlb_iprot(const struct tlbe *tlbe)
 {
 	return (tlbe->mas1 >> 30) & 0x1;
 }
@@ -156,7 +156,7 @@ static inline unsigned int get_tlb_esel_bit(
 }
 
 static inline int tlbe_is_host_safe(const struct kvm_vcpu *vcpu,
-			const struct kvm_book3e_206_tlb_entry *tlbe)
+			const struct tlbe *tlbe)
 {
 	gpa_t gpa;
 
