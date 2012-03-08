@@ -27,7 +27,6 @@
 #include <asm/kvm_44x.h>
 #include <asm/kvm_ppc.h>
 
-#include "booke.h"
 #include "44x_tlb.h"
 
 void kvmppc_core_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
@@ -160,13 +159,7 @@ void kvmppc_core_vcpu_free(struct kvm_vcpu *vcpu)
 
 int __kvmppc_vcpu_run(struct kvm_run *kvm_run, struct kvm_vcpu *vcpu)
 {
-	int ret;
-
-	kvmppc_wdt_resume(vcpu);
-	ret = __kvmppc_vcpu_entry(kvm_run, vcpu);
-	kvmppc_wdt_pause(vcpu);
-
-	return ret;
+	return __kvmppc_vcpu_entry(kvm_run, vcpu);
 }
 
 static int __init kvmppc_44x_init(void)
