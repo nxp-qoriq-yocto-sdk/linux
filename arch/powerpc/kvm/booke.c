@@ -211,12 +211,6 @@ void kvmppc_core_dequeue_watchdog(struct kvm_vcpu *vcpu)
 	clear_bit(BOOKE_IRQPRIO_WATCHDOG, &vcpu->arch.pending_exceptions);
 }
 
-enum int_class {
-	INT_CLASS_NONCRIT,
-	INT_CLASS_CRIT,
-	INT_CLASS_MC,
-};
-
 /* Deliver the interrupt of the corresponding priority, if possible. */
 static int kvmppc_booke_irqprio_deliver(struct kvm_vcpu *vcpu,
                                         unsigned int priority)
@@ -228,7 +222,6 @@ static int kvmppc_booke_irqprio_deliver(struct kvm_vcpu *vcpu,
 	ulong crit_r1 = kvmppc_get_gpr(vcpu, 1);
 	bool crit;
 	bool keep_irq = false;
-	enum int_class int_class;
 
 	/* Truncate crit indicators in 32 bit mode */
 	if (!(vcpu->arch.shared->msr & MSR_SF)) {
@@ -265,7 +258,6 @@ static int kvmppc_booke_irqprio_deliver(struct kvm_vcpu *vcpu,
 	case BOOKE_IRQPRIO_ALIGNMENT:
 		allowed = 1;
 		msr_mask = MSR_CE|MSR_ME|MSR_DE;
-		int_class = INT_CLASS_NONCRIT;
 		break;
 	case BOOKE_IRQPRIO_WATCHDOG:
 		allowed = vcpu->arch.tcr & TCR_WIE;
@@ -273,12 +265,10 @@ static int kvmppc_booke_irqprio_deliver(struct kvm_vcpu *vcpu,
 	case BOOKE_IRQPRIO_CRITICAL:
 		allowed = allowed && vcpu->arch.shared->msr & MSR_CE;
 		msr_mask = MSR_ME;
-		int_class = INT_CLASS_CRIT;
 		break;
 	case BOOKE_IRQPRIO_MACHINE_CHECK:
 		allowed = vcpu->arch.shared->msr & MSR_ME;
 		msr_mask = 0;
-		int_class = INT_CLASS_MC;
 		break;
 	case BOOKE_IRQPRIO_DECREMENTER:
 		allowed = vcpu->arch.tcr & TCR_DIE;
@@ -288,30 +278,18 @@ static int kvmppc_booke_irqprio_deliver(struct kvm_vcpu *vcpu,
 		allowed = allowed && vcpu->arch.shared->msr & MSR_EE;
 		allowed = allowed && !crit;
 		msr_mask = MSR_CE|MSR_ME|MSR_DE;
-		int_class = INT_CLASS_NONCRIT;
 		break;
 	case BOOKE_IRQPRIO_DEBUG:
 		allowed = vcpu->arch.shared->msr & MSR_DE;
 		msr_mask = MSR_ME;
-		int_class = INT_CLASS_CRIT;
 		break;
 	default:
 		allowed = 0;
 	}
 
 	if (allowed) {
-		switch (int_class) {
-		case INT_CLASS_NONCRIT:
-			vcpu->arch.shared->srr0 = vcpu->arch.pc;
-			vcpu->arch.shared->srr1 = vcpu->arch.shared->msr;
-			break;
-		case INT_CLASS_CRIT:
-			vcpu->arch.csrr0 = vcpu->arch.pc;
-			vcpu->arch.csrr1 = vcpu->arch.shared->msr;
-			break;
-		case INT_CLASS_MC:
-			break;
-		}
+		vcpu->arch.shared->srr0 = vcpu->arch.pc;
+		vcpu->arch.shared->srr1 = vcpu->arch.shared->msr;
 		vcpu->arch.pc = vcpu->arch.ivpr | vcpu->arch.ivor[priority];
 		if (update_esr == true)
 			vcpu->arch.shared->esr = vcpu->arch.queued_esr;
