@@ -122,10 +122,6 @@ static void xes_mpc85xx_fixups(void)
 	}
 }
 
-#ifdef CONFIG_PCI
-static int primary_phb_addr;
-#endif
-
 /*
  * Setup the architecture
  */
@@ -134,9 +130,6 @@ extern void __init mpc85xx_smp_init(void);
 #endif
 static void __init xes_mpc85xx_setup_arch(void)
 {
-#ifdef CONFIG_PCI
-	struct device_node *np;
-#endif
 	struct device_node *root;
 	const char *model = "Unknown";
 
@@ -151,24 +144,24 @@ static void __init xes_mpc85xx_setup_arch(void)
 
 	xes_mpc85xx_fixups();
 
-#ifdef CONFIG_PCI
-	for_each_node_by_type(np, "pci") {
-		if (of_device_is_compatible(np, "fsl,mpc8540-pci") ||
-		    of_device_is_compatible(np, "fsl,mpc8548-pcie")) {
-			struct resource rsrc;
-			of_address_to_resource(np, 0, &rsrc);
-			if ((rsrc.start & 0xfffff) == primary_phb_addr)
-				fsl_add_bridge(np, 1);
-			else
-				fsl_add_bridge(np, 0);
-		}
-	}
-#endif
-
 #ifdef CONFIG_SMP
 	mpc85xx_smp_init();
 #endif
 }
+
+static struct of_device_id __initdata xes_mpc85xx_pci_ids[] = {
+	{ .compatible = "fsl,mpc8540-pci", },
+	{ .compatible = "fsl,mpc8548-pcie", },
+	{},
+};
+
+static int __init xes_mpc85xx_publish_pci_device(void)
+{
+	return of_platform_bus_probe(NULL, xes_mpc85xx_pci_ids, NULL);
+}
+machine_arch_initcall(xes_mpc8572, xes_mpc85xx_publish_pci_device);
+machine_arch_initcall(xes_mpc8548, xes_mpc85xx_publish_pci_device);
+machine_arch_initcall(xes_mpc8540, xes_mpc85xx_publish_pci_device);
 
 static struct of_device_id __initdata xes_mpc85xx_ids[] = {
 	{ .type = "soc", },

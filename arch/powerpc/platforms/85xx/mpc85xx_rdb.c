@@ -1,10 +1,10 @@
 /*
  * MPC85xx RDB Board Setup
  *
- * Copyright 2009 Freescale Semiconductor Inc.
+ * Copyright 2009,2012 Freescale Semiconductor Inc.
  *
- * This program is free software; you can redistribute  it and/or modify it
- * under  the terms of  the GNU General  Public License as published by the
+ * This program is free software; you can redistribute	it and/or modify it
+ * under  the terms of	the GNU General	 Public License as published by the
  * Free Software Foundation;  either version 2 of the  License, or (at your
  * option) any later version.
  */
@@ -80,20 +80,8 @@ extern void __init mpc85xx_smp_init(void);
 #endif
 static void __init mpc85xx_rdb_setup_arch(void)
 {
-#ifdef CONFIG_PCI
-	struct device_node *np;
-#endif
-
 	if (ppc_md.progress)
 		ppc_md.progress("mpc85xx_rdb_setup_arch()", 0);
-
-#ifdef CONFIG_PCI
-	for_each_node_by_type(np, "pci") {
-		if (of_device_is_compatible(np, "fsl,mpc8548-pcie"))
-			fsl_add_bridge(np, 0);
-	}
-
-#endif
 
 #ifdef CONFIG_SMP
 	mpc85xx_smp_init();
@@ -101,6 +89,23 @@ static void __init mpc85xx_rdb_setup_arch(void)
 
 	printk(KERN_INFO "MPC85xx RDB board from Freescale Semiconductor\n");
 }
+
+static struct of_device_id __initdata mpc85xxrdb_pci_ids[] = {
+	{ .compatible = "fsl,mpc8548-pcie", },
+	{},
+};
+
+static int __init mpc85xxrdb_publish_pci_device(void)
+{
+	return of_platform_bus_probe(NULL, mpc85xxrdb_pci_ids, NULL);
+}
+machine_arch_initcall(p2020_rdb, mpc85xxrdb_publish_pci_device);
+machine_arch_initcall(p1020_rdb, mpc85xxrdb_publish_pci_device);
+machine_arch_initcall(p1020_rdb_pc, mpc85xxrdb_publish_pci_device);
+machine_arch_initcall(p2020_rdb_pc, mpc85xxrdb_publish_pci_device);
+machine_arch_initcall(p1024_rdb, mpc85xxrdb_publish_pci_device);
+machine_arch_initcall(p1021_rdb_pc, mpc85xxrdb_publish_pci_device);
+machine_arch_initcall(p1025_rdb, mpc85xxrdb_publish_pci_device);
 
 static struct of_device_id __initdata mpc85xxrdb_ids[] = {
 	{ .type = "soc", },
