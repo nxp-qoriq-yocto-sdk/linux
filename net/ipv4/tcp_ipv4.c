@@ -1967,6 +1967,8 @@ void tcp_v4_destroy_sock(struct sock *sk)
 	__skb_queue_purge(&sk->sk_async_wait_queue);
 #endif
 
+	__skb_queue_purge(&sk->sk_ack_queue);
+
 	/* Clean prequeue, it must be empty really */
 	__skb_queue_purge(&tp->ucopy.prequeue);
 

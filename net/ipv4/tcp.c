@@ -2077,6 +2077,7 @@ int tcp_disconnect(struct sock *sk, int flags)
 #ifdef CONFIG_NET_DMA
 	__skb_queue_purge(&sk->sk_async_wait_queue);
 #endif
+	__skb_queue_purge(&sk->sk_ack_queue);
 
 	inet->inet_dport = 0;
 

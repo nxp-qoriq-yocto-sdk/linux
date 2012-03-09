@@ -64,6 +64,7 @@
 #include <net/sock.h>
 #include <net/checksum.h>
 #include <net/xfrm.h>
+#include <net/tcp.h>
 
 #include <asm/uaccess.h>
 #include <asm/system.h>
@@ -508,6 +509,27 @@ bool skb_recycle_check(struct sk_buff *skb, int skb_size)
 	return true;
 }
 EXPORT_SYMBOL(skb_recycle_check);
+
+bool skb_tcp_ack_recycle(struct sk_buff *skb)
+{
+	unsigned long flags = 0;
+
+	if (sysctl_tcp_fast_ack &&
+	skb->osk && !skb->destructor &&
+	skb->truesize == SKB_DATA_ALIGN(MAX_TCP_HEADER) +
+	sizeof(struct sk_buff) &&
+	skb->osk->sk_state == TCP_ESTABLISHED &&
+	TCP_SKB_CB(skb)->flags == TCPHDR_ACK &&
+	skb_queue_len(&skb->osk->sk_ack_queue) < TCP_ACK_RECYCLE_MAX) {
+		spin_lock_irqsave(&skb->osk->sk_ack_queue.lock, flags);
+		__skb_queue_head(&skb->osk->sk_ack_queue, skb);
+		spin_unlock_irqrestore(&skb->osk->sk_ack_queue.lock, flags);
+		return true;
+	}
+
+	return false;
+}
+EXPORT_SYMBOL(skb_tcp_ack_recycle);
 
 static void __copy_skb_header(struct sk_buff *new, const struct sk_buff *old)
 {

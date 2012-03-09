@@ -272,6 +272,7 @@ typedef unsigned char *sk_buff_data_t;
  *	@next: Next buffer in list
  *	@prev: Previous buffer in list
  *	@sk: Socket we are owned by
+ *	@osk: Original socket we are owned by
  *	@tstamp: Time we arrived
  *	@dev: Device we arrived on/are leaving by
  *	@transport_header: Transport layer header
@@ -331,6 +332,7 @@ struct sk_buff {
 	ktime_t			tstamp;
 
 	struct sock		*sk;
+	struct sock		*osk;
 	struct net_device	*dev;
 #ifdef CONFIG_GFAR_HW_TCP_RECEIVE_OFFLOAD
 	struct net_device	*gfar_dev;
@@ -514,6 +516,7 @@ static inline struct sk_buff *alloc_skb_fclone(unsigned int size,
 
 extern void skb_recycle(struct sk_buff *skb);
 extern bool skb_recycle_check(struct sk_buff *skb, int skb_size);
+extern bool skb_tcp_ack_recycle(struct sk_buff *skb);
 
 extern struct sk_buff *skb_morph(struct sk_buff *dst, struct sk_buff *src);
 extern struct sk_buff *skb_clone(struct sk_buff *skb,
