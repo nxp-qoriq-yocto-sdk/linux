@@ -182,6 +182,7 @@ struct sock_common {
   *	@sk_wmem_alloc: transmit queue bytes committed
   *	@sk_write_queue: Packet sending queue
   *	@sk_async_wait_queue: DMA copied packets
+  *	@sk_ack_queue: TCP ack packets
   *	@sk_omem_alloc: "o" is "option" or "other"
   *	@sk_wmem_queued: persistent queue size
   *	@sk_forward_alloc: space allocated forward
@@ -288,9 +289,12 @@ struct sock {
 	struct sk_buff_head	sk_async_wait_queue;
 #endif
 
+	struct sk_buff_head	sk_ack_queue;
+
 #ifdef CONFIG_XFRM
 	struct xfrm_policy	*sk_policy[2];
 #endif
+
 #ifdef CONFIG_GFAR_HW_TCP_RECEIVE_OFFLOAD
 	struct sock		**hw_tcp_chan_ref;
 	u32			init_seq;

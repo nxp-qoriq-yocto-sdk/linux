@@ -54,6 +54,8 @@ extern void tcp_time_wait(struct sock *sk, int state, int timeo);
 #define MAX_TCP_HEADER	(128 + MAX_HEADER)
 #define MAX_TCP_OPTION_SPACE 40
 
+#define TCP_ACK_RECYCLE_MAX 128
+
 /* 
  * Never offer a window over 32767 without using window scaling. Some
  * poor stacks do signed 16bit maths! 
@@ -246,6 +248,7 @@ extern int sysctl_tcp_max_ssthresh;
 extern int sysctl_tcp_cookie_size;
 extern int sysctl_tcp_thin_linear_timeouts;
 extern int sysctl_tcp_thin_dupack;
+extern int sysctl_tcp_fast_ack;
 
 extern atomic_long_t tcp_memory_allocated;
 extern struct percpu_counter tcp_sockets_allocated;

@@ -2115,6 +2115,7 @@ int dev_hard_start_xmit(struct sk_buff *skb, struct net_device *dev,
 		if (!list_empty(&ptype_all))
 			dev_queue_xmit_nit(skb, dev);
 
+		skb->osk = skb->sk;
 		skb_orphan_try(skb);
 
 		features = netif_skb_features(skb);

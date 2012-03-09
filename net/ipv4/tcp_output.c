@@ -16,6 +16,8 @@
  *		Matthew Dillon, <dillon@apollo.west.oic.com>
  *		Arnt Gulbrandsen, <agulbra@nvg.unit.no>
  *		Jorge Cwik, <jorge@laser.satlink.net>
+ *
+ *		Copyright 2012 Freescale Semiconductor, Inc.
  */
 
 /*
@@ -62,6 +64,9 @@ int sysctl_tcp_slow_start_after_idle __read_mostly = 1;
 
 int sysctl_tcp_cookie_size __read_mostly = 0; /* TCP_COOKIE_MAX */
 EXPORT_SYMBOL_GPL(sysctl_tcp_cookie_size);
+
+int sysctl_tcp_fast_ack __read_mostly;
+EXPORT_SYMBOL(sysctl_tcp_fast_ack);
 
 
 /* Account for new data that has been sent to the network. */
@@ -2707,6 +2712,88 @@ void tcp_send_delayed_ack(struct sock *sk)
 	sk_reset_timer(sk, &icsk->icsk_delack_timer, timeout);
 }
 
+static int tcp_fast_ack(struct sock *sk)
+{
+	const struct net_device_ops *ops;
+	struct net_device *dev;
+	struct inet_sock *inet;
+	struct tcp_sock *tp;
+	struct tcphdr *th;
+	struct rtable *rt;
+	struct iphdr *iph;
+	struct sk_buff *skb;
+	int len = 0;
+	int rc;
+	const struct inet_connection_sock *icsk = inet_csk(sk);
+
+	rt = (struct rtable *)__sk_dst_check(sk, 0);
+
+	if (rt == NULL)
+		return 0;
+
+	skb = NULL;
+	skb = skb_dequeue(&sk->sk_ack_queue);
+	if (!skb)
+		return 0;
+
+	if (icsk->icsk_ca_ops->flags & TCP_CONG_RTT_STAMP)
+		__net_timestamp(skb);
+
+	skb->next = 0;
+	atomic_set(&skb->users, 1);
+	atomic_set(&(skb_shinfo(skb)->dataref), 1);
+	skb->csum = 0;
+	tp = tcp_sk(sk);
+	if (tcp_packets_in_flight(tp) == 0)
+		tcp_ca_event(sk, CA_EVENT_TX_START);
+
+	th	= tcp_hdr(skb);
+	th->seq	= htonl(tcp_acceptable_seq(sk));
+	th->ack_seq	= htonl(tp->rcv_nxt);
+	th->window	= htons(tcp_select_window(sk));
+	th->check	= 0;
+
+	if (tcp_sk(sk)->rx_opt.tstamp_ok) {
+		len	= TCPOLEN_TSTAMP_ALIGNED + sizeof(struct tcphdr);
+		*((__be32 *)(th + 1)+1)	= htonl(tcp_time_stamp);
+		*((__be32 *)(th + 1)+2)	= htonl(tcp_sk(sk)->rx_opt.ts_recent);
+	} else
+		len	= sizeof(struct tcphdr);
+
+	skb->len	= sizeof(struct iphdr) + len + ETH_HLEN;
+	skb->data	= skb->head + MAX_TCP_HEADER - skb->len;
+	inet	= inet_sk(sk);
+
+	if (skb->ip_summed == CHECKSUM_PARTIAL)
+		th->check = ~tcp_v4_check(len, inet->inet_saddr,
+					inet->inet_daddr, 0);
+	else
+		th->check = tcp_v4_check(len, inet->inet_saddr,
+					inet->inet_daddr, csum_partial(th,
+						      th->doff << 2,
+						      skb->csum));
+
+	tcp_event_ack_sent(sk, tcp_skb_pcount(skb));
+	TCP_INC_STATS(sock_net(sk), TCP_MIB_OUTSEGS);
+	iph	= ip_hdr(skb);
+	iph->id	= htons(inet_sk(sk)->inet_id);
+	inet_sk(sk)->inet_id	+= 1;
+	iph->check	= 0;
+	iph->check	= ip_fast_csum((unsigned char *)iph, iph->ihl);
+	rcu_read_lock_bh();
+	dev	= skb->dev;
+	IP_UPD_PO_STATS(dev_net(dev), IPSTATS_MIB_OUT, skb->len);
+	ops	= dev->netdev_ops;
+	rc	= ops->ndo_start_xmit(skb, dev);
+	rcu_read_unlock_bh();
+
+	if (likely(rc <= 0))
+		return 1;
+
+	tcp_enter_cwr(sk, 1);
+	return 0;
+}
+
 /* This routine sends an ack and also updates the window. */
 void tcp_send_ack(struct sock *sk)
 {
@@ -2714,6 +2801,10 @@ void tcp_send_ack(struct sock *sk)
 
 	/* If we have been reset, we may not send again. */
 	if (sk->sk_state == TCP_CLOSE)
+		return;
+
+	if (sysctl_tcp_fast_ack && sk->sk_state == TCP_ESTABLISHED &&
+		tcp_fast_ack(sk))
 		return;
 
 	/* We are not putting this on the write queue, so

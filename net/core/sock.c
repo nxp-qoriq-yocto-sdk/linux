@@ -1242,6 +1242,7 @@ struct sock *sk_clone(const struct sock *sk, const gfp_t priority)
 #ifdef CONFIG_NET_DMA
 		skb_queue_head_init(&newsk->sk_async_wait_queue);
 #endif
+		skb_queue_head_init(&newsk->sk_ack_queue);
 
 		spin_lock_init(&newsk->sk_dst_lock);
 		rwlock_init(&newsk->sk_callback_lock);
@@ -1991,6 +1992,7 @@ void sock_init_data(struct socket *sock, struct sock *sk)
 #ifdef CONFIG_NET_DMA
 	skb_queue_head_init(&sk->sk_async_wait_queue);
 #endif
+	skb_queue_head_init(&sk->sk_ack_queue);
 
 	sk->sk_send_head	=	NULL;
 

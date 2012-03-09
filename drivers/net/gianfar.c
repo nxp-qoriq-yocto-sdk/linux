@@ -3649,7 +3649,8 @@ static int gfar_clean_tx_ring(struct gfar_priv_tx_q *tx_queue,
 			bdp = next_txbd(bdp, base, tx_ring_size);
 		}
 
-		gfar_free_skb(skb);
+		if (!skb_tcp_ack_recycle(skb))
+			gfar_free_skb(skb);
 		tx_queue->tx_skbuff[skb_dirtytx] = NULL;
 
 		skb_dirtytx = (skb_dirtytx + 1) &
