@@ -6,7 +6,7 @@
  * MPIC.
  *
  * Copyright (c) 2004 Jocelyn Mayer
- * Copyright 2010-2011 Freescale Semiconductor, Inc.
+ * Copyright 2010-2012 Freescale Semiconductor, Inc.
  *
  * Some KVM infrastructure code is from arch/x86/kvm/i8259.c:
  *   Copyright (c) 2007 Intel Corporation
@@ -54,6 +54,20 @@
 #define VID         0x03 /* MPIC version ID */
 #define VENI        0x00000000 /* Vendor ID */
 
+#define MPIC_EISR 0x3900
+#define MPIC_EIMR 0x3910
+
+/* Linux would enable cascaded error interrupt
+ * support based on MPIC version. MPIC
+ * version >= 4.1 supports EIMR which is required
+ * for cascaded error interrupt handling. Also,
+ * we only support error interrupts for e500mc
+ * guests, so for e500v2 guests we would
+ * provide an MPIC version number < 4.1.
+ */
+#define MPIC_BRR1_VERSION_4_1 0x00400401 /* MPIC version 4.1 */
+#define MPIC_BRR1_VERSION_3_1 0x00400301 /* MPIC version 3.1 */
+
 enum {
 	IRQ_IPVP = 0,
 	IRQ_IDE,
@@ -66,13 +80,23 @@ enum {
 #define MAX_TMR      8
 #define MAX_IPI      4
 
+#define MAX_ERR      32
+/* MPIC interrupt 16 is the error interrupt */
+#define MPIC_ERR_IRQ_NUM    16
+
 /* Interrupt definitions */
 #define MPIC_EXT_IRQ      0
 #define MPIC_INT_IRQ      (MPIC_EXT_IRQ + MAX_EXT)
 #define MPIC_SPECIAL_IRQ  (MPIC_INT_IRQ + MAX_INT)
 #define MPIC_TMR_IRQ      MPIC_SPECIAL_IRQ
 #define MPIC_IPI_IRQ      (MPIC_TMR_IRQ + MAX_TMR)
-#define MAX_IRQ           (MPIC_IPI_IRQ + MAX_IPI)
+#define MPIC_ERR_IRQ      (MPIC_IPI_IRQ + MAX_IPI * MAX_CPU)
+#define MAX_IRQ           (MPIC_ERR_IRQ + MAX_ERR)
+
+struct error_int_state {
+	u32 eisr;
+	u32 eimr;
+};
 
 struct irq_queue {
 	unsigned long queue[BITS_TO_LONGS(MAX_IRQ)];
@@ -121,6 +145,8 @@ struct openpic {
 
 	struct irq_source src[MAX_IRQ];
 	struct irq_dest dst[MAX_CPU];
+
+	struct error_int_state error_int;
 
 	int num_cpus;
 };
@@ -335,6 +361,41 @@ static void openpic_set_irq(struct openpic *opp, struct irq_source *src,
 			src->pending = 1;
 	}
 	openpic_update_irq(opp, src);
+}
+
+static void openpic_set_err_int(struct openpic *opp)
+{
+	struct irq_source *src = &opp->src[MPIC_ERR_IRQ_NUM];
+	int level = 1;
+
+	if (!(opp->error_int.eisr & ~opp->error_int.eimr))
+		level = 0;
+
+	openpic_set_irq(opp, src, level);
+}
+
+static inline int mpic_is_err_int_src(struct irq_source *src)
+{
+#ifdef CONFIG_KVM_E500MC
+	return src->num >= MPIC_ERR_IRQ && src->num < MPIC_ERR_IRQ + MAX_ERR;
+#else
+	return 0;
+#endif
+}
+
+static void openpic_handle_error_irq(struct openpic *opp, struct irq_source *src, int level)
+{
+	int err_int = src->num - MPIC_ERR_IRQ;
+	u32 err_int_mask;
+
+	err_int_mask = 1 << (31 - err_int);
+
+	if (!level)
+		opp->error_int.eisr &= ~err_int_mask;
+	else
+		opp->error_int.eisr |=  err_int_mask;
+
+	openpic_set_err_int(opp);
 }
 
 static uint32_t read_IRQreg(struct openpic *opp, int n_IRQ, uint32_t reg)
@@ -649,6 +710,21 @@ err:
 	return -EOPNOTSUPP;
 }
 
+#ifdef CONFIG_KVM_E500MC
+static void openpic_notify_acked_errirq(struct openpic *opp)
+{
+	u32 eisr = opp->error_int.eisr;
+	int index, err_int;
+
+	while (eisr) {
+		index = __ffs(eisr);
+		err_int = MPIC_ERR_IRQ + (31 - index);
+		kvm_notify_acked_sysirq(opp->kvm, &opp->src[err_int].arch);
+		eisr &= ~(1 << index);
+	}
+}
+#endif
+
 static int openpic_cpu_write(struct kvm_pic *pic, int addr, uint32_t val)
 {
 	struct openpic *opp = pic->priv;
@@ -735,7 +811,12 @@ static int openpic_cpu_write(struct kvm_pic *pic, int addr, uint32_t val)
 		 * state is already updated at this stage.
 		 */
 		spin_unlock(&pic->lock);
-		kvm_notify_acked_sysirq(opp->kvm, &opp->src[s_IRQ].arch);
+#ifdef CONFIG_KVM_E500MC
+		if (s_IRQ == MPIC_ERR_IRQ_NUM)
+			openpic_notify_acked_errirq(opp);
+		else
+#endif
+			kvm_notify_acked_sysirq(opp->kvm, &opp->src[s_IRQ].arch);
 		spin_lock(&pic->lock);
 
 		break;
@@ -854,6 +935,13 @@ static uint32_t openpic_cpu_read(struct kvm_pic *pic, int addr, u32 *valp)
 	addr &= 0xFF0;
 
 	switch (addr) {
+	case 0x0: /* BRR1 */
+#ifdef CONFIG_KVM_E500MC
+		retval = MPIC_BRR1_VERSION_4_1;
+#else
+		retval = MPIC_BRR1_VERSION_3_1;
+#endif
+		break;
 	case 0x80: /* PCTP */
 		retval = dst->shared->mpic_ctpr;
 		break;
@@ -879,6 +967,43 @@ err:
 	return -EOPNOTSUPP;
 }
 
+static uint32_t mpic_err_write(struct kvm_pic *pic, int addr, u32 val)
+{
+	struct openpic *opp = pic->priv;
+
+	pr_debug("%s: addr %08x\n", __func__, addr);
+
+	if (addr != MPIC_EIMR) {
+		pr_debug("%s: => unhandled\n", __func__);
+		return -EOPNOTSUPP;
+	}
+
+	opp->error_int.eimr = val;
+
+	openpic_set_err_int(opp);
+
+	return 0;
+}
+
+static uint32_t mpic_err_read(struct kvm_pic *pic, int addr, u32 *valp)
+{
+	struct openpic *opp = pic->priv;
+
+	pr_debug("%s: addr %08x\n", __func__, addr);
+
+	switch (addr) {
+	case MPIC_EISR:
+		*valp = opp->error_int.eisr & ~opp->error_int.eimr;
+		return 0;
+	case MPIC_EIMR:
+		*valp = opp->error_int.eimr;
+		return 0;
+	default:
+		pr_debug("%s: => unhandled\n", __func__);
+		return -EOPNOTSUPP;
+	}
+}
+
 static int openpic_writel(struct kvm_pic *pic, int addr, uint32_t val)
 {
 	int ret = 0;
@@ -890,9 +1015,12 @@ static int openpic_writel(struct kvm_pic *pic, int addr, uint32_t val)
 	} else if (addr < 0x10f0) {
 		/* Global registers */
 		ret = openpic_gbl_write(pic, addr, val);
-	} else if (addr < 0x10000) {
+	} else if (addr < 0x2400) {
 		/* Timers registers */
 		ret = mpic_timer_write(pic, addr, val);
+	} else if (addr < 0x3a00) {
+		/* Error Interrupt registers */
+		ret = mpic_err_write(pic, addr, val);
 	} else if (addr < 0x20000) {
 		/* Source registers */
 		ret = openpic_src_write(pic, addr, val);
@@ -916,9 +1044,12 @@ static int openpic_readl(struct kvm_pic *pic, int addr, u32 *val)
 	} else if (addr < 0x10f0) {
 		/* Global registers */
 		ret = openpic_gbl_read(pic, addr, val);
-	} else if (addr < 0x10000) {
+	} else if (addr < 0x2400) {
 		/* Timers registers */
 		ret = mpic_timer_read(pic, addr, val);
+	} else if (addr < 0x3a00) {
+		/* Error Interrupt registers */
+		ret = mpic_err_read(pic, addr, val);
 	} else if (addr < 0x20000) {
 		/* Source registers */
 		ret = openpic_src_read(pic, addr, val);
@@ -1089,7 +1220,11 @@ int kvm_arch_set_irq(struct kvm *kvm, struct kvm_arch_irq *irq, int level)
 	unsigned long flags;
 
 	spin_lock_irqsave(&pic->lock, flags);
-	openpic_set_irq(priv, src, level);
+	if (mpic_is_err_int_src(src))
+		openpic_handle_error_irq(priv, src, level);
+	else
+		openpic_set_irq(priv, src, level);
+
 	spin_unlock_irqrestore(&pic->lock, flags);
 	return 1;
 }
@@ -1140,10 +1275,13 @@ kvm_arch_lookup_irq(struct kvm *kvm, struct kvm_assigned_irq *irq)
 				return NULL;
 
 			return &priv->src[irqnum].arch;
-
-		case 1: /* error interrupts -- no EISR support yet */
-			return NULL;
-
+#ifdef CONFIG_KVM_E500MC
+		case 1: /* Error Interrupts */
+			irqnum = irq->sysirq.intspec[3];
+			if (irqnum >= MAX_ERR)
+				return NULL;
+			return &priv->src[irqnum + MPIC_ERR_IRQ].arch;
+#endif
 		case 2: /* IPIs */
 			irqnum = irq->sysirq.intspec[0];
 			if (irqnum >= MAX_IPI)
