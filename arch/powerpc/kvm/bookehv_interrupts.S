@@ -59,6 +59,7 @@
 #define NEED_EMU		0x00000001 /* emulation -- save nv regs */
 #define NEED_DEAR		0x00000002 /* save faulting DEAR */
 #define NEED_ESR		0x00000004 /* save faulting ESR */
+#define NEED_DBSR		0x00000008 /* save DBSR */
 
 /*
  * On entry:
@@ -206,6 +207,11 @@
 	PPC_STL	r9, VCPU_FAULT_DEAR(r4)
 	.endif
 
+	.if	\flags & NEED_DBSR
+	mfspr	r9, SPRN_DBSR
+	stw	r9, VCPU_DBSR(r4)
+	.endif
+
 	b	kvmppc_resume_host
 .endm
 
@@ -303,9 +309,9 @@ kvm_handler BOOKE_INTERRUPT_GUEST_DBELL, SPRN_GSRR0, SPRN_GSRR1, 0
 kvm_lvl_handler BOOKE_INTERRUPT_GUEST_DBELL_CRIT, \
 	SPRN_SPRG_RSCRATCH_CRIT, SPRN_CSRR0, SPRN_CSRR1, 0
 kvm_lvl_handler BOOKE_INTERRUPT_DEBUG, \
-	SPRN_SPRG_RSCRATCH_CRIT, SPRN_CSRR0, SPRN_CSRR1, 0
+	SPRN_SPRG_RSCRATCH_CRIT, SPRN_CSRR0, SPRN_CSRR1, NEED_DBSR
 kvm_lvl_handler BOOKE_INTERRUPT_DEBUG, \
-	SPRN_SPRG_RSCRATCH_DBG, SPRN_DSRR0, SPRN_DSRR1, 0
+	SPRN_SPRG_RSCRATCH_DBG, SPRN_DSRR0, SPRN_DSRR1, NEED_DBSR
 
 
 /* Registers:
@@ -334,37 +340,33 @@ skip_pmgc0_save:
 	 * No Need to save guest debug registers as they are already intact
 	 * in guest/shadow registers.
 	 */
-	addi	r8, r4, VCPU_SHADOW_DBG
-	lwz	r9, 0(r8)
-	rlwinm	r9, r9, 0, 4, 24
-	cmpwi	r9, 0
+	lwz	r9, VCPU_SHADOW_DBG(r4)
+	rlwinm.	r8, r9, 0, ~DBCR0_IDM
 	beq	skip_load_host_debug
-	addi	r7, r4, VCPU_HOST_DBG - 4
-	lwzu	r3, 4(r7)
-	lwz	r9, 0(r8)
+	lwz	r3, VCPU_HOST_DBG(r4)
 	andis.	r9, r9, DBCR0_AC_BITS@h
 	li	r9, 0
 	mtspr	SPRN_DBCR0, r9		/* disable all debug event */
 	beq	..skip_load_hw_bkpts
-	lwzu	r9, 4(r7)
-	mtspr	SPRN_DBCR1, r9
-	lwzu	r9, 4(r7)
-	mtspr	SPRN_DBCR2, r9
-	lwzu	r9, 4(r7)
+	lwz	r7, VCPU_HOST_DBG+VCPU_DBCR1(r4)
+	lwz	r8, VCPU_HOST_DBG+VCPU_DBCR2(r4)
+	lwz	r9, VCPU_HOST_DBG+VCPU_DBCR4(r4)
+	mtspr	SPRN_DBCR1, r7
+	lwz	r7, VCPU_HOST_DBG+VCPU_IAC1(r4)
+	mtspr	SPRN_DBCR2, r8
+	lwz	r8, VCPU_HOST_DBG+VCPU_IAC1+4(r4)
 	mtspr	SPRN_DBCR4, r9
-	lwzu	r9, 4(r7)
-	mtspr	SPRN_IAC1, r9
-	lwzu	r9, 4(r7)
-	mtspr	SPRN_IAC2, r9
+	mtspr	SPRN_IAC1, r7
+	mtspr	SPRN_IAC2, r8
 #ifndef CONFIG_FSL_BOOKE
-	lwzu	r9, 4(r7)
-	mtspr	SPRN_IAC3, r9
-	lwzu	r9, 4(r7)
+	lwz	r8, VCPU_HOST_DBG+VCPU_IAC1+8(r4)
+	lwz	r9, VCPU_HOST_DBG+VCPU_IAC1+12(r4)
+	mtspr	SPRN_IAC3, r8
 	mtspr	SPRN_IAC4, r9
 #endif
-	lwzu	r9, 4(r7)
-	mtspr	SPRN_DAC1, r9
-	lwzu	r9, 4(r7)
+	lwz	r8, VCPU_HOST_DBG+VCPU_DAC1(r4)
+	lwz	r9, VCPU_HOST_DBG+VCPU_DAC1+4(r4)
+	mtspr	SPRN_DAC1, r8
 	mtspr	SPRN_DAC2, r9
 ..skip_load_hw_bkpts:
 	isync
@@ -372,11 +374,6 @@ skip_pmgc0_save:
 	mfspr	r8, SPRN_DBSR
 	mtspr	SPRN_DBSR, r8
 	isync
-//	andi.	r9, r6, NEED_DBG_SAVE_REGS // FIXME
-	andi.	r9, r6, 0 // FIXME
-	beq	skip_dbsr_save
-	stw	r8, VCPU_DBSR(r4)
-skip_dbsr_save:
 	/* Clear EPCR.DUVD and set host DBCR0 */
 	mfspr	r8, SPRN_EPCR
 	rlwinm	r8, r8, 0, ~SPRN_EPCR_DUVD
@@ -650,63 +647,59 @@ skip_pmgc0_restore:
 	 * to not allow debug events in HV mode. Do not change the
 	 * debug registers if guest is not using the debug facility.
 	 */
-	addi	r5, r4, VCPU_SHADOW_DBG
-	lwz	r6, 0(r5)
-	rlwinm	r6, r6, 0, 4, 24
-	cmpwi	r6, 0
+	lwz	r6, VCPU_SHADOW_DBG(r4)
+	rlwinm.	r7, r6, 0, ~DBCR0_IDM
 	beq	..skip_load_guest_debug
 	/* Save host DBCR0 */
-	addi	r7, r4, VCPU_HOST_DBG
 	mfspr	r8, SPRN_DBCR0
-	stw	r8, 0(r7)
+	stw	r8, VCPU_HOST_DBG(r4)
 	/*
 	 * Save host DBCR1/2, IACx and DACx and load guest DBCR1/2,
 	 * IACx and DACx if guest using hw breakpoint/watchpoints.
 	 */
-	lwz	r6, 0(r5)
 	andis.	r3, r6, DBCR0_AC_BITS@h
 	beq	..skip_hw_bkpts
-	mfspr	r8, SPRN_DBCR1
-	stwu	r8, 4(r7)
+	mfspr	r7, SPRN_DBCR1
+	stw	r7, VCPU_HOST_DBG+VCPU_DBCR1(r4)
 	mfspr	r8, SPRN_DBCR2
-	stwu	r8, 4(r7)
-	mfspr	r8, SPRN_DBCR4
-	stwu	r8, 4(r7)
+	stw	r8, VCPU_HOST_DBG+VCPU_DBCR2(r4)
+	mfspr	r7, SPRN_DBCR4
+	stw	r7, VCPU_HOST_DBG+VCPU_DBCR4(r4)
 	mfspr	r8, SPRN_IAC1
-	stwu	r8, 4(r7)
-	mfspr	r8, SPRN_IAC2
-	stwu	r8, 4(r7)
+	stw	r8, VCPU_HOST_DBG+VCPU_IAC1(r4)
+	mfspr	r7, SPRN_IAC2
+	stw	r7, VCPU_HOST_DBG+VCPU_IAC1+4(r4)
 #ifndef CONFIG_FSL_BOOKE
 	mfspr	r8, SPRN_IAC3
-	stwu	r8, 4(r7)
-	mfspr	r8, SPRN_IAC4
-	stwu	r8, 4(r7)
+	stw	r8, VCPU_HOST_DBG+VCPU_IAC1+8(r4)
+	mfspr	r7, SPRN_IAC4
+	stw	r7, VCPU_HOST_DBG+VCPU_IAC1+12(r4)
 #endif
 	mfspr	r8, SPRN_DAC1
-	stwu	r8, 4(r7)
-	mfspr	r8, SPRN_DAC2
-	stwu	r8, 4(r7)
+	stw	r8, VCPU_HOST_DBG+VCPU_DAC1(r4)
+	mfspr	r7, SPRN_DAC2
+	stw	r7, VCPU_HOST_DBG+VCPU_DAC1+4(r4)
 	li	r8, 0
 	mtspr	SPRN_DBCR0, r8		/* disable all debug event */
-	lwzu	r8, 4(r5)
-	mtspr	SPRN_DBCR1, r8
-	lwzu	r8, 4(r5)
+	lwz	r7, VCPU_SHADOW_DBG+VCPU_DBCR1(r4)
+	lwz	r8, VCPU_SHADOW_DBG+VCPU_DBCR2(r4)
+	lwz	r9, VCPU_SHADOW_DBG+VCPU_DBCR4(r4)
+	mtspr	SPRN_DBCR1, r7
+	lwz	r7, VCPU_SHADOW_DBG+VCPU_IAC1(r4)
 	mtspr	SPRN_DBCR2, r8
-	lwzu	r8, 4(r5)
-	mtspr	SPRN_DBCR4, r8
-	lwzu	r8, 4(r5)
-	mtspr	SPRN_IAC1, r8
-	lwzu	r8, 4(r5)
+	lwz	r8, VCPU_SHADOW_DBG+VCPU_IAC1+4(r4)
+	mtspr	SPRN_DBCR4, r9
+	mtspr	SPRN_IAC1, r7
 	mtspr	SPRN_IAC2, r8
 #ifndef CONFIG_FSL_BOOKE
-	lwzu	r8, 4(r5)
-	mtspr	SPRN_IAC3, r8
-	lwzu	r8, 4(r5)
+	lwz	r7, VCPU_SHADOW_DBG+VCPU_IAC1+8(r4)
+	lwz	r8, VCPU_SHADOW_DBG+VCPU_IAC1+12(r4)
+	mtspr	SPRN_IAC3, r7
 	mtspr	SPRN_IAC4, r8
 #endif
-	lwzu	r8, 4(r5)
-	mtspr	SPRN_DAC1, r8
-	lwzu	r8, 4(r5)
+	lwz	r7, VCPU_SHADOW_DBG+VCPU_DAC1(r4)
+	lwz	r8, VCPU_SHADOW_DBG+VCPU_DAC1+4(r4)
+	mtspr	SPRN_DAC1, r7
 	mtspr	SPRN_DAC2, r8
 ..skip_hw_bkpts:
 	/* Set EPCR.DUVD and guest DBCR0 */
@@ -718,7 +711,7 @@ skip_pmgc0_restore:
 	mfspr	r8, SPRN_DBSR
 	mtspr	SPRN_DBSR, r8
 	isync
-	/* Restore guest DBSR */
+	/* Restore guest DBCR */
 	mtspr	SPRN_DBCR0, r6
 	isync
 ..skip_load_guest_debug:
