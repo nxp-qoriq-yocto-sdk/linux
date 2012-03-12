@@ -582,6 +582,14 @@ int main(void)
 	DEFINE(VCPU_DBSR, offsetof(struct kvm_vcpu, arch.dbsr));
 	DEFINE(VCPU_SHADOW_DBG, offsetof(struct kvm_vcpu, arch.shadow_dbg_reg));
 	DEFINE(VCPU_HOST_DBG, offsetof(struct kvm_vcpu, arch.host_dbg_reg));
+	DEFINE(VCPU_DBCR0, offsetof(struct kvmppc_debug_reg, dbcr0));
+	DEFINE(VCPU_DBCR1, offsetof(struct kvmppc_debug_reg, dbcr1));
+	DEFINE(VCPU_DBCR2, offsetof(struct kvmppc_debug_reg, dbcr2));
+#ifdef CONFIG_KVM_E500MC
+	DEFINE(VCPU_DBCR4, offsetof(struct kvmppc_debug_reg, dbcr4));
+#endif
+	DEFINE(VCPU_IAC1, offsetof(struct kvmppc_debug_reg, iac[0]));
+	DEFINE(VCPU_DAC1, offsetof(struct kvmppc_debug_reg, dac[0]));
 	DEFINE(VCPU_GUEST_DEBUG, offsetof(struct kvm_vcpu, guest_debug));
 	DEFINE(VCPU_SHADOW_PMGC0, offsetof(struct kvm_vcpu,
 						arch.shadow_pm_reg.pmgc0));
