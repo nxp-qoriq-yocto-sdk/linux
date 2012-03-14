@@ -1,7 +1,7 @@
 /*
  * P1023 RDS Device Tree Source
  *
- * Copyright 2010-2011 Freescale Semiconductor Inc.
+ * Copyright 2010-2012 Freescale Semiconductor Inc.
  *
  * Author: Roy Zang <tie-fei.zang@freescale.com>
  *
@@ -54,37 +54,10 @@
 
 	qportals: qman-portals@ff000000 {
 		ranges = <0x0 0xf 0xff000000 0x200000>;
-		qportal0: qman-portal@0 {
-			cpu-handle = <&cpu0>;
-			fsl,qman-pool-channels = <&qpool1 &qpool2 &qpool3>;
-		};
-
-		qportal1: qman-portal@4000 {
-			cpu-handle = <&cpu1>;
-			fsl,qman-pool-channels = <&qpool1 &qpool2 &qpool3>;
-		};
-
-		qportal2: qman-portal@8000 {
-			fsl,qman-pool-channels = <&qpool1 &qpool2 &qpool3>;
-		};
 	};
 
 	bportals: bman-portals@ff200000 {
 		ranges = <0x0 0xf 0xff200000 0x200000>;
-		bman-portal@0 {
-			cpu-handle = <&cpu0>;
-		};
-		bman-portal@4000 {
-			cpu-handle = <&cpu1>;
-		};
-		bman-portal@8000 {
-		};
-
-		buffer-pool@0 {
-			compatible = "fsl,p1023-bpool", "fsl,bpool";
-			fsl,bpid = <0>;
-			fsl,bpool-cfg = <0 0x100 0 1 0 0x100>;
-		};
 	};
 
 	soc: soc@ff600000 {
@@ -291,3 +264,5 @@
 };
 
 /include/ "fsl/p1023si-post.dtsi"
+
+/include/ "fsl/qoriq-dpaa-res2.dtsi"
