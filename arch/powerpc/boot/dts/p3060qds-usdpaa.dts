@@ -66,56 +66,48 @@
 		ethernet@0 {
 			compatible = "fsl,p3060-dpa-ethernet-init", "fsl,dpa-ethernet-init";
 			fsl,bman-buffer-pools = <&bp7 &bp8 &bp9>;
-			fsl,qman-channel = <&qpool4>;
 			fsl,qman-frame-queues-rx = <0x50 1 0x51 1>;
 			fsl,qman-frame-queues-tx = <0x70 1 0x71 1>;
 		};
 		ethernet@1 {
 			compatible = "fsl,p3060-dpa-ethernet-init", "fsl,dpa-ethernet-init";
 			fsl,bman-buffer-pools = <&bp7 &bp8 &bp9>;
-			fsl,qman-channel = <&qpool4>;
 			fsl,qman-frame-queues-rx = <0x52 1 0x53 1>;
 			fsl,qman-frame-queues-tx = <0x72 1 0x73 1>;
 		};
 		ethernet@2 {
 			compatible = "fsl,p3060-dpa-ethernet-init", "fsl,dpa-ethernet-init";
 			fsl,bman-buffer-pools = <&bp7 &bp8 &bp9>;
-			fsl,qman-channel = <&qpool4>;
 			fsl,qman-frame-queues-rx = <0x54 1 0x55 1>;
 			fsl,qman-frame-queues-tx = <0x74 1 0x75 1>;
 		};
 		ethernet@3 {
 			compatible = "fsl,p3060-dpa-ethernet-init", "fsl,dpa-ethernet-init";
 			fsl,bman-buffer-pools = <&bp7 &bp8 &bp9>;
-			fsl,qman-channel = <&qpool4>;
 			fsl,qman-frame-queues-rx = <0x56 1 0x57 1>;
 			fsl,qman-frame-queues-tx = <0x76 1 0x77 1>;
 		};
 		ethernet@5 {
 			compatible = "fsl,p3060-dpa-ethernet-init", "fsl,dpa-ethernet-init";
 			fsl,bman-buffer-pools = <&bp7 &bp8 &bp9>;
-			fsl,qman-channel = <&qpool4>;
 			fsl,qman-frame-queues-rx = <0x5c 1 0x5d 1>;
 			fsl,qman-frame-queues-tx = <0x7c 1 0x7d 1>;
 		};
 		ethernet@6 {
 			compatible = "fsl,p3060-dpa-ethernet-init", "fsl,dpa-ethernet-init";
 			fsl,bman-buffer-pools = <&bp7 &bp8 &bp9>;
-			fsl,qman-channel = <&qpool4>;
 			fsl,qman-frame-queues-rx = <0x5e 1 0x5f 1>;
 			fsl,qman-frame-queues-tx = <0x7e 1 0x7f 1>;
 		};
 		ethernet@7 {
 			compatible = "fsl,p3060-dpa-ethernet-init", "fsl,dpa-ethernet-init";
 			fsl,bman-buffer-pools = <&bp7 &bp8 &bp9>;
-			fsl,qman-channel = <&qpool4>;
 			fsl,qman-frame-queues-rx = <0x60 1 0x61 1>;
 			fsl,qman-frame-queues-tx = <0x80 1 0x81 1>;
 		};
 		ethernet@8 {
 			compatible = "fsl,p3060-dpa-ethernet-init", "fsl,dpa-ethernet-init";
 			fsl,bman-buffer-pools = <&bp7 &bp8 &bp9>;
-			fsl,qman-channel = <&qpool4>;
 			fsl,qman-frame-queues-rx = <0x62 1 0x63 1>;
 			fsl,qman-frame-queues-tx = <0x82 1 0x83 1>;
 		};

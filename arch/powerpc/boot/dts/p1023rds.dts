@@ -252,12 +252,10 @@
 
 		ethernet@0 {
 			compatible = "fsl,p1023-dpa-ethernet", "fsl,dpa-ethernet";
-			fsl,qman-channel = <&qpool1>;
 			fsl,fman-mac = <&enet0>;
 		};
 		ethernet@1 {
 			compatible = "fsl,p1023-dpa-ethernet", "fsl,dpa-ethernet";
-			fsl,qman-channel = <&qpool1>;
 			fsl,fman-mac = <&enet1>;
 		};
 	};
