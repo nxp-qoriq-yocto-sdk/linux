@@ -3409,6 +3409,7 @@ void perf_event_update_userpage(struct perf_event *event)
 unlock:
 	rcu_read_unlock();
 }
+EXPORT_SYMBOL_GPL(perf_event_update_userpage);
 
 static unsigned long perf_data_size(struct perf_buffer *buffer);
 
@@ -5058,6 +5059,7 @@ int perf_event_overflow(struct perf_event *event, int nmi,
 {
 	return __perf_event_overflow(event, nmi, 1, data, regs);
 }
+EXPORT_SYMBOL_GPL(perf_event_overflow);
 
 /*
  * Generic software event infrastructure
