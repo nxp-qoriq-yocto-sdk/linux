@@ -1,7 +1,7 @@
 /*
  * P1023/P1017 Silicon/SoC Device Tree Source (post include)
  *
- * Copyright 2011 Freescale Semiconductor Inc.
+ * Copyright 2011-2012 Freescale Semiconductor Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -122,24 +122,6 @@
 		reg = <0x8000 0x4000 0x102000 0x1000>;
 		interrupts = <33 2 0 0>;
 		fsl,qman-channel-id = <0x2>;
-	};
-
-	qpool1: qman-pool@1 {
-		cell-index = <1>;
-		compatible = "fsl,qman-pool-channel";
-		fsl,qman-channel-id = <0x21>;
-	};
-
-	qpool2: qman-pool@2 {
-		cell-index = <2>;
-		compatible = "fsl,qman-pool-channel";
-		fsl,qman-channel-id = <0x22>;
-	};
-
-	qpool3: qman-pool@3 {
-		cell-index = <3>;
-		compatible = "fsl,qman-pool-channel";
-		fsl,qman-channel-id = <0x23>;
 	};
 };
 
