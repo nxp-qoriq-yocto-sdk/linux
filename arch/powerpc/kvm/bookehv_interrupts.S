@@ -620,13 +620,13 @@ lightweight_exit:
 	 * SPRGs, so we need to reload them here with the guest's values.
 	 */
 	lwz	r3, VCPU_VRSAVE(r4)
-	lwz	r5, VCPU_SHARED_SPRG4(r11)
+	PPC_LL	r5, VCPU_SHARED_SPRG4(r11)
 	mtspr	SPRN_VRSAVE, r3
-	lwz	r6, VCPU_SHARED_SPRG5(r11)
+	PPC_LL	r6, VCPU_SHARED_SPRG5(r11)
 	mtspr	SPRN_SPRG4W, r5
-	lwz	r7, VCPU_SHARED_SPRG6(r11)
+	PPC_LL	r7, VCPU_SHARED_SPRG6(r11)
 	mtspr	SPRN_SPRG5W, r6
-	lwz	r8, VCPU_SHARED_SPRG7(r11)
+	PPC_LL	r8, VCPU_SHARED_SPRG7(r11)
 	mtspr	SPRN_SPRG6W, r7
 	lwz	r9, VCPU_PM_IS_RESERVED(r4)
 	mtspr	SPRN_SPRG7W, r8
