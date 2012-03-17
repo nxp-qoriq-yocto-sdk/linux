@@ -268,6 +268,7 @@ _GLOBAL(kvmppc_handler_\intno\()_\srr1)
 	PPC_STL r3, VCPU_GPR(r10)(r11)
 	mfctr	r7
 	PPC_STL	r12, VCPU_GPR(r12)(r11)
+	PPC_STL	r13, VCPU_GPR(r13)(r11)
 	PPC_STL	r4, VCPU_GPR(r11)(r11)
 	PPC_STL	r7, VCPU_CTR(r11)
 	mr	r4, r11
