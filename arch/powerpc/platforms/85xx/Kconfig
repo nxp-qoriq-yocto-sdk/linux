@@ -91,6 +91,15 @@ config P1023_RDS
 	help
 	  This option enables support for the P1023 RDS board
 
+config BSC9131_RDB
+	bool "Freescale BSC9131RDB"
+	select DEFAULT_UIMAGE
+	help
+	  This option enables support for the Freescale BSC9131RDB board.
+	  The BSC9131 is a heterogeneous SoC containing an e500v2 powerpc and a
+	  StarCore SC3850 DSP
+	  Manufacturer : Freescale Semiconductor, Inc
+
 config SOCRATES
 	bool "Socrates"
 	select DEFAULT_UIMAGE
