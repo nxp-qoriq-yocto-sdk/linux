@@ -126,6 +126,9 @@ struct talitos_private {
 	void __iomem *reg;
 	int irq[2];
 
+	/* SEC global registers lock */
+	spinlock_t reg_lock ____cacheline_aligned;
+
 	/* SEC version geometry (from device tree node) */
 	unsigned int num_channels;
 	unsigned int chfifo_len;
@@ -419,6 +422,7 @@ static int talitos_done_##name(struct napi_struct *napi, int budget)	\
 	struct device *dev = &napi->dev->dev;				\
 	struct talitos_private *priv = dev_get_drvdata(dev);		\
 	int budget_per_ch, work_done = 0;				\
+	unsigned long flags;						\
 									\
 	budget_per_ch = budget / num_ch;				\
 	if (ch_done_mask & 1)						\
@@ -438,9 +442,11 @@ out:									\
 		/* At this point, all completed channels have been */	\
 		/* processed. Unmask done interrupts for channels */	\
 		/* completed later on. */				\
+		spin_lock_irqsave(&priv->reg_lock, flags);		\
 		setbits32(priv->reg + TALITOS_IMR, ch_done_mask);	\
 		setbits32(priv->reg + TALITOS_IMR_LO,			\
 			  TALITOS_IMR_LO_INIT);				\
+		spin_unlock_irqrestore(&priv->reg_lock, flags);		\
 	}								\
 									\
 	return work_done;						\
@@ -634,16 +640,20 @@ static irqreturn_t talitos_interrupt_##name(int irq, void *data)	       \
 	struct device *dev = data;					       \
 	struct talitos_private *priv = dev_get_drvdata(dev);		       \
 	u32 isr, isr_lo;						       \
+	unsigned long flags;						       \
 									       \
+	spin_lock_irqsave(&priv->reg_lock, flags);			       \
 	isr = in_be32(priv->reg + TALITOS_ISR);				       \
 	isr_lo = in_be32(priv->reg + TALITOS_ISR_LO);			       \
 	/* Acknowledge interrupt */					       \
 	out_be32(priv->reg + TALITOS_ICR, isr & (ch_done_mask | ch_err_mask)); \
 	out_be32(priv->reg + TALITOS_ICR_LO, isr_lo);			       \
 									       \
-	if (unlikely((isr & ~TALITOS_ISR_4CHDONE) & ch_err_mask || isr_lo))    \
-		talitos_error(dev, isr, isr_lo);			       \
-	else								       \
+	if (unlikely(isr & ch_err_mask || isr_lo)) {			       \
+		spin_unlock_irqrestore(&priv->reg_lock, flags);		       \
+		talitos_error(dev, isr & ch_err_mask, isr_lo);		       \
+	}								       \
+	else {								       \
 		if (likely(isr & ch_done_mask)) {			       \
 			/* mask further done interrupts. */		       \
 			clrbits32(priv->reg + TALITOS_IMR, ch_done_mask);      \
@@ -651,6 +661,8 @@ static irqreturn_t talitos_interrupt_##name(int irq, void *data)	       \
 			napi_schedule(per_cpu_ptr(priv->done_task[sirq],       \
 						  smp_processor_id()));	       \
 		}							       \
+		spin_unlock_irqrestore(&priv->reg_lock, flags);		       \
+	}								       \
 									       \
 	return (isr & (ch_done_mask | ch_err_mask) || isr_lo) ? IRQ_HANDLED :  \
 								IRQ_NONE;      \
@@ -2741,6 +2753,8 @@ static int talitos_probe(struct platform_device *ofdev)
 
 	priv->ofdev = ofdev;
 	priv->dev = dev;
+
+	spin_lock_init(&priv->reg_lock);
 
 	priv->netdev = alloc_percpu(struct net_device);
 	if (!priv->netdev) {
