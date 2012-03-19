@@ -745,7 +745,7 @@ static irqreturn_t pamu_av_isr(int irq, void *arg)
 static int __init fsl_pamu_probe(struct platform_device *pdev)
 {
 	void __iomem *pamu_regs = NULL;
-	struct ccsr_guts_85xx __iomem *guts_regs = NULL;
+	struct ccsr_guts __iomem *guts_regs = NULL;
 	u32 pamubypenr, pamu_counter;
 	unsigned long pamu_reg_off;
 	struct device_node *guts_node;

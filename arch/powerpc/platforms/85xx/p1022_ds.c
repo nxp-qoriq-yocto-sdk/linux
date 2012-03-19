@@ -198,7 +198,7 @@ static void p1022ds_set_monitor_port(enum fsl_diu_monitor_port port)
 	struct device_node *guts_node;
 	struct device_node *lbc_node = NULL;
 	struct device_node *law_node = NULL;
-	struct ccsr_guts_85xx __iomem *guts;
+	struct ccsr_guts __iomem *guts;
 	struct fsl_lbc_regs *lbc = NULL;
 	void *ecm = NULL;
 	u8 __iomem *lbc_lcs0_ba = NULL;
@@ -405,7 +405,7 @@ exit:
 void p1022ds_set_pixel_clock(unsigned int pixclock)
 {
 	struct device_node *guts_np = NULL;
-	struct ccsr_guts_85xx __iomem *guts;
+	struct ccsr_guts __iomem *guts;
 	unsigned long freq;
 	u64 temp;
 	u32 pxclk;
