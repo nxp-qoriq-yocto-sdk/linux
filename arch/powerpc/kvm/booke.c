@@ -555,6 +555,7 @@ void kvmppc_watchdog_func(unsigned long data)
 			if (tsr & TSR_WIS) {
 				new_tsr = (tsr & ~TCR_WRC_MASK) |
 					  (vcpu->arch.tcr & TCR_WRC_MASK);
+				vcpu->arch.tcr &= ~TCR_WRC_MASK;
 				final = 1;
 			} else {
 				new_tsr = tsr | TSR_WIS;
