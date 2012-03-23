@@ -403,6 +403,7 @@ static int kvmppc_booke_irqprio_deliver(struct kvm_vcpu *vcpu,
 		keep_irq = true;
 		break;
 #endif
+	case BOOKE_IRQPRIO_WATCHDOG:
 	case BOOKE_IRQPRIO_CRITICAL:
 	case BOOKE_IRQPRIO_DBELL_CRIT:
 		allowed = vcpu->arch.shared->msr & MSR_CE;
