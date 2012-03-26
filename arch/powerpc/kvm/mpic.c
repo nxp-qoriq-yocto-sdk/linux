@@ -890,6 +890,12 @@ static u32 iack_nolock(struct openpic *opp, struct irq_dest *dst)
 	return retval;
 }
 
+int kvm_mpic_is_using_coreint(struct kvm *kvm)
+{
+	struct openpic *opp = kvm->arch.vpic->priv;
+	return	opp->glbc & 0x60000000;
+}
+
 u32 kvmppc_mpic_iack(struct kvm *kvm, int vcpu)
 {
 	struct kvm_pic *pic = kvm->arch.vpic;

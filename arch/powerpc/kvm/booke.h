@@ -128,6 +128,7 @@ void kvmppc_booke_vcpu_load(struct kvm_vcpu *vcpu, int cpu);
 void kvmppc_booke_vcpu_put(struct kvm_vcpu *vcpu);
 
 u32 kvmppc_mpic_iack(struct kvm *kvm, int vcpu);
+int kvm_mpic_is_using_coreint(struct kvm *kvm);
 
 void kvmppc_recalc_shadow_ac(struct kvm_vcpu *vcpu);
 void kvmppc_recalc_shadow_dbcr(struct kvm_vcpu *vcpu);
