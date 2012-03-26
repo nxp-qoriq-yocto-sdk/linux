@@ -465,11 +465,18 @@ static int kvmppc_booke_irqprio_deliver(struct kvm_vcpu *vcpu,
 			clear_bit(priority, &vcpu->arch.pending_exceptions);
 
 #ifdef CONFIG_KVM_MPIC
-		/* FIXME: nicer interface, vcpu, guest-requested */
-		if (priority == BOOKE_IRQPRIO_EXTERNAL &&
-		    vcpu->arch.magic_page_ea)
-			vcpu->arch.shared->epr =
-			    kvmppc_mpic_iack(vcpu->kvm, vcpu->vcpu_id);
+		if (priority == BOOKE_IRQPRIO_EXTERNAL)
+#ifdef CONFIG_KVM_BOOKE_HV
+			if (kvm_mpic_is_using_coreint(vcpu->kvm)) {
+				mtspr(SPRN_GEPR,
+				    kvmppc_mpic_iack(vcpu->kvm, vcpu->vcpu_id));
+			}
+#else
+			/* FIXME: nicer interface, vcpu, guest-requested */
+			if (vcpu->arch.magic_page_ea)
+				vcpu->arch.shared->epr =
+				    kvmppc_mpic_iack(vcpu->kvm, vcpu->vcpu_id);
+#endif
 #endif
 	}
 
