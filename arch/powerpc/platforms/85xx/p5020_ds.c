@@ -89,7 +89,7 @@ define_machine(p5020_ds) {
 	.pcibios_fixup_bus	= fsl_pcibios_fixup_bus,
 #endif
 /* coreint doesn't play nice with lazy EE, use legacy mpic for now */
-#ifdef CONFIG_PPC64
+#ifdef CONFIG_PPC_LAZY_EE
 	.get_irq		= mpic_get_irq,
 #else
 	.get_irq		= mpic_get_coreint_irq,
