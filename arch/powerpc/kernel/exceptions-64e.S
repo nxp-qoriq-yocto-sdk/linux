@@ -107,11 +107,6 @@
 #define PROLOG_ADDITION_NONE_DBG
 #define PROLOG_ADDITION_NONE_MC
 
-#define PROLOG_ADDITION_MASKABLE_GEN					    \
-	lbz	r11,PACASOFTIRQEN(r13); /* are irqs soft-disabled ? */	    \
-	cmpwi	cr0,r11,0;		/* yes -> go out of line */	    \
-	beq	masked_interrupt_book3e;
-
 #define PROLOG_ADDITION_2REGS_GEN					    \
 	std	r14,PACA_EXGEN+EX_R14(r13);				    \
 	std	r15,PACA_EXGEN+EX_R15(r13)
@@ -131,11 +126,29 @@
 	std	r14,PACA_EXMC+EX_R14(r13);				    \
 	std	r15,PACA_EXMC+EX_R15(r13)
 
+#ifdef CONFIG_PPC_LAZY_EE
+#define PROLOG_ADDITION_MASKABLE_GEN					    \
+	lbz	r11,PACASOFTIRQEN(r13); /* are irqs soft-disabled ? */	    \
+	cmpwi	cr0,r11,0;		/* yes -> go out of line */	    \
+	beq	masked_interrupt_book3e;
+
 #define PROLOG_ADDITION_DOORBELL_GEN					    \
 	lbz	r11,PACASOFTIRQEN(r13); /* are irqs soft-disabled ? */	    \
 	cmpwi	cr0,r11,0;		/* yes -> go out of line */	    \
 	beq	masked_doorbell_book3e
+#else /* CONFIG_PPC_LAZY_EE */
+#define PROLOG_ADDITION_MASKABLE_GEN
+#define PROLOG_ADDITION_DOORBELL_GEN
+#endif /* CONFIG_PPC_LAZY_EE */
 
+#ifdef CONFIG_PPC_LAZY_EE
+#define GET_IRQ_SOFT_ENABLED						    \
+	lbz	r11,PACASOFTIRQEN(r13)
+#else
+#define GET_IRQ_SOFT_ENABLED						    \
+	mfmsr	r11;							    \
+	rlwimi	r11,r11,0,16,16
+#endif
 
 /* Core exception code for all exceptions except TLB misses.
  * XXX: Needs to make SPRN_SPRG_GEN depend on exception type
@@ -159,7 +172,7 @@
 	mfspr	r8,SPRN_XER;		/* save XER in stackframe */	    \
 	ld	r9,excf+EX_R1(r13);	/* load orig r1 back from PACA */   \
 	lwz	r10,excf+EX_CR(r13);	/* load orig CR back from PACA	*/  \
-	lbz	r11,PACASOFTIRQEN(r13);	/* get current IRQ softe */	    \
+	GET_IRQ_SOFT_ENABLED;		/* get current IRQ softe */	    \
 	ld	r12,exception_marker@toc(r2);				    \
 	li	r0,0;							    \
 	std	r3,GPR10(r1);		/* save r10 to stackframe */	    \
@@ -180,11 +193,18 @@
 
 /* Variants for the "ints" argument */
 #define INTS_KEEP
+
+#ifdef CONFIG_PPC_LAZY_EE
 #define INTS_DISABLE_SOFT						    \
 	stb	r0,PACASOFTIRQEN(r13);	/* mark interrupts soft-disabled */ \
 	TRACE_DISABLE_INTS;
 #define INTS_DISABLE_HARD						    \
 	stb	r0,PACAHARDIRQEN(r13); /* and hard disabled */
+#else
+#define INTS_DISABLE_SOFT
+#define INTS_DISABLE_HARD
+#endif
+
 #define INTS_DISABLE_ALL						    \
 	INTS_DISABLE_SOFT						    \
 	INTS_DISABLE_HARD
@@ -609,6 +629,7 @@ kernel_dbg_exc:
 	MASKABLE_EXCEPTION(0x320, BOOKE_INTERRUPT_HV_PRIV,
 			   ehpriv, .unknown_exception, ACK_NONE)
 
+#ifdef CONFIG_PPC_LAZY_EE
 /*
  * An interrupt came in while soft-disabled; clear EE in SRR1,
  * clear paca->hard_enabled and return.
@@ -633,6 +654,7 @@ masked_interrupt_book3e_common:
 	mfspr	r13,SPRN_SPRG_GEN_SCRATCH;
 	rfi
 	b	.
+#endif /* CONFIG_PPC_LAZY_EE */
 
 /*
  * This is called from 0x300 and 0x400 handlers after the prologs with

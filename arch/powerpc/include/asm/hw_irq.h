@@ -17,7 +17,21 @@ extern void WatchdogException(struct pt_regs *regs);
 extern void unknown_exception(struct pt_regs *regs);
 extern void machine_check_exception(struct pt_regs *regs);
 
+#ifdef CONFIG_BOOKE
+#define __hard_irq_enable()	asm volatile("wrteei 1" : : : "memory");
+#define __hard_irq_disable()	asm volatile("wrteei 0" : : : "memory");
+#else
 #ifdef CONFIG_PPC64
+#define __hard_irq_enable()	__mtmsrd(mfmsr() | MSR_EE, 1)
+#define __hard_irq_disable()	__mtmsrd(mfmsr() & ~MSR_EE, 1)
+#else
+#define __hard_irq_enable()	mtmsr(mfmsr() | MSR_EE)
+#define __hard_irq_disable()	mtmsr(mfmsr() & ~MSR_EE)
+#endif
+#endif /* CONFIG_BOOKE */
+
+#if defined(CONFIG_PPC64) && defined(CONFIG_PPC_LAZY_EE)
+
 #include <asm/paca.h>
 
 static inline unsigned long arch_local_save_flags(void)
@@ -53,9 +67,11 @@ static inline void arch_local_irq_enable(void)
 	arch_local_irq_restore(1);
 }
 
-static inline unsigned long arch_local_irq_save(void)
+static inline void hard_irq_disable(void)
 {
-	return arch_local_irq_disable();
+	__hard_irq_disable();
+	get_paca()->soft_enabled = 0;
+	get_paca()->hard_enabled = 0;
 }
 
 static inline bool arch_irqs_disabled_flags(unsigned long flags)
@@ -63,29 +79,7 @@ static inline bool arch_irqs_disabled_flags(unsigned long flags)
 	return flags == 0;
 }
 
-static inline bool arch_irqs_disabled(void)
-{
-	return arch_irqs_disabled_flags(arch_local_save_flags());
-}
-
-#ifdef CONFIG_PPC_BOOK3E
-#define __hard_irq_enable()	asm volatile("wrteei 1" : : : "memory");
-#define __hard_irq_disable()	asm volatile("wrteei 0" : : : "memory");
-#else
-#define __hard_irq_enable()	__mtmsrd(mfmsr() | MSR_EE, 1)
-#define __hard_irq_disable()	__mtmsrd(mfmsr() & ~MSR_EE, 1)
-#endif
-
-#define  hard_irq_disable()			\
-	do {					\
-		__hard_irq_disable();		\
-		get_paca()->soft_enabled = 0;	\
-		get_paca()->hard_enabled = 0;	\
-	} while(0)
-
-#else /* CONFIG_PPC64 */
-
-#define SET_MSR_EE(x)	mtmsr(x)
+#else /* CONFIG_PPC64 && CONFIG_PPC_LAZY_EE */
 
 static inline unsigned long arch_local_save_flags(void)
 {
@@ -101,34 +95,24 @@ static inline void arch_local_irq_restore(unsigned long flags)
 #endif
 }
 
-static inline unsigned long arch_local_irq_save(void)
+static inline void arch_local_irq_enable(void)
 {
-	unsigned long flags = arch_local_save_flags();
-#ifdef CONFIG_BOOKE
-	asm volatile("wrteei 0" : : : "memory");
-#else
-	SET_MSR_EE(flags & ~MSR_EE);
-#endif
+	__hard_irq_enable();
+}
+
+static inline unsigned long arch_local_irq_disable(void)
+{
+	unsigned long flags;
+
+	flags = arch_local_save_flags();
+	__hard_irq_disable();
+
 	return flags;
 }
 
-static inline void arch_local_irq_disable(void)
+static inline void hard_irq_disable(void)
 {
-#ifdef CONFIG_BOOKE
-	asm volatile("wrteei 0" : : : "memory");
-#else
-	arch_local_irq_save();
-#endif
-}
-
-static inline void arch_local_irq_enable(void)
-{
-#ifdef CONFIG_BOOKE
-	asm volatile("wrteei 1" : : : "memory");
-#else
-	unsigned long msr = mfmsr();
-	SET_MSR_EE(msr | MSR_EE);
-#endif
+	__hard_irq_disable();
 }
 
 static inline bool arch_irqs_disabled_flags(unsigned long flags)
@@ -136,14 +120,17 @@ static inline bool arch_irqs_disabled_flags(unsigned long flags)
 	return (flags & MSR_EE) == 0;
 }
 
+#endif /* CONFIG_PPC64 && CONFIG_PPC_LAZY_EE */
+
+static inline unsigned long arch_local_irq_save(void)
+{
+	return arch_local_irq_disable();
+}
+
 static inline bool arch_irqs_disabled(void)
 {
 	return arch_irqs_disabled_flags(arch_local_save_flags());
 }
-
-#define hard_irq_disable()		arch_local_irq_disable()
-
-#endif /* CONFIG_PPC64 */
 
 #define ARCH_IRQ_INIT_FLAGS	IRQ_NOREQUEST
 

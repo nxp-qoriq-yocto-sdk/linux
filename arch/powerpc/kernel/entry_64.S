@@ -124,8 +124,10 @@ END_FW_FTR_SECTION_IFSET(FW_FEATURE_SPLPAR)
 	ld	r12,_MSR(r1)
 #endif /* CONFIG_TRACE_IRQFLAGS */
 	li	r10,1
+#ifdef CONFIG_PPC_LAZY_EE
 	stb	r10,PACASOFTIRQEN(r13)
 	stb	r10,PACAHARDIRQEN(r13)
+#endif
 	std	r10,SOFTE(r1)
 #ifdef CONFIG_PPC_ISERIES
 BEGIN_FW_FTR_SECTION
@@ -613,10 +615,12 @@ ALT_FW_FTR_SECTION_END_IFCLR(FW_FEATURE_ISERIES)
 2:
 	TRACE_AND_RESTORE_IRQ(r5);
 
+#ifdef CONFIG_PPC_LAZY_EE
 	/* extract EE bit and use it to restore paca->hard_enabled */
 	ld	r3,_MSR(r1)
 	rldicl	r4,r3,49,63		/* r0 = (r3 >> 15) & 1 */
 	stb	r4,PACAHARDIRQEN(r13)
+#endif
 
 #ifdef CONFIG_PPC_BOOK3E
 	b	.exception_return_book3e

@@ -609,6 +609,22 @@ config SECCOMP
 
 	  If unsure, say Y. Only embedded should say N here.
 
+config PPC_LAZY_EE
+	bool
+	prompt "Lazy interrupt disabling" if PPC_BOOK3E_64
+	default y if PPC_BOOK3S_64
+	help
+	  Local interrupt disabling functions don't disable
+	  interrupts right away and instead just clear an
+	  internal 'interrupts are enabled' flag. If an
+	  interrupt is triggered during this time, the
+	  interrupt handling code checks the flag, and if
+	  interrupts are supposed to be off, disables them
+	  for real and returns, skipping interrupt handling.
+	  When interrupts are enabled back, the interrupt
+	  fires again and this time gets handled.
+
+	  If unsure, say N.
 endmenu
 
 config ISA_DMA_API

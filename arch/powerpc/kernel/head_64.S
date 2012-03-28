@@ -549,12 +549,14 @@ _GLOBAL(pmac_secondary_start)
 	add	r13,r13,r4		/* for this processor.		*/
 	SET_PACA(r13)			/* Save vaddr of paca in an SPRG*/
 
+#ifdef CONFIG_PPC_LAZY_EE
 	/* Mark interrupts soft and hard disabled (they might be enabled
 	 * in the PACA when doing hotplug)
 	 */
 	li	r0,0
 	stb	r0,PACASOFTIRQEN(r13)
 	stb	r0,PACAHARDIRQEN(r13)
+#endif
 
 	/* Create a temp kernel stack for use before relocation is on.	*/
 	ld	r1,PACAEMERGSP(r13)
@@ -611,14 +613,18 @@ __secondary_start:
 #ifdef CONFIG_PPC_ISERIES
 BEGIN_FW_FTR_SECTION
 	ori	r4,r4,MSR_EE
+#ifdef CONFIG_PPC_LAZY_EE
 	li	r8,1
 	stb	r8,PACAHARDIRQEN(r13)
+#endif
 END_FW_FTR_SECTION_IFSET(FW_FEATURE_ISERIES)
 #endif
+#ifdef CONFIG_PPC_LAZY_EE
 BEGIN_FW_FTR_SECTION
 	stb	r7,PACAHARDIRQEN(r13)
 END_FW_FTR_SECTION_IFCLR(FW_FEATURE_ISERIES)
 	stb	r7,PACASOFTIRQEN(r13)
+#endif
 
 	mtspr	SPRN_SRR0,r3
 	mtspr	SPRN_SRR1,r4
@@ -759,8 +765,10 @@ _INIT_GLOBAL(start_here_common)
 
 	/* Load up the kernel context */
 5:
+#ifdef CONFIG_PPC_LAZY_EE
 	li	r5,0
 	stb	r5,PACASOFTIRQEN(r13)	/* Soft Disabled */
+#endif
 #ifdef CONFIG_PPC_ISERIES
 BEGIN_FW_FTR_SECTION
 	mfmsr	r5
@@ -769,7 +777,9 @@ BEGIN_FW_FTR_SECTION
 	li	r5,1
 END_FW_FTR_SECTION_IFSET(FW_FEATURE_ISERIES)
 #endif
+#ifdef CONFIG_PPC_LAZY_EE
 	stb	r5,PACAHARDIRQEN(r13)	/* Hard Disabled on others */
+#endif
 
 	bl	.start_kernel
 
