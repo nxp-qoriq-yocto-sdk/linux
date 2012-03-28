@@ -28,6 +28,7 @@ _GLOBAL(book3e_idle)
 	/* Hard disable interrupts */
 	wrteei	0
 
+#ifdef CONFIG_PPC_LAZY_EE
 	/* Now check if an interrupt came in while we were soft disabled
 	 * since we may otherwise lose it (doorbells etc...). We know
 	 * that since PACAHARDIRQEN will have been cleared in that case.
@@ -35,6 +36,7 @@ _GLOBAL(book3e_idle)
 	lbz	r3,PACAHARDIRQEN(r13)
 	cmpwi	cr0,r3,0
 	beqlr
+#endif
 
 	/* Now we are going to mark ourselves as soft and hard enables in
 	 * order to be able to take interrupts while asleep. We inform lockdep
@@ -44,9 +46,12 @@ _GLOBAL(book3e_idle)
 	stdu    r1,-128(r1)
 	bl	.trace_hardirqs_on
 #endif
+
+#ifdef CONFIG_PPC_LAZY_EE
 	li	r0,1
 	stb	r0,PACASOFTIRQEN(r13)
 	stb	r0,PACAHARDIRQEN(r13)
+#endif
 	
 	/* Interrupts will make use return to LR, so get something we want
 	 * in there
@@ -56,10 +61,12 @@ _GLOBAL(book3e_idle)
 	/* Hard disable interrupts again */
 	wrteei	0
 
+#ifdef CONFIG_PPC_LAZY_EE
 	/* Mark them off again in the PACA as well */
 	li	r0,0
 	stb	r0,PACASOFTIRQEN(r13)
 	stb	r0,PACAHARDIRQEN(r13)
+#endif
 
 	/* Tell lockdep about it */
 #ifdef CONFIG_TRACE_IRQFLAGS

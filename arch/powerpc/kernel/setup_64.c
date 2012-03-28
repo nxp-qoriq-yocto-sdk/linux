@@ -233,8 +233,10 @@ void __init early_setup(unsigned long dt_ptr)
 #ifdef CONFIG_SMP
 void early_setup_secondary(void)
 {
+#ifdef CONFIG_PPC_LAZY_EE
 	/* Mark interrupts enabled in PACA */
 	get_paca()->soft_enabled = 0;
+#endif
 
 	/* Initialize the hash table or TLB handling */
 	early_init_mmu_secondary();

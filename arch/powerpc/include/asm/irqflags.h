@@ -39,6 +39,8 @@
 #define TRACE_ENABLE_INTS	TRACE_WITH_FRAME_BUFFER(.trace_hardirqs_on)
 #define TRACE_DISABLE_INTS	TRACE_WITH_FRAME_BUFFER(.trace_hardirqs_off)
 
+#ifdef CONFIG_PPC_LAZY_EE
+
 #define TRACE_AND_RESTORE_IRQ_PARTIAL(en,skip)		\
 	cmpdi	en,0;					\
 	bne	95f;					\
@@ -51,12 +53,32 @@
 	TRACE_AND_RESTORE_IRQ_PARTIAL(en,96f);	\
 	stb	en,PACASOFTIRQEN(r13);		\
 96:
+
+#else /* CONFIG_PPC_LAZY_EE */
+
+#define TRACE_AND_RESTORE_IRQ_PARTIAL(en,skip)		\
+	cmpdi	en,0;					\
+	bne	95f;					\
+	TRACE_WITH_FRAME_BUFFER(.trace_hardirqs_off)	\
+	b	skip;					\
+95:	TRACE_WITH_FRAME_BUFFER(.trace_hardirqs_on)	\
+	li	en,1;
+#define TRACE_AND_RESTORE_IRQ(en)		\
+	TRACE_AND_RESTORE_IRQ_PARTIAL(en,96f);	\
+96:
+
+#endif /* CONFIG_PPC_LAZY_EE */
+
 #else
 #define TRACE_ENABLE_INTS
 #define TRACE_DISABLE_INTS
 #define TRACE_AND_RESTORE_IRQ_PARTIAL(en,skip)
+#ifdef CONFIG_PPC_LAZY_EE
 #define TRACE_AND_RESTORE_IRQ(en)		\
 	stb	en,PACASOFTIRQEN(r13)
+#else
+#define TRACE_AND_RESTORE_IRQ(en)
+#endif
 #endif
 #endif
 

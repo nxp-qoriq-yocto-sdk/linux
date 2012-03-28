@@ -99,6 +99,8 @@ EXPORT_SYMBOL(irq_desc);
 
 int distribute_irqs = 1;
 
+#ifdef CONFIG_PPC_LAZY_EE
+
 static inline notrace unsigned long get_hard_enabled(void)
 {
 	unsigned long enabled;
@@ -184,6 +186,9 @@ notrace void arch_local_irq_restore(unsigned long en)
 	__hard_irq_enable();
 }
 EXPORT_SYMBOL(arch_local_irq_restore);
+
+#endif /* CONFIG_PPC_LAZY_EE */
+
 #endif /* CONFIG_PPC64 */
 
 int arch_show_interrupts(struct seq_file *p, int prec)
