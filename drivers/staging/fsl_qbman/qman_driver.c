@@ -354,6 +354,8 @@ static __init int qman_init(void)
 #endif
 	/* Initialise portals. See bman_driver.c for comments */
 	for_each_compatible_node(dn, NULL, "fsl,qman-portal") {
+		if (!of_device_is_available(dn))
+			continue;
 		pcfg = parse_pcfg(dn);
 		if (pcfg) {
 			pcfg->public_cfg.pools = pools_sdqcr;
