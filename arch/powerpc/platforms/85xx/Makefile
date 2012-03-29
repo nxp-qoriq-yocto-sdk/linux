@@ -22,6 +22,7 @@ obj-$(CONFIG_P3041_DS)    += p3041_ds.o corenet_ds.o
 obj-$(CONFIG_P3060_QDS)   += p3060_qds.o corenet_ds.o
 obj-$(CONFIG_P4080_DS)    += p4080_ds.o corenet_ds.o
 obj-$(CONFIG_P5020_DS)    += p5020_ds.o corenet_ds.o
+obj-$(CONFIG_P5040_DS)    += p5040_ds.o corenet_ds.o
 obj-$(CONFIG_FSL_P3060_QDS_MDIO) += p3060_qds_mdio.o
 obj-$(CONFIG_FSL_P4080_DS_MDIO) += p4080_ds_mdio.o
 obj-$(CONFIG_FSL_HYDRA_DS_MDIO) += hydra_mdio.o

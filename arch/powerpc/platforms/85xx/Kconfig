@@ -262,6 +262,24 @@ config P5020_DS
 	help
 	  This option enables support for the P5020 DS board
 
+config P5040_DS
+	bool "Freescale P5040 DS"
+	select DEFAULT_UIMAGE
+	select E500
+	select PPC_E500MC
+	select PHYS_64BIT
+	select SWIOTLB
+	select MPC8xxx_GPIO
+	select HAS_RAPIDIO
+	select PPC_EPAPR_HV_PIC
+	select HAS_FSL_PAMU
+	select HAS_FSL_QBMAN
+	select HAS_FSL_PME
+	select FSL_HYDRA_DS_MDIO if PHYLIB
+	help
+	  This option enables support for the Freescale P5040 DS
+	  ("Super Hydra") reference board.
+
 endif # FSL_SOC_BOOKE
 
 config FSL_P3060_QDS_MDIO
