@@ -153,6 +153,10 @@ static inline ulong kvmppc_get_instr_ea(struct kvm_vcpu *vcpu, u32 inst)
  */
 /* XXX Should probably auto-generate instruction decoding for a particular core
  * from opcode tables in the future. */
+/*
+ * The caller should provide guest physical address for LOAD/STORE operations
+ * in vcpu->arch.paddr_accessed
+ */
 int kvmppc_emulate_instruction(struct kvm_run *run, struct kvm_vcpu *vcpu)
 {
 	u32 inst = kvmppc_get_last_inst(vcpu);

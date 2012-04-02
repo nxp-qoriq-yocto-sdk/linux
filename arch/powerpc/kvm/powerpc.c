@@ -476,34 +476,35 @@ static void kvmppc_complete_dcr_load(struct kvm_vcpu *vcpu,
 	kvmppc_set_gpr(vcpu, vcpu->arch.io_gpr, run->dcr.data);
 }
 
-static void kvmppc_complete_mmio_load(struct kvm_vcpu *vcpu,
-                                      struct kvm_run *run)
+static void kvmppc_complete_load(struct kvm_vcpu *vcpu, void *data,
+				 unsigned int len, int is_big_endian,
+				 int is_sign_extend, unsigned int rt)
 {
 	u64 uninitialized_var(gpr);
 
-	if (run->mmio.len > sizeof(gpr)) {
-		printk(KERN_ERR "bad MMIO length: %d\n", run->mmio.len);
+	if (len > sizeof(gpr)) {
+		printk(KERN_ERR "bad MMIO length: %d\n", len);
 		return;
 	}
 
-	if (vcpu->arch.mmio_is_bigendian) {
-		switch (run->mmio.len) {
-		case 8: gpr = *(u64 *)run->mmio.data; break;
-		case 4: gpr = *(u32 *)run->mmio.data; break;
-		case 2: gpr = *(u16 *)run->mmio.data; break;
-		case 1: gpr = *(u8 *)run->mmio.data; break;
+	if (is_big_endian) {
+		switch (len) {
+		case 8: gpr = *(u64 *)data; break;
+		case 4: gpr = *(u32 *)data; break;
+		case 2: gpr = *(u16 *)data; break;
+		case 1: gpr = *(u8 *)data; break;
 		}
 	} else {
 		/* Convert BE data from userland back to LE. */
-		switch (run->mmio.len) {
-		case 4: gpr = ld_le32((u32 *)run->mmio.data); break;
-		case 2: gpr = ld_le16((u16 *)run->mmio.data); break;
-		case 1: gpr = *(u8 *)run->mmio.data; break;
+		switch (len) {
+		case 4: gpr = ld_le32((u32 *)data); break;
+		case 2: gpr = ld_le16((u16 *)data); break;
+		case 1: gpr = *(u8 *)data; break;
 		}
 	}
 
-	if (vcpu->arch.mmio_sign_extend) {
-		switch (run->mmio.len) {
+	if (is_sign_extend) {
+		switch (len) {
 #ifdef CONFIG_PPC64
 		case 4:
 			gpr = (s64)(s32)gpr;
@@ -518,22 +519,22 @@ static void kvmppc_complete_mmio_load(struct kvm_vcpu *vcpu,
 		}
 	}
 
-	kvmppc_set_gpr(vcpu, vcpu->arch.io_gpr, gpr);
+	kvmppc_set_gpr(vcpu, rt, gpr);
 
-	switch (vcpu->arch.io_gpr & KVM_MMIO_REG_EXT_MASK) {
+	switch (rt & KVM_MMIO_REG_EXT_MASK) {
 	case KVM_MMIO_REG_GPR:
-		kvmppc_set_gpr(vcpu, vcpu->arch.io_gpr, gpr);
+		kvmppc_set_gpr(vcpu, rt, gpr);
 		break;
 	case KVM_MMIO_REG_FPR:
-		vcpu->arch.fpr[vcpu->arch.io_gpr & KVM_MMIO_REG_MASK] = gpr;
+		vcpu->arch.fpr[rt & KVM_MMIO_REG_MASK] = gpr;
 		break;
 #ifdef CONFIG_PPC_BOOK3S
 	case KVM_MMIO_REG_QPR:
-		vcpu->arch.qpr[vcpu->arch.io_gpr & KVM_MMIO_REG_MASK] = gpr;
+		vcpu->arch.qpr[rt & KVM_MMIO_REG_MASK] = gpr;
 		break;
 	case KVM_MMIO_REG_FQPR:
-		vcpu->arch.fpr[vcpu->arch.io_gpr & KVM_MMIO_REG_MASK] = gpr;
-		vcpu->arch.qpr[vcpu->arch.io_gpr & KVM_MMIO_REG_MASK] = gpr;
+		vcpu->arch.fpr[rt & KVM_MMIO_REG_MASK] = gpr;
+		vcpu->arch.qpr[rt & KVM_MMIO_REG_MASK] = gpr;
 		break;
 #endif
 	default:
@@ -545,15 +546,11 @@ int kvmppc_handle_load(struct kvm_run *run, struct kvm_vcpu *vcpu,
                        unsigned int rt, unsigned int bytes, int is_bigendian)
 {
 	u64 addr = vcpu->arch.paddr_accessed;
-	void *regptr;
+	ulong val;
 
-#ifdef CONFIG_BOOKE
-	regptr = &vcpu->arch.gpr[rt];
-#else
-#error need regptr
-#endif
-
-	if (!kvm_io_bus_read(vcpu->kvm, KVM_MMIO_BUS, addr, bytes, regptr)) {
+	if (!kvm_io_bus_read(vcpu->kvm, KVM_MMIO_BUS,
+				addr, bytes, &val)) {
+		kvmppc_complete_load(vcpu, &val, bytes, is_bigendian, 0, rt);
 		return EMULATE_DONE;
 	}
 
@@ -579,31 +576,31 @@ int kvmppc_handle_load(struct kvm_run *run, struct kvm_vcpu *vcpu,
 int kvmppc_handle_loads(struct kvm_run *run, struct kvm_vcpu *vcpu,
                         unsigned int rt, unsigned int bytes, int is_bigendian)
 {
-	int r;
+	u64 addr = vcpu->arch.paddr_accessed;
+	ulong val;
 
-	r = kvmppc_handle_load(run, vcpu, rt, bytes, is_bigendian);
-
-	if (r == EMULATE_DONE) {
-		unsigned long val = kvmppc_get_gpr(vcpu, rt);
-
-		switch (bytes) {
-		case 1:
-			val = (s8)val;
-			break;
-		case 2:
-			val = (s16)val;
-			break;
-		case 4:
-			val = (s32)val;
-			break;
-		}
-
-		kvmppc_set_gpr(vcpu, rt, val);
-	} else {
-		vcpu->arch.mmio_sign_extend = 1;
+	if (!kvm_io_bus_read(vcpu->kvm, KVM_MMIO_BUS,
+				addr, bytes, &val)) {
+		kvmppc_complete_load(vcpu, &val, bytes, is_bigendian, 1, rt);
+		return EMULATE_DONE;
 	}
 
-	return r;
+	if (bytes > sizeof(run->mmio.data)) {
+		printk(KERN_ERR "%s: bad MMIO length: %d\n", __func__,
+		       run->mmio.len);
+	}
+
+	run->mmio.phys_addr = addr;
+	run->mmio.len = bytes;
+	run->mmio.is_write = 0;
+
+	vcpu->arch.io_gpr = rt;
+	vcpu->arch.mmio_is_bigendian = is_bigendian;
+	vcpu->mmio_needed = 1;
+	vcpu->mmio_is_write = 0;
+	vcpu->arch.mmio_sign_extend = 1;
+
+	return EMULATE_DO_MMIO;
 }
 
 int kvmppc_handle_store(struct kvm_run *run, struct kvm_vcpu *vcpu,
@@ -656,7 +653,11 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
 
 	if (vcpu->mmio_needed) {
 		if (!vcpu->mmio_is_write)
-			kvmppc_complete_mmio_load(vcpu, run);
+			kvmppc_complete_load(vcpu, run->mmio.data,
+					     run->mmio.len,
+					     vcpu->arch.mmio_is_bigendian,
+					     vcpu->arch.mmio_sign_extend,
+					     vcpu->arch.io_gpr);
 		vcpu->mmio_needed = 0;
 	} else if (vcpu->arch.dcr_needed) {
 		if (!vcpu->arch.dcr_is_write)
