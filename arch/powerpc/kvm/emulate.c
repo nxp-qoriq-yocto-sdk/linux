@@ -126,6 +126,17 @@ u32 kvmppc_get_dec(struct kvm_vcpu *vcpu, u64 tb)
 	return vcpu->arch.dec - jd;
 }
 
+/*
+ * Dispatch ea computing to specific arch
+ */
+static inline ulong kvmppc_get_instr_ea(struct kvm_vcpu *vcpu, u32 inst)
+{
+	int ra = get_ra(inst);
+	int rb = get_rb(inst);
+
+	return kvmppc_get_ea_indexed(vcpu, ra, rb);
+}
+
 /* XXX to do:
  * lhax
  * lhaux
@@ -145,11 +156,10 @@ u32 kvmppc_get_dec(struct kvm_vcpu *vcpu, u64 tb)
 int kvmppc_emulate_instruction(struct kvm_run *run, struct kvm_vcpu *vcpu)
 {
 	u32 inst = kvmppc_get_last_inst(vcpu);
-	u32 ea;
-	int ra;
-	int rb;
 	int rs;
 	int rt;
+	int ra;
+	ulong ea;
 	int sprn;
 #ifdef CONFIG_KVM_BOOKE206_PERFMON
 	int pmrn;
@@ -191,12 +201,7 @@ int kvmppc_emulate_instruction(struct kvm_run *run, struct kvm_vcpu *vcpu)
 		case OP_31_XOP_LBZUX:
 			rt = get_rt(inst);
 			ra = get_ra(inst);
-			rb = get_rb(inst);
-
-			ea = kvmppc_get_gpr(vcpu, rb);
-			if (ra)
-				ea += kvmppc_get_gpr(vcpu, ra);
-
+			ea = kvmppc_get_instr_ea(vcpu, inst);
 			emulated = kvmppc_handle_load(run, vcpu, rt, 1, 1);
 			kvmppc_set_gpr(vcpu, ra, ea);
 			break;
@@ -217,13 +222,7 @@ int kvmppc_emulate_instruction(struct kvm_run *run, struct kvm_vcpu *vcpu)
 
 		case OP_31_XOP_STBUX:
 			rs = get_rs(inst);
-			ra = get_ra(inst);
-			rb = get_rb(inst);
-
-			ea = kvmppc_get_gpr(vcpu, rb);
-			if (ra)
-				ea += kvmppc_get_gpr(vcpu, ra);
-
+			ea = kvmppc_get_instr_ea(vcpu, inst);
 			emulated = kvmppc_handle_store(run, vcpu,
 						       kvmppc_get_gpr(vcpu, rs),
 			                               1, 1);
@@ -242,13 +241,7 @@ int kvmppc_emulate_instruction(struct kvm_run *run, struct kvm_vcpu *vcpu)
 
 		case OP_31_XOP_LHZUX:
 			rt = get_rt(inst);
-			ra = get_ra(inst);
-			rb = get_rb(inst);
-
-			ea = kvmppc_get_gpr(vcpu, rb);
-			if (ra)
-				ea += kvmppc_get_gpr(vcpu, ra);
-
+			ea = kvmppc_get_instr_ea(vcpu, inst);
 			emulated = kvmppc_handle_load(run, vcpu, rt, 2, 1);
 			kvmppc_set_gpr(vcpu, ra, ea);
 			break;
@@ -481,9 +474,6 @@ int kvmppc_emulate_instruction(struct kvm_run *run, struct kvm_vcpu *vcpu)
 
 		case OP_31_XOP_STHX:
 			rs = get_rs(inst);
-			ra = get_ra(inst);
-			rb = get_rb(inst);
-
 			emulated = kvmppc_handle_store(run, vcpu,
 						       kvmppc_get_gpr(vcpu, rs),
 			                               2, 1);
@@ -492,12 +482,7 @@ int kvmppc_emulate_instruction(struct kvm_run *run, struct kvm_vcpu *vcpu)
 		case OP_31_XOP_STHUX:
 			rs = get_rs(inst);
 			ra = get_ra(inst);
-			rb = get_rb(inst);
-
-			ea = kvmppc_get_gpr(vcpu, rb);
-			if (ra)
-				ea += kvmppc_get_gpr(vcpu, ra);
-
+			ea = kvmppc_get_instr_ea(vcpu, inst);
 			emulated = kvmppc_handle_store(run, vcpu,
 						       kvmppc_get_gpr(vcpu, rs),
 			                               2, 1);
@@ -567,9 +552,6 @@ int kvmppc_emulate_instruction(struct kvm_run *run, struct kvm_vcpu *vcpu)
 
 		case OP_31_XOP_STWBRX:
 			rs = get_rs(inst);
-			ra = get_ra(inst);
-			rb = get_rb(inst);
-
 			emulated = kvmppc_handle_store(run, vcpu,
 						       kvmppc_get_gpr(vcpu, rs),
 			                               4, 0);
@@ -582,9 +564,6 @@ int kvmppc_emulate_instruction(struct kvm_run *run, struct kvm_vcpu *vcpu)
 
 		case OP_31_XOP_STHBRX:
 			rs = get_rs(inst);
-			ra = get_ra(inst);
-			rb = get_rb(inst);
-
 			emulated = kvmppc_handle_store(run, vcpu,
 						       kvmppc_get_gpr(vcpu, rs),
 			                               2, 0);
