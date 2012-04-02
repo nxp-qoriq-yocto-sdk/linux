@@ -327,6 +327,15 @@ int kvmppc_booke_emulate_mtspr(struct kvm_vcpu *vcpu, int sprn, int rs)
 	case SPRN_IVOR15:
 		vcpu->arch.ivor[BOOKE_IRQPRIO_DEBUG] = spr_val;
 		break;
+#ifdef CONFIG_64BIT
+	case SPRN_EPCR:
+		vcpu->arch.epcr = kvmppc_get_gpr(vcpu, rs);
+		vcpu->arch.shadow_epcr &= ~SPRN_EPCR_GICM;
+		if (vcpu->arch.epcr & SPRN_EPCR_ICM)
+			vcpu->arch.shadow_epcr |= SPRN_EPCR_GICM;
+		mtspr(SPRN_EPCR, vcpu->arch.shadow_epcr);
+		break;
+#endif
 
 	default:
 		emulated = EMULATE_FAIL;
@@ -464,6 +473,11 @@ int kvmppc_booke_emulate_mfspr(struct kvm_vcpu *vcpu, int sprn, int rt)
 	case SPRN_IVOR15:
 		kvmppc_set_gpr(vcpu, rt, vcpu->arch.ivor[BOOKE_IRQPRIO_DEBUG]);
 		break;
+#ifdef CONFIG_64BIT
+	case SPRN_EPCR:
+		kvmppc_set_gpr(vcpu, rt, vcpu->arch.epcr);
+		break;
+#endif
 
 	default:
 		emulated = EMULATE_FAIL;
