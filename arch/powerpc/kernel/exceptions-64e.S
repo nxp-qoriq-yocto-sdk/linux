@@ -1301,8 +1301,14 @@ _GLOBAL(setup_ehv_ivors)
 	 */
 	mfspr	r10,SPRN_MMUCFG
 	rlwinm.	r10,r10,0,MMUCFG_LPIDSIZE
-	beqlr
+	bne 1f
 
-	SET_IVOR(40, 0x300) /* Embedded Hypervisor System Call */
+	ld	r10,CPU_SPEC_FEATURES(r5)
+	LOAD_REG_IMMEDIATE(r9,CPU_FTR_EMB_HV)
+	andc	r10,r10,r9
+	std	r10,CPU_SPEC_FEATURES(r5)
+	blr
+
+1:	SET_IVOR(40, 0x300) /* Embedded Hypervisor System Call */
 	SET_IVOR(41, 0x320) /* Embedded Hypervisor Privilege */
 	blr
