@@ -2,6 +2,7 @@
  *  Boot code and exception vectors for Book3E processors
  *
  *  Copyright (C) 2007 Ben. Herrenschmidt (benh@kernel.crashing.org), IBM Corp.
+ *  Copyright 2012 Freescale Semiconductor, Inc.
  *
  *  This program is free software; you can redistribute it and/or
  *  modify it under the terms of the GNU General Public License
@@ -24,6 +25,8 @@
 #include <asm/ptrace.h>
 #include <asm/ppc-opcode.h>
 #include <asm/mmu.h>
+#include <asm/kvm_asm.h>
+#include <asm/kvm_booke_hv_asm.h>
 
 /* XXX This will ultimately add space for a special exception save
  *     structure used to save things like SRR0/SRR1, SPRGs, MAS, etc...
@@ -33,13 +36,24 @@
  */
 #define	SPECIAL_EXC_FRAME_SIZE	INT_FRAME_SIZE
 
+#ifdef CONFIG_KVM_BOOKE_HV
+#define KVM_BOOKE_HV_MFSPR(reg, spr)				\
+	BEGIN_FTR_SECTION					\
+		mfspr	reg, spr;			  	\
+	END_FTR_SECTION_IFSET(CPU_FTR_EMB_HV)
+#else
+#define KVM_BOOKE_HV_MFSPR(reg, spr)
+#endif
+
 /* Exception prolog code for all exceptions */
-#define EXCEPTION_PROLOG(n, type, srr0, srr1, addition)				    \
+#define EXCEPTION_PROLOG(n, intnum, type, srr0, srr1, addition)		    \
 	mtspr	SPRN_SPRG_##type##_SCRATCH,r13;	/* get spare registers */   \
 	mfspr	r13,SPRN_SPRG_PACA;	/* get PACA */			    \
 	std	r10,PACA_EX##type+EX_R10(r13);				    \
 	std	r11,PACA_EX##type+EX_R11(r13);				    \
 	mfcr	r10;			/* save CR */			    \
+	KVM_BOOKE_HV_MFSPR(r11,srr1);			    		    \
+	DO_KVM	intnum,srr1;				    		    \
 	addition;			/* additional code for that exc. */ \
 	std	r1,PACA_EX##type+EX_R1(r13); /* save old r1 in the PACA */  \
 	stw	r10,PACA_EX##type+EX_CR(r13); /* save old CR in the PACA */ \
@@ -68,25 +82,26 @@
 	ld	r1,PACA_MC_STACK(r13);					    \
 	subi	r1,r1,SPECIAL_EXC_FRAME_SIZE;
 
-#define NORMAL_EXCEPTION_PROLOG(n, addition)			    \
-	EXCEPTION_PROLOG(n, GEN, SPRN_SRR0, SPRN_SRR1,		    \
+#define NORMAL_EXCEPTION_PROLOG(n, intnum, addition)			    \
+	EXCEPTION_PROLOG(n, intnum, GEN, SPRN_SRR0, SPRN_SRR1,		    \
 					 addition##_GEN)
 
 #define CRIT_EXCEPTION_PROLOG(n, intnum, addition)			    \
-	EXCEPTION_PROLOG(n, CRIT, SPRN_CSRR0, SPRN_CSRR1, 	    \
+	EXCEPTION_PROLOG(n, intnum, CRIT, SPRN_CSRR0, SPRN_CSRR1, 	    \
 					 addition##_CRIT)
 
 #define DBG_EXCEPTION_PROLOG(n, intnum, addition)			    \
-	EXCEPTION_PROLOG(n, DBG, SPRN_DSRR0, SPRN_DSRR1, 	    \
+	EXCEPTION_PROLOG(n, intnum, DBG, SPRN_DSRR0, SPRN_DSRR1, 	    \
 					 addition##_DBG)
 
 #define MC_EXCEPTION_PROLOG(n, intnum, addition)			    \
-	EXCEPTION_PROLOG(n, MC, SPRN_MCSRR0, SPRN_MCSRR1, 	    \
+	EXCEPTION_PROLOG(n, intnum, MC, SPRN_MCSRR0, SPRN_MCSRR1, 	    \
 					 addition##_MC)
 
 
 /* Variants of the "addition" argument for the prolog
  */
+#define PROLOG_ADDITION_NONE
 #define PROLOG_ADDITION_NONE_GEN
 #define PROLOG_ADDITION_NONE_CRIT
 #define PROLOG_ADDITION_NONE_DBG
@@ -231,14 +246,14 @@ exc_##n##_bad_stack:							    \
 1:
 
 
-#define MASKABLE_EXCEPTION(trapnum, label, hdlr, ack)			\
-	START_EXCEPTION(label);						\
-	NORMAL_EXCEPTION_PROLOG(trapnum, PROLOG_ADDITION_MASKABLE)	\
-	EXCEPTION_COMMON(trapnum, PACA_EXGEN, INTS_DISABLE_ALL)		\
-	ack(r8);							\
-	CHECK_NAPPING();						\
-	addi	r3,r1,STACK_FRAME_OVERHEAD;				\
-	bl	hdlr;							\
+#define MASKABLE_EXCEPTION(trapnum, intnum, label, hdlr, ack)		    \
+	START_EXCEPTION(label);						    \
+	NORMAL_EXCEPTION_PROLOG(trapnum, intnum, PROLOG_ADDITION_MASKABLE)  \
+	EXCEPTION_COMMON(trapnum, PACA_EXGEN, INTS_DISABLE_ALL)		    \
+	ack(r8);							    \
+	CHECK_NAPPING();						    \
+	addi	r3,r1,STACK_FRAME_OVERHEAD;				    \
+	bl	hdlr;							    \
 	b	.ret_from_except_lite;
 
 /* This value is used to mark exception frames on the stack. */
@@ -284,7 +299,8 @@ interrupt_end_book3e:
 
 /* Critical Input Interrupt */
 	START_EXCEPTION(critical_input);
-	CRIT_EXCEPTION_PROLOG(0x100, PROLOG_ADDITION_NONE)
+	CRIT_EXCEPTION_PROLOG(0x100, BOOKE_INTERRUPT_CRITICAL,
+			      PROLOG_ADDITION_NONE)
 //	EXCEPTION_COMMON(0x100, PACA_EXCRIT, INTS_DISABLE_ALL)
 //	bl	special_reg_save_crit
 //	CHECK_NAPPING();
@@ -295,7 +311,8 @@ interrupt_end_book3e:
 
 /* Machine Check Interrupt */
 	START_EXCEPTION(machine_check);
-	MC_EXCEPTION_PROLOG(0x200, PROLOG_ADDITION_NONE)
+	MC_EXCEPTION_PROLOG(0x200, BOOKE_INTERRUPT_MACHINE_CHECK,
+			    PROLOG_ADDITION_NONE)
 //	EXCEPTION_COMMON(0x200, PACA_EXMC, INTS_DISABLE_ALL)
 //	bl	special_reg_save_mc
 //	addi	r3,r1,STACK_FRAME_OVERHEAD
@@ -306,7 +323,8 @@ interrupt_end_book3e:
 
 /* Data Storage Interrupt */
 	START_EXCEPTION(data_storage)
-	NORMAL_EXCEPTION_PROLOG(0x300, PROLOG_ADDITION_2REGS)
+	NORMAL_EXCEPTION_PROLOG(0x300, BOOKE_INTERRUPT_DATA_STORAGE,
+				PROLOG_ADDITION_2REGS)
 	mfspr	r14,SPRN_DEAR
 	mfspr	r15,SPRN_ESR
 	EXCEPTION_COMMON(0x300, PACA_EXGEN, INTS_KEEP)
@@ -314,18 +332,21 @@ interrupt_end_book3e:
 
 /* Instruction Storage Interrupt */
 	START_EXCEPTION(instruction_storage);
-	NORMAL_EXCEPTION_PROLOG(0x400, PROLOG_ADDITION_2REGS)
+	NORMAL_EXCEPTION_PROLOG(0x400, BOOKE_INTERRUPT_INST_STORAGE,
+				PROLOG_ADDITION_2REGS)
 	li	r15,0
 	mr	r14,r10
 	EXCEPTION_COMMON(0x400, PACA_EXGEN, INTS_KEEP)
 	b	storage_fault_common
 
 /* External Input Interrupt */
-	MASKABLE_EXCEPTION(0x500, external_input, .do_IRQ, ACK_NONE)
+	MASKABLE_EXCEPTION(0x500, BOOKE_INTERRUPT_EXTERNAL,
+			   external_input, .do_IRQ, ACK_NONE)
 
 /* Alignment */
 	START_EXCEPTION(alignment);
-	NORMAL_EXCEPTION_PROLOG(0x600, PROLOG_ADDITION_2REGS)
+	NORMAL_EXCEPTION_PROLOG(0x600, BOOKE_INTERRUPT_ALIGNMENT,
+				PROLOG_ADDITION_2REGS)
 	mfspr	r14,SPRN_DEAR
 	mfspr	r15,SPRN_ESR
 	EXCEPTION_COMMON(0x600, PACA_EXGEN, INTS_KEEP)
@@ -333,7 +354,8 @@ interrupt_end_book3e:
 
 /* Program Interrupt */
 	START_EXCEPTION(program);
-	NORMAL_EXCEPTION_PROLOG(0x700, PROLOG_ADDITION_1REG)
+	NORMAL_EXCEPTION_PROLOG(0x700, BOOKE_INTERRUPT_PROGRAM,
+				PROLOG_ADDITION_1REG)
 	mfspr	r14,SPRN_ESR
 	EXCEPTION_COMMON(0x700, PACA_EXGEN, INTS_DISABLE_SOFT)
 	std	r14,_DSISR(r1)
@@ -346,7 +368,8 @@ interrupt_end_book3e:
 
 /* Floating Point Unavailable Interrupt */
 	START_EXCEPTION(fp_unavailable);
-	NORMAL_EXCEPTION_PROLOG(0x800, PROLOG_ADDITION_NONE)
+	NORMAL_EXCEPTION_PROLOG(0x800, BOOKE_INTERRUPT_FP_UNAVAIL,
+				PROLOG_ADDITION_NONE)
 	/* we can probably do a shorter exception entry for that one... */
 	EXCEPTION_COMMON(0x800, PACA_EXGEN, INTS_KEEP)
 	bne	1f			/* if from user, just load it up */
@@ -360,14 +383,17 @@ interrupt_end_book3e:
 	b	fast_exception_return
 
 /* Decrementer Interrupt */
-	MASKABLE_EXCEPTION(0x900, decrementer, .timer_interrupt, ACK_DEC)
+	MASKABLE_EXCEPTION(0x900, BOOKE_INTERRUPT_DECREMENTER,
+			   decrementer, .timer_interrupt, ACK_DEC)
 
 /* Fixed Interval Timer Interrupt */
-	MASKABLE_EXCEPTION(0x980, fixed_interval, .unknown_exception, ACK_FIT)
+	MASKABLE_EXCEPTION(0x980, BOOKE_INTERRUPT_FIT,
+			   fixed_interval, .unknown_exception, ACK_FIT)
 
 /* Watchdog Timer Interrupt */
 	START_EXCEPTION(watchdog);
-	CRIT_EXCEPTION_PROLOG(0x9f0, PROLOG_ADDITION_NONE)
+	CRIT_EXCEPTION_PROLOG(0x9f0, BOOKE_INTERRUPT_WATCHDOG,
+			      PROLOG_ADDITION_NONE)
 //	EXCEPTION_COMMON(0x9f0, PACA_EXCRIT, INTS_DISABLE_ALL)
 //	bl	special_reg_save_crit
 //	CHECK_NAPPING();
@@ -386,7 +412,8 @@ interrupt_end_book3e:
 
 /* Auxiliary Processor Unavailable Interrupt */
 	START_EXCEPTION(ap_unavailable);
-	NORMAL_EXCEPTION_PROLOG(0xf20, PROLOG_ADDITION_NONE)
+	NORMAL_EXCEPTION_PROLOG(0xf20, BOOKE_INTERRUPT_AP_UNAVAIL,
+				PROLOG_ADDITION_NONE)
 	EXCEPTION_COMMON(0xf20, PACA_EXGEN, INTS_KEEP)
 	addi	r3,r1,STACK_FRAME_OVERHEAD
 	bl	.save_nvgprs
@@ -396,7 +423,8 @@ interrupt_end_book3e:
 
 /* Debug exception as a critical interrupt*/
 	START_EXCEPTION(debug_crit);
-	CRIT_EXCEPTION_PROLOG(0xd00, PROLOG_ADDITION_2REGS)
+	CRIT_EXCEPTION_PROLOG(0xd00, BOOKE_INTERRUPT_DEBUG,
+			      PROLOG_ADDITION_2REGS)
 
 	/*
 	 * If there is a single step or branch-taken exception in an
@@ -461,7 +489,8 @@ kernel_dbg_exc:
 
 /* Debug exception as a debug interrupt*/
 	START_EXCEPTION(debug_debug);
-	DBG_EXCEPTION_PROLOG(0xd00, PROLOG_ADDITION_2REGS)
+	DBG_EXCEPTION_PROLOG(0xd00, BOOKE_INTERRUPT_DEBUG,
+						 PROLOG_ADDITION_2REGS)
 
 	/*
 	 * If there is a single step or branch-taken exception in an
@@ -521,11 +550,13 @@ kernel_dbg_exc:
 	bl	.DebugException
 	b	.ret_from_except
 
-	MASKABLE_EXCEPTION(0x260, perfmon, .performance_monitor_exception, ACK_NONE)
+	MASKABLE_EXCEPTION(0x260, BOOKE_INTERRUPT_PERFORMANCE_MONITOR,
+			   perfmon, .performance_monitor_exception, ACK_NONE)
 
 /* Doorbell interrupt */
 	START_EXCEPTION(doorbell)
-	NORMAL_EXCEPTION_PROLOG(0x2070, PROLOG_ADDITION_DOORBELL)
+	NORMAL_EXCEPTION_PROLOG(0x2070, BOOKE_INTERRUPT_DOORBELL,
+				PROLOG_ADDITION_DOORBELL)
 	EXCEPTION_COMMON(0x2070, PACA_EXGEN, INTS_DISABLE_ALL)
 	CHECK_NAPPING()
 	addi	r3,r1,STACK_FRAME_OVERHEAD
@@ -534,7 +565,8 @@ kernel_dbg_exc:
 
 /* Doorbell critical Interrupt */
 	START_EXCEPTION(doorbell_crit);
-	CRIT_EXCEPTION_PROLOG(0x2080, PROLOG_ADDITION_NONE)
+	CRIT_EXCEPTION_PROLOG(0x2080, BOOKE_INTERRUPT_DOORBELL_CRITICAL,
+			      PROLOG_ADDITION_NONE)
 //	EXCEPTION_COMMON(0x2080, PACA_EXCRIT, INTS_DISABLE_ALL)
 //	bl	special_reg_save_crit
 //	CHECK_NAPPING();
@@ -543,11 +575,39 @@ kernel_dbg_exc:
 //	b	ret_from_crit_except
 	b	.
 
-	MASKABLE_EXCEPTION(0x2c0, guest_doorbell, .unknown_exception, ACK_NONE)
-	MASKABLE_EXCEPTION(0x2e0, guest_doorbell_crit, .unknown_exception, ACK_NONE)
-	MASKABLE_EXCEPTION(0x310, hypercall, .unknown_exception, ACK_NONE)
-	MASKABLE_EXCEPTION(0x320, ehpriv, .unknown_exception, ACK_NONE)
+/*
+ *	Guest doorbell interrupt
+ *	This interrupt is comming from guest and it should be handled by HV
+ */
+	START_EXCEPTION(guest_doorbell);
+	EXCEPTION_PROLOG(0x2c0, BOOKE_INTERRUPT_GUEST_DBELL, GEN,
+			 SPRN_GSRR0, SPRN_GSRR1, PROLOG_ADDITION_NONE)
+	EXCEPTION_COMMON(0x2c0, PACA_EXGEN, INTS_DISABLE_ALL)
+	CHECK_NAPPING();
+	addi	r3,r1,STACK_FRAME_OVERHEAD;
+	bl	.unknown_exception;
+	b	.ret_from_except_lite
 
+/*
+ *	Guest doorbell critical interrupt
+ *	This interrupt is comming from guest and it should be handled by HV
+ */
+	START_EXCEPTION(guest_doorbell_crit);
+	CRIT_EXCEPTION_PROLOG(0x2e0, BOOKE_INTERRUPT_GUEST_DBELL_CRIT,
+			      PROLOG_ADDITION_NONE)
+	EXCEPTION_COMMON(0x2e0, PACA_EXCRIT, INTS_DISABLE_ALL)
+	CHECK_NAPPING();
+	addi	r3,r1,STACK_FRAME_OVERHEAD;
+	bl	.unknown_exception;
+	b	.ret_from_except_lite
+
+/* Hypervisor hypercall interrupt */
+	MASKABLE_EXCEPTION(0x310, BOOKE_INTERRUPT_HV_SYSCALL,
+			   hypercall, .unknown_exception, ACK_NONE)
+
+/* Hypervisor privilege interrupt */
+	MASKABLE_EXCEPTION(0x320, BOOKE_INTERRUPT_HV_PRIV,
+			   ehpriv, .unknown_exception, ACK_NONE)
 
 /*
  * An interrupt came in while soft-disabled; clear EE in SRR1,
