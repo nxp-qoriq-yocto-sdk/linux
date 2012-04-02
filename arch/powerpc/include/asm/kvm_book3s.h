@@ -224,6 +224,17 @@ static inline ulong kvmppc_get_gpr(struct kvm_vcpu *vcpu, int num)
 		return vcpu->arch.gpr[num];
 }
 
+static inline ulong kvmppc_get_ea_indexed(struct kvm_vcpu *vcpu, int ra, int rb)
+{
+	ulong ea;
+
+	ea = kvmppc_get_gpr(vcpu, rb);
+	if (ra)
+		ea += kvmppc_get_gpr(vcpu, ra);
+
+	return ea;
+}
+
 static inline void kvmppc_set_cr(struct kvm_vcpu *vcpu, u32 val)
 {
 	struct kvmppc_book3s_shadow_vcpu *svcpu = svcpu_get(vcpu);

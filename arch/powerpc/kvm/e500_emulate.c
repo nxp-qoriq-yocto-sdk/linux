@@ -93,12 +93,22 @@ static void kvmppc_set_mcsr(struct kvm_vcpu *vcpu, ulong val)
 #endif
 }
 
+/*
+ * Dispatch ea computing to specific arch
+ */
+static inline ulong kvmppc_get_instr_ea(struct kvm_vcpu *vcpu, u32 inst)
+{
+	int ra = get_ra(inst);
+	int rb = get_rb(inst);
+
+	return kvmppc_get_ea_indexed(vcpu, ra, rb);
+}
+
 int kvmppc_core_emulate_op(struct kvm_run *run, struct kvm_vcpu *vcpu,
                            unsigned int inst, int *advance)
 {
 	int emulated = EMULATE_DONE;
-	int ra;
-	int rb;
+	gva_t ea;
 	int rt;
 
 	switch (get_op(inst)) {
@@ -124,21 +134,19 @@ int kvmppc_core_emulate_op(struct kvm_run *run, struct kvm_vcpu *vcpu,
 			break;
 
 		case XOP_TLBSX:
-			rb = get_rb(inst);
-			emulated = kvmppc_e500_emul_tlbsx(vcpu,rb);
+			ea = kvmppc_get_instr_ea(vcpu, inst);
+			emulated = kvmppc_e500_emul_tlbsx(vcpu, ea);
 			break;
 
 		case XOP_TLBILX:
-			ra = get_ra(inst);
-			rb = get_rb(inst);
 			rt = get_rt(inst);
-			emulated = kvmppc_e500_emul_tlbilx(vcpu, rt, ra, rb);
+			ea = kvmppc_get_instr_ea(vcpu, inst);
+			emulated = kvmppc_e500_emul_tlbilx(vcpu, rt, ea);
 			break;
 
 		case XOP_TLBIVAX:
-			ra = get_ra(inst);
-			rb = get_rb(inst);
-			emulated = kvmppc_e500_emul_tlbivax(vcpu, ra, rb);
+			ea = kvmppc_get_instr_ea(vcpu, inst);
+			emulated = kvmppc_e500_emul_tlbivax(vcpu, ea);
 			break;
 
 		default:
