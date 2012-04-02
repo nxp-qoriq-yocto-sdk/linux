@@ -2450,6 +2450,16 @@ config GIANFAR_L2SRAM
 	  be passed accordingly, otherwise the driver will fall back to normal
 	  memory operation.
 
+config GFAR_HW_TCP_RECEIVE_OFFLOAD
+	default n
+	bool "Hardware TCP receive offload"
+	depends on GIANFAR && EXPERIMENTAL && !BONDING
+	help
+	  Hardware offload receive large TCP data.
+
+	  Inserts TCP stream rules into eTSEC filer table,
+	  to offload TCP receive.
+
 config UCC_GETH
 	tristate "Freescale QE Gigabit Ethernet"
 	depends on QUICC_ENGINE
