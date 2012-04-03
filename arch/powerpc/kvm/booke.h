@@ -64,6 +64,8 @@
 			  (1 << BOOKE_IRQPRIO_WATCHDOG) | \
 			  (1 << BOOKE_IRQPRIO_CRITICAL))
 
+#define BOOKE_IRQMASK_ME (1 <<  BOOKE_IRQPRIO_MACHINE_CHECK)
+
 extern unsigned long kvmppc_booke_handlers;
 extern unsigned long kvmppc_booke_handler_addr[];
 
