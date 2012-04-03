@@ -492,13 +492,29 @@ skip_load_host_debug:
 	PPC_STL	r5, VCPU_LR(r4)
 	mfspr	r7, SPRN_SPRG5
 	stw	r3, VCPU_VRSAVE(r4)
-	PPC_STL	r6, VCPU_SHARED_SPRG4(r11)
+#ifdef CONFIG_64BIT
+	std	r6, VCPU_SHARED_SPRG4(r11)
+#else
+	stw	r6, (VCPU_SHARED_SPRG4 + 4)(r11)
+#endif
 	mfspr	r8, SPRN_SPRG6
-	PPC_STL	r7, VCPU_SHARED_SPRG5(r11)
+#ifdef CONFIG_64BIT
+	std	r7, VCPU_SHARED_SPRG5(r11)
+#else
+	stw	r7, (VCPU_SHARED_SPRG5 + 4)(r11)
+#endif
 	mfspr	r9, SPRN_SPRG7
-	PPC_STL	r8, VCPU_SHARED_SPRG6(r11)
+#ifdef CONFIG_64BIT
+	std	r8, VCPU_SHARED_SPRG6(r11)
+#else
+	stw	r8, (VCPU_SHARED_SPRG6 + 4)(r11)
+#endif
 	mfxer	r3
-	PPC_STL	r9, VCPU_SHARED_SPRG7(r11)
+#ifdef CONFIG_64BIT
+	std	r9, VCPU_SHARED_SPRG7(r11)
+#else
+	stw	r9, (VCPU_SHARED_SPRG7 + 4)(r11)
+#endif
 
 	/* save guest MAS registers and restore host mas4 & mas6 */
 	mfspr	r5, SPRN_MAS0
@@ -721,13 +737,29 @@ lightweight_exit:
 	 * SPRGs, so we need to reload them here with the guest's values.
 	 */
 	lwz	r3, VCPU_VRSAVE(r4)
-	PPC_LL	r5, VCPU_SHARED_SPRG4(r11)
+#ifdef CONFIG_64BIT
+	ld	r5, VCPU_SHARED_SPRG4(r11)
+#else
+	lwz	r5, (VCPU_SHARED_SPRG4 + 4)(r11)
+#endif
 	mtspr	SPRN_VRSAVE, r3
-	PPC_LL	r6, VCPU_SHARED_SPRG5(r11)
+#ifdef CONFIG_64BIT
+	ld	r6, VCPU_SHARED_SPRG5(r11)
+#else
+	lwz	r6, (VCPU_SHARED_SPRG5 + 4)(r11)
+#endif
 	mtspr	SPRN_SPRG4W, r5
-	PPC_LL	r7, VCPU_SHARED_SPRG6(r11)
+#ifdef CONFIG_64BIT
+	ld	r7, VCPU_SHARED_SPRG6(r11)
+#else
+	lwz	r7, (VCPU_SHARED_SPRG6 + 4)(r11)
+#endif
 	mtspr	SPRN_SPRG5W, r6
-	PPC_LL	r8, VCPU_SHARED_SPRG7(r11)
+#ifdef CONFIG_64BIT
+	ld	r8, VCPU_SHARED_SPRG7(r11)
+#else
+	lwz	r8, (VCPU_SHARED_SPRG7 + 4)(r11)
+#endif
 	mtspr	SPRN_SPRG6W, r7
 	lwz	r9, VCPU_PM_IS_RESERVED(r4)
 	mtspr	SPRN_SPRG7W, r8
