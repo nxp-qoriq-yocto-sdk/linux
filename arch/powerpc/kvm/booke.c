@@ -497,7 +497,7 @@ static int kvmppc_booke_irqprio_deliver(struct kvm_vcpu *vcpu,
 		kvmppc_set_pending_interrupt(vcpu, INT_CLASS_NONCRIT);
 	if (vcpu->arch.pending_exceptions & BOOKE_IRQMASK_CE)
 		kvmppc_set_pending_interrupt(vcpu, INT_CLASS_CRIT);
-	if (vcpu->arch.pending_exceptions & BOOKE_IRQPRIO_MACHINE_CHECK)
+	if (vcpu->arch.pending_exceptions & BOOKE_IRQMASK_ME)
 		kvmppc_set_pending_interrupt(vcpu, INT_CLASS_MC);
 #endif
 
