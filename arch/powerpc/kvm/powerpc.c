@@ -910,7 +910,10 @@ static int kvm_vm_ioctl_get_pvinfo(struct kvm_ppc_pvinfo *pvinfo)
 	pvinfo->hcall[3] = inst_nop;
 #endif
 
+// FIXME: support idle on 64-bit
+#ifndef CONFIG_64BIT
 	pvinfo->flags = KVM_PPC_PVINFO_FLAGS_EV_IDLE;
+#endif
 
 	return 0;
 }
