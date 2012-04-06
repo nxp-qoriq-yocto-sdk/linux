@@ -325,10 +325,10 @@ static __init int bman_init(void)
 	LIST_HEAD(cfg_list);
 
 	for_each_compatible_node(dn, NULL, "fsl,bman") {
-		if (!bman_init_error_int(dn))
+		if (!bman_init_ccsr(dn))
 			pr_info("Bman err interrupt handler present\n");
 		else
-			pr_err("Bman err interrupt handler missing\n");
+			pr_err("Bman CCSR setup failed\n");
 	}
 	if (!bman_have_ccsr()) {
 		/* If there's no CCSR, our bpid allocator is empty unless

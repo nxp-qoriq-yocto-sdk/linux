@@ -226,10 +226,10 @@ static __init int qman_init(void)
 	LIST_HEAD(cfg_list);
 
 	for_each_compatible_node(dn, NULL, "fsl,qman") {
-		if (!qman_init_error_int(dn))
+		if (!qman_init_ccsr(dn))
 			pr_info("Qman err interrupt handler present\n");
 		else
-			pr_err("Qman err interrupt handler missing\n");
+			pr_err("Qman CCSR setup failed\n");
 	}
 #ifdef CONFIG_FSL_QMAN_FQ_LOOKUP
 	ret = qman_setup_fq_lookup_table(fqd_size/64);
