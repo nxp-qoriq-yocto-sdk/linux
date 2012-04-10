@@ -61,11 +61,13 @@
 #define OP_31_XOP_MTPMR     462
 
 #define OP_LWZ  32
+#define OP_LD   58
 #define OP_LWZU 33
 #define OP_LBZ  34
 #define OP_LBZU 35
 #define OP_STW  36
 #define OP_STWU 37
+#define OP_STD  62
 #define OP_STB  38
 #define OP_STBU 39
 #define OP_LHZ  40
@@ -585,6 +587,11 @@ int kvmppc_emulate_instruction(struct kvm_run *run, struct kvm_vcpu *vcpu)
 		emulated = kvmppc_handle_load(run, vcpu, rt, 4, 1);
 		break;
 
+	case OP_LD:
+		rt = get_rt(inst);
+		emulated = kvmppc_handle_load(run, vcpu, rt, 8, 1);
+		break;
+
 	case OP_LWZU:
 		ra = get_ra(inst);
 		rt = get_rt(inst);
@@ -609,6 +616,13 @@ int kvmppc_emulate_instruction(struct kvm_run *run, struct kvm_vcpu *vcpu)
 		emulated = kvmppc_handle_store(run, vcpu,
 					       kvmppc_get_gpr(vcpu, rs),
 		                               4, 1);
+		break;
+
+	case OP_STD:
+		rs = get_rs(inst);
+		emulated = kvmppc_handle_store(run, vcpu,
+					       kvmppc_get_gpr(vcpu, rs),
+		                               8, 1);
 		break;
 
 	case OP_STWU:
