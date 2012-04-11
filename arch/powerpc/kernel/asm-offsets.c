@@ -589,7 +589,11 @@ int main(void)
 	DEFINE(VCPU_DBCR4, offsetof(struct kvmppc_debug_reg, dbcr4));
 #endif
 	DEFINE(VCPU_IAC1, offsetof(struct kvmppc_debug_reg, iac[0]));
+	DEFINE(VCPU_IAC2, offsetof(struct kvmppc_debug_reg, iac[1]));
+	DEFINE(VCPU_IAC3, offsetof(struct kvmppc_debug_reg, iac[2]));
+	DEFINE(VCPU_IAC4, offsetof(struct kvmppc_debug_reg, iac[3]));
 	DEFINE(VCPU_DAC1, offsetof(struct kvmppc_debug_reg, dac[0]));
+	DEFINE(VCPU_DAC2, offsetof(struct kvmppc_debug_reg, dac[1]));
 	DEFINE(VCPU_GUEST_DEBUG, offsetof(struct kvm_vcpu, guest_debug));
 	DEFINE(VCPU_SHADOW_PMGC0, offsetof(struct kvm_vcpu,
 						arch.shadow_pm_reg.pmgc0));

@@ -237,19 +237,19 @@ _GLOBAL(kvmppc_resume_host)
 	mtspr	SPRN_DBCR1, r9
 	lwzu	r9, 4(r7)
 	mtspr	SPRN_DBCR2, r9
-	lwzu	r9, 4(r7)
+	lwzu	r9, 8(r7)
 	mtspr	SPRN_IAC1, r9
-	lwzu	r9, 4(r7)
+	lwzu	r9, 8(r7)
 	mtspr	SPRN_IAC2, r9
-#ifndef CONFIG_FSL_BOOKE
-	lwzu	r9, 4(r7)
+#ifndef CONFIG_PPC_FSL_BOOK3E
+	lwzu	r9, 8(r7)
 	mtspr	SPRN_IAC3, r9
-	lwzu	r9, 4(r7)
+	lwzu	r9, 8(r7)
 	mtspr	SPRN_IAC4, r9
 #endif
-	lwzu	r9, 4(r7)
+	lwzu	r9, 8(r7)
 	mtspr	SPRN_DAC1, r9
-	lwzu	r9, 4(r7)
+	lwzu	r9, 8(r7)
 	mtspr	SPRN_DAC2, r9
 ..skip_load_host_debug:
 	/* Clear h/w DBSR and save current(guest) DBSR */
@@ -536,38 +536,38 @@ lightweight_exit:
 	mfspr	r8, SPRN_DBCR2
 	stwu	r8, 4(r7)
 	mfspr	r8, SPRN_IAC1
-	stwu	r8, 4(r7)
+	stwu	r8, 8(r7)
 	mfspr	r8, SPRN_IAC2
-	stwu	r8, 4(r7)
-#ifndef CONFIG_FSL_BOOKE
+	stwu	r8, 8(r7)
+#ifndef CONFIG_PPC_FSL_BOOK3E
 	mfspr	r8, SPRN_IAC3
-	stwu	r8, 4(r7)
+	stwu	r8, 8(r7)
 	mfspr	r8, SPRN_IAC4
-	stwu	r8, 4(r7)
+	stwu	r8, 8(r7)
 #endif
 	mfspr	r8, SPRN_DAC1
-	stwu	r8, 4(r7)
+	stwu	r8, 8(r7)
 	mfspr	r8, SPRN_DAC2
-	stwu	r8, 4(r7)
+	stwu	r8, 8(r7)
 	li	r8, 0
 	mtspr	SPRN_DBCR0, r8		/* disable all debug event */
 	lwzu	r8, 4(r5)
 	mtspr	SPRN_DBCR1, r8
 	lwzu	r8, 4(r5)
 	mtspr	SPRN_DBCR2, r8
-	lwzu	r8, 4(r5)
+	lwzu	r8, 8(r5)
 	mtspr	SPRN_IAC1, r8
-	lwzu	r8, 4(r5)
+	lwzu	r8, 8(r5)
 	mtspr	SPRN_IAC2, r8
-#ifndef CONFIG_FSL_BOOKE
-	lwzu	r8, 4(r5)
+#ifndef CONFIG_PPC_FSL_BOOK3E
+	lwzu	r8, 8(r5)
 	mtspr	SPRN_IAC3, r8
-	lwzu	r8, 4(r5)
+	lwzu	r8, 8(r5)
 	mtspr	SPRN_IAC4, r8
 #endif
-	lwzu	r8, 4(r5)
+	lwzu	r8, 8(r5)
 	mtspr	SPRN_DAC1, r8
-	lwzu	r8, 4(r5)
+	lwzu	r8, 8(r5)
 	mtspr	SPRN_DAC2, r8
 ..skip_load_guest_debug:
 	mtspr	SPRN_DBCR0, r6

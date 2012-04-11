@@ -196,7 +196,7 @@ int kvmppc_booke_emulate_mtspr(struct kvm_vcpu *vcpu, int sprn, int rs)
 		vcpu->arch.dbg_reg.iac[1] = spr_val;
 		kvmppc_recalc_shadow_ac(vcpu);
 		break;
-#ifndef CONFIG_FSL_BOOKE
+#ifndef CONFIG_PPC_FSL_BOOK3E
 	case SPRN_IAC3:
 		vcpu->arch.dbg_reg.iac[2] = spr_val;
 		kvmppc_recalc_shadow_ac(vcpu);
@@ -381,7 +381,7 @@ int kvmppc_booke_emulate_mfspr(struct kvm_vcpu *vcpu, int sprn, int rt)
 	case SPRN_IAC2:
 		kvmppc_set_gpr(vcpu, rt, vcpu->arch.dbg_reg.iac[1]);
 		break;
-#ifndef CONFIG_FSL_BOOKE
+#ifndef CONFIG_PPC_FSL_BOOK3E
 	case SPRN_IAC3:
 		kvmppc_set_gpr(vcpu, rt, vcpu->arch.dbg_reg.iac[2]);
 		break;

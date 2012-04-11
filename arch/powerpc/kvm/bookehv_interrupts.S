@@ -62,6 +62,20 @@
 #define NEED_ESR		0x00000004 /* save faulting ESR */
 #define NEED_DBSR		0x00000008 /* save DBSR */
 
+#ifdef CONFIG_64BIT
+#define LOAD_REG_FROM_64(reg, addr) \
+	ld	reg, addr
+
+#define STORE_REG_TO_64(reg, addr) \
+	std	reg, addr
+#else
+#define LOAD_REG_FROM_64(reg, addr) \
+	lwz	reg, 4+addr
+
+#define STORE_REG_TO_64(reg, addr) \
+	stw	reg, 4+addr
+#endif
+
 /*
  * On entry:
  * r4 = vcpu, r5 = srr0, r6 = srr1
@@ -445,20 +459,20 @@ skip_pmgc0_save:
 	lwz	r8, VCPU_HOST_DBG+VCPU_DBCR2(r4)
 	lwz	r9, VCPU_HOST_DBG+VCPU_DBCR4(r4)
 	mtspr	SPRN_DBCR1, r7
-	lwz	r7, VCPU_HOST_DBG+VCPU_IAC1(r4)
+	LOAD_REG_FROM_64(r6, VCPU_HOST_DBG+VCPU_IAC1(r4))
+	LOAD_REG_FROM_64(r7, VCPU_HOST_DBG+VCPU_IAC2(r4))
 	mtspr	SPRN_DBCR2, r8
-	lwz	r8, VCPU_HOST_DBG+VCPU_IAC1+4(r4)
 	mtspr	SPRN_DBCR4, r9
-	mtspr	SPRN_IAC1, r7
-	mtspr	SPRN_IAC2, r8
-#ifndef CONFIG_FSL_BOOKE
-	lwz	r8, VCPU_HOST_DBG+VCPU_IAC1+8(r4)
-	lwz	r9, VCPU_HOST_DBG+VCPU_IAC1+12(r4)
-	mtspr	SPRN_IAC3, r8
-	mtspr	SPRN_IAC4, r9
+	mtspr	SPRN_IAC1, r6
+	mtspr	SPRN_IAC2, r7
+#ifndef CONFIG_PPC_FSL_BOOK3E
+	LOAD_REG_FROM_64(r7, VCPU_HOST_DBG+VCPU_IAC3(r4))
+	LOAD_REG_FROM_64(r8, VCPU_HOST_DBG+VCPU_IAC4(r4))
+	mtspr	SPRN_IAC3, r7
+	mtspr	SPRN_IAC4, r8
 #endif
-	lwz	r8, VCPU_HOST_DBG+VCPU_DAC1(r4)
-	lwz	r9, VCPU_HOST_DBG+VCPU_DAC1+4(r4)
+	LOAD_REG_FROM_64(r8, VCPU_HOST_DBG+VCPU_DAC1(r4))
+	LOAD_REG_FROM_64(r9, VCPU_HOST_DBG+VCPU_DAC2(r4))
 	mtspr	SPRN_DAC1, r8
 	mtspr	SPRN_DAC2, r9
 ..skip_load_hw_bkpts:
@@ -751,39 +765,39 @@ skip_pmgc0_restore:
 	mfspr	r7, SPRN_DBCR4
 	stw	r7, VCPU_HOST_DBG+VCPU_DBCR4(r4)
 	mfspr	r8, SPRN_IAC1
-	stw	r8, VCPU_HOST_DBG+VCPU_IAC1(r4)
+	STORE_REG_TO_64(r8, VCPU_HOST_DBG+VCPU_IAC1(r4))
 	mfspr	r7, SPRN_IAC2
-	stw	r7, VCPU_HOST_DBG+VCPU_IAC1+4(r4)
-#ifndef CONFIG_FSL_BOOKE
+	STORE_REG_TO_64(r7, VCPU_HOST_DBG+VCPU_IAC2(r4))
+#ifndef CONFIG_PPC_FSL_BOOK3E
 	mfspr	r8, SPRN_IAC3
-	stw	r8, VCPU_HOST_DBG+VCPU_IAC1+8(r4)
+	STORE_REG_TO_64(r8, VCPU_HOST_DBG+VCPU_IAC3(r4))
 	mfspr	r7, SPRN_IAC4
-	stw	r7, VCPU_HOST_DBG+VCPU_IAC1+12(r4)
+	STORE_REG_TO_64(r7, VCPU_HOST_DBG+VCPU_IAC4(r4))
 #endif
 	mfspr	r8, SPRN_DAC1
-	stw	r8, VCPU_HOST_DBG+VCPU_DAC1(r4)
+	STORE_REG_TO_64(r8, VCPU_HOST_DBG+VCPU_DAC1(r4))
 	mfspr	r7, SPRN_DAC2
-	stw	r7, VCPU_HOST_DBG+VCPU_DAC1+4(r4)
+	STORE_REG_TO_64(r7, VCPU_HOST_DBG+VCPU_DAC2(r4))
 	li	r8, 0
 	mtspr	SPRN_DBCR0, r8		/* disable all debug event */
 	lwz	r7, VCPU_SHADOW_DBG+VCPU_DBCR1(r4)
 	lwz	r8, VCPU_SHADOW_DBG+VCPU_DBCR2(r4)
 	lwz	r9, VCPU_SHADOW_DBG+VCPU_DBCR4(r4)
 	mtspr	SPRN_DBCR1, r7
-	lwz	r7, VCPU_SHADOW_DBG+VCPU_IAC1(r4)
+	LOAD_REG_FROM_64(r7, VCPU_SHADOW_DBG+VCPU_IAC1(r4))
+	LOAD_REG_FROM_64(r3, VCPU_SHADOW_DBG+VCPU_IAC2(r4))
 	mtspr	SPRN_DBCR2, r8
-	lwz	r8, VCPU_SHADOW_DBG+VCPU_IAC1+4(r4)
 	mtspr	SPRN_DBCR4, r9
 	mtspr	SPRN_IAC1, r7
-	mtspr	SPRN_IAC2, r8
-#ifndef CONFIG_FSL_BOOKE
-	lwz	r7, VCPU_SHADOW_DBG+VCPU_IAC1+8(r4)
-	lwz	r8, VCPU_SHADOW_DBG+VCPU_IAC1+12(r4)
+	mtspr	SPRN_IAC2, r3
+#ifndef CONFIG_PPC_FSL_BOOK3E
+	LOAD_REG_FROM_64(r7, VCPU_SHADOW_DBG+VCPU_IAC3(r4))
+	LOAD_REG_FROM_64(r8, VCPU_SHADOW_DBG+VCPU_IAC4(r4))
 	mtspr	SPRN_IAC3, r7
 	mtspr	SPRN_IAC4, r8
 #endif
-	lwz	r7, VCPU_SHADOW_DBG+VCPU_DAC1(r4)
-	lwz	r8, VCPU_SHADOW_DBG+VCPU_DAC1+4(r4)
+	LOAD_REG_FROM_64(r7, VCPU_SHADOW_DBG+VCPU_DAC1(r4))
+	LOAD_REG_FROM_64(r8, VCPU_SHADOW_DBG+VCPU_DAC2(r4))
 	mtspr	SPRN_DAC1, r7
 	mtspr	SPRN_DAC2, r8
 ..skip_hw_bkpts:
