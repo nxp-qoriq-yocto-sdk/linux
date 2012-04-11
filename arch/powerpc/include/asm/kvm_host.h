@@ -345,13 +345,15 @@ struct kvmppc_slb {
 };
 
 #ifdef CONFIG_BOOKE
-# ifdef CONFIG_FSL_BOOKE
+# ifdef CONFIG_PPC_FSL_BOOK3E
 #define KVMPPC_IAC_NUM	2
 #define KVMPPC_DAC_NUM	2
 # else
 #define KVMPPC_IAC_NUM	4
 #define KVMPPC_DAC_NUM	2
 # endif
+#define KVMPPC_MAX_IAC	4
+#define KVMPPC_MAX_DAC	2
 #endif
 
 #define PERFMON_COUNTERS	4
@@ -372,8 +374,8 @@ struct kvmppc_debug_reg {
 #ifdef CONFIG_KVM_E500MC
 	u32 dbcr4;
 #endif
-	u32 iac[KVMPPC_IAC_NUM];
-	u32 dac[KVMPPC_DAC_NUM];
+	u64 iac[KVMPPC_MAX_IAC];
+	u64 dac[KVMPPC_MAX_DAC];
 #endif
 };
 

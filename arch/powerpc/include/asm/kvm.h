@@ -225,6 +225,12 @@ struct kvm_sregs {
 
 			__u32 dbsr;	/* KVM_SREGS_E_UPDATE_DBSR */
 			__u32 dbcr[3];
+			/*
+			 * FIXME: iac/dac registers are 64bit wide, so this API
+			 * interface will provide only lower 32 bits on 64 bit
+			 * processors. Either change this API to support 64 bit
+			 * or add ONE_REG interface for 64bit iac/dac registers.
+			 */
 			__u32 iac[4];
 			__u32 dac[2];
 			__u32 dvc[2];
