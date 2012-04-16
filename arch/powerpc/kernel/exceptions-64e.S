@@ -1284,31 +1284,11 @@ _GLOBAL(setup_perfmon_ivor)
 _GLOBAL(setup_doorbell_ivors)
 	SET_IVOR(36, 0x280) /* Processor Doorbell */
 	SET_IVOR(37, 0x2a0) /* Processor Doorbell Crit */
-
-	/* Check MMUCFG[LPIDSIZE] to determine if we have category E.HV */
-	mfspr	r10,SPRN_MMUCFG
-	rlwinm.	r10,r10,0,MMUCFG_LPIDSIZE
-	beqlr
-
-	SET_IVOR(38, 0x2c0) /* Guest Processor Doorbell */
-	SET_IVOR(39, 0x2e0) /* Guest Processor Doorbell Crit/MC */
 	blr
 
 _GLOBAL(setup_ehv_ivors)
-	/*
-	 * We may be running as a guest and lack E.HV even on a chip
-	 * that normally has it.
-	 */
-	mfspr	r10,SPRN_MMUCFG
-	rlwinm.	r10,r10,0,MMUCFG_LPIDSIZE
-	bne 1f
-
-	ld	r10,CPU_SPEC_FEATURES(r5)
-	LOAD_REG_IMMEDIATE(r9,CPU_FTR_EMB_HV)
-	andc	r10,r10,r9
-	std	r10,CPU_SPEC_FEATURES(r5)
-	blr
-
-1:	SET_IVOR(40, 0x300) /* Embedded Hypervisor System Call */
+	SET_IVOR(40, 0x300) /* Embedded Hypervisor System Call */
 	SET_IVOR(41, 0x320) /* Embedded Hypervisor Privilege */
+	SET_IVOR(38, 0x2c0) /* Guest Processor Doorbell */
+	SET_IVOR(39, 0x2e0) /* Guest Processor Doorbell Crit/MC */
 	blr
