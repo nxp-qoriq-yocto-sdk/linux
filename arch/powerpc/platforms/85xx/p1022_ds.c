@@ -377,6 +377,7 @@ static struct of_device_id __initdata p1022_ds_ids[] = {
 	{ .compatible = "gianfar", },
 	/* So that the DMA channel nodes can be probed individually: */
 	{ .compatible = "fsl,eloplus-dma", },
+	{ .compatible = "fsl,p1022-elbc", },
 	{},
 };
 
