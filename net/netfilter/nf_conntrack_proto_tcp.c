@@ -1,5 +1,6 @@
 /* (C) 1999-2001 Paul `Rusty' Russell
  * (C) 2002-2004 Netfilter Core Team <coreteam@netfilter.org>
+ * Copyright 2011 Freescale Semiconductor, Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -717,6 +718,49 @@ static bool tcp_in_window(const struct nf_conn *ct,
 				state->retrans = 0;
 			}
 		}
+
+#ifdef CONFIG_AS_FASTPATH
+	state->seen[dir].td_delta = receiver_offset;
+	state->seen[dir].td_rcvwin = win;
+	/* Setting Time stamp */
+	{
+		unsigned char *tcpopt;
+		unsigned char *endptr;
+		int     optlen;
+		tcpopt = (unsigned char *)(tcph) + 20;
+		optlen = tcph->doff * 4 - 20;
+		if (optlen > 0) {
+			endptr = tcpopt + optlen;
+			while (tcpopt < endptr) {
+				if (tcpopt[1] <= 0)
+					break;
+
+				switch (*tcpopt) {
+				case TCPOPT_EOL:
+				case TCPOPT_NOP:
+					tcpopt++;
+					break;
+				case TCPOPT_MSS:
+					tcpopt += 4; /* 4 byte option length */
+					break;
+				case TCPOPT_WINDOW:
+					tcpopt += 3; /* 3 byte option length */
+					break;
+				case TCPOPT_TIMESTAMP:
+					state->seen[dir].td_tcptimestamp =
+						ntohl(*((unsigned long *)
+							(tcpopt + 2)));
+					goto DONE;
+				default:
+					tcpopt += tcpopt[1];
+					break;
+				}
+			}
+		}
+	}
+DONE:
+#endif
+
 		res = true;
 	} else {
 		res = false;
