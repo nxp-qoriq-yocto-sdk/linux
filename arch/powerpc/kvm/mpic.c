@@ -383,6 +383,11 @@ static inline int mpic_is_err_int_src(struct irq_source *src)
 #endif
 }
 
+static inline int mpic_is_ipi_src(struct irq_source *src)
+{
+	return src->num >= MPIC_IPI_IRQ && src->num < MPIC_ERR_IRQ;
+}
+
 static void openpic_handle_error_irq(struct openpic *opp, struct irq_source *src, int level)
 {
 	int err_int = src->num - MPIC_ERR_IRQ;
@@ -1226,6 +1231,15 @@ int kvm_arch_set_irq(struct kvm *kvm, struct kvm_arch_irq *irq, int level)
 	unsigned long flags;
 
 	spin_lock_irqsave(&pic->lock, flags);
+
+	/*
+	* Emulated IPIs are triggered by setting the destination
+	* field, use the same approach for IPIs that are triggered
+	* from a direct mapped IPI interrupt.
+	*/
+	if (mpic_is_ipi_src(src))
+		src->ide = 0x1;
+
 	if (mpic_is_err_int_src(src))
 		openpic_handle_error_irq(priv, src, level);
 	else
