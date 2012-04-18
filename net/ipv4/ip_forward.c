@@ -100,6 +100,14 @@ int ip_forward(struct sk_buff *skb)
 		goto drop;
 	iph = ip_hdr(skb);
 
+#ifdef CONFIG_AS_FASTPATH
+	if (route_add_fn &&
+	    rt && rt->rt_src)	/* To avoid ARP packet */
+		/* ToS in route table is not actually that is in packet */
+		route_add_fn(rt->rt_iif, rt->dst.dev, rt->rt_dst, rt->rt_src,
+			     iph->tos, NULL);
+#endif
+
 	/* Decrease ttl after skb cow done */
 	ip_decrease_ttl(iph);
 
@@ -130,3 +138,6 @@ drop:
 	kfree_skb(skb);
 	return NET_RX_DROP;
 }
+#ifdef CONFIG_AS_FASTPATH
+EXPORT_SYMBOL(ip_forward);
+#endif

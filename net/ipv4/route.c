@@ -226,6 +226,10 @@ const __u8 ip_tos2prio[16] = {
 	ECN_OR_COST(INTERACTIVE_BULK)
 };
 
+#ifdef CONFIG_AS_FASTPATH
+route_add_hook *route_add_fn;
+static route_flush_hook *route_flush_fn;
+#endif
 
 /*
  * Route cache.
@@ -942,6 +946,12 @@ static void rt_cache_invalidate(struct net *net)
 void rt_cache_flush(struct net *net, int delay)
 {
 	rt_cache_invalidate(net);
+
+#ifdef CONFIG_AS_FASTPATH
+	if (route_flush_fn)
+		route_flush_fn();
+#endif
+
 	if (delay >= 0)
 		rt_do_flush(net, !in_softirq());
 }
@@ -2814,6 +2824,23 @@ slow_output:
 }
 EXPORT_SYMBOL_GPL(__ip_route_output_key);
 
+#ifdef CONFIG_AS_FASTPATH
+void route_hook_fn_register(route_add_hook *add,
+			    route_flush_hook *flush)
+{
+	route_add_fn = add;
+	route_flush_fn = flush;
+}
+EXPORT_SYMBOL(route_hook_fn_register);
+
+void route_hook_fn_unregister(void)
+{
+	route_add_fn = NULL;
+	route_flush_fn = NULL;
+}
+EXPORT_SYMBOL(route_hook_fn_unregister);
+#endif
+
 static struct dst_entry *ipv4_blackhole_dst_check(struct dst_entry *dst, u32 cookie)
 {
 	return NULL;
@@ -3299,9 +3326,9 @@ static struct ctl_table empty[1];
 
 static struct ctl_table ipv4_skeleton[] =
 {
-	{ .procname = "route", 
+	{ .procname = "route",
 	  .mode = 0555, .child = ipv4_route_table},
-	{ .procname = "neigh", 
+	{ .procname = "neigh",
 	  .mode = 0555, .child = empty},
 	{ }
 };
