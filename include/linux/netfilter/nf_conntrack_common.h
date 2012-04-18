@@ -20,7 +20,7 @@ enum ip_conntrack_info {
 
 	IP_CT_ESTABLISHED_REPLY = IP_CT_ESTABLISHED + IP_CT_IS_REPLY,
 	IP_CT_RELATED_REPLY = IP_CT_RELATED + IP_CT_IS_REPLY,
-	IP_CT_NEW_REPLY = IP_CT_NEW + IP_CT_IS_REPLY,	
+	IP_CT_NEW_REPLY = IP_CT_NEW + IP_CT_IS_REPLY,
 	/* Number of distinct IP_CT types (no NEW in reply dirn). */
 	IP_CT_NUMBER = IP_CT_IS_REPLY * 2 - 1
 };
@@ -79,6 +79,12 @@ enum ip_conntrack_status {
 	/* Conntrack is a template */
 	IPS_TEMPLATE_BIT = 11,
 	IPS_TEMPLATE = (1 << IPS_TEMPLATE_BIT),
+
+#ifdef CONFIG_AS_FASTPATH
+	/* Session offloaded to ASF */
+	IPS_ASF_OFFLOADED_BIT = 20,
+	IPS_ASF_OFFLOADED = (1 << IPS_ASF_OFFLOADED_BIT),
+#endif
 
 	/* Conntrack is a fake untracked entry */
 	IPS_UNTRACKED_BIT = 12,
