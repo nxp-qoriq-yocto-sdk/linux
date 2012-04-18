@@ -109,7 +109,7 @@ static int decrementer_set_next_event(unsigned long evt,
 static void decrementer_set_mode(enum clock_event_mode mode,
 				 struct clock_event_device *dev);
 
-static struct clock_event_device decrementer_clockevent = {
+struct clock_event_device decrementer_clockevent = {
        .name           = "decrementer",
        .rating         = 200,
        .shift          = 0,	/* To be filled in */
@@ -119,6 +119,7 @@ static struct clock_event_device decrementer_clockevent = {
        .set_mode       = decrementer_set_mode,
        .features       = CLOCK_EVT_FEAT_ONESHOT,
 };
+EXPORT_SYMBOL(decrementer_clockevent);
 
 struct decrementer_clock {
 	struct clock_event_device event;
