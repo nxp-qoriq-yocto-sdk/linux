@@ -475,7 +475,7 @@ int kvmppc_emulate_instruction(struct kvm_run *run, struct kvm_vcpu *vcpu)
 			default:
 				emulated = kvmppc_core_emulate_mfspr(vcpu, sprn, rt);
 				if (emulated == EMULATE_FAIL) {
-					printk("mfspr: unknown spr %x\n", sprn);
+					printk("mfspr: unknown spr %u\n", sprn);
 					kvmppc_set_gpr(vcpu, rt, 0);
 				}
 				break;
@@ -539,7 +539,7 @@ int kvmppc_emulate_instruction(struct kvm_run *run, struct kvm_vcpu *vcpu)
 			default:
 				emulated = kvmppc_core_emulate_mtspr(vcpu, sprn, rs);
 				if (emulated == EMULATE_FAIL)
-					printk("mtspr: unknown spr %x\n", sprn);
+					printk("mtspr: unknown spr %u\n", sprn);
 				break;
 			}
 			kvmppc_set_exit_type(vcpu, EMULATED_MTSPR_EXITS);
