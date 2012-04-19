@@ -777,7 +777,7 @@ static __init void kvm_free_tmp(void)
 	}
 }
 
-#ifdef CONFIG_E500
+#ifdef CONFIG_KVM_E500V2
 static void kvm_msrwe_idle(void)
 {
 	mtmsr(mfmsr() | MSR_WE | MSR_EE);
@@ -799,7 +799,7 @@ static int __init kvm_guest_init(void)
 	/* Enable napping */
 	powersave_nap = 1;
 #endif
-#ifdef CONFIG_E500
+#ifdef CONFIG_KVM_E500V2
 	/*
 	 * Skip the overhead of HID0 accesses that KVM ignores --
 	 * just write MSR[WE].
