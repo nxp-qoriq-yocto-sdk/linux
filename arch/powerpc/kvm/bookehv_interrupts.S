@@ -265,8 +265,11 @@
 	EX_R10, \
 	EX_R11
 
+/*
+ * Only bolted TLB miss exception handlers are supported for now
+ */
 #define EX_PARAMS_TLB \
-	SPRN_SPRG_TLB_SCRATCH, \
+	SPRN_SPRG_GEN_SCRATCH, \
 	PACA_EXTLB, \
 	EX_TLB_R10, \
 	EX_TLB_R11
