@@ -1,7 +1,7 @@
 /*
  * P1022 DS Device Tree Source stub (no addresses or top-level ranges)
  *
- * Copyright 2011 Freescale Semiconductor Inc.
+ * Copyright 2011-2012 Freescale Semiconductor Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -75,6 +75,18 @@
 				label = "file system-spi";
 				reg = <0x00700000 0x00900000>;
 			};
+		};
+
+		slic@0 {
+			compatible = "zarlink,le88266";
+			reg = <1>;
+			spi-max-frequency = <8000000>;
+		};
+
+		slic@1 {
+			compatible = "zarlink,le88266";
+			reg = <2>;
+			spi-max-frequency = <8000000>;
 		};
 	};
 
