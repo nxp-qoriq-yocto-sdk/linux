@@ -1,7 +1,7 @@
 /*
  * P1024 RDB 36Bit Physical Address Map Device Tree Source
  *
- * Copyright 2011 Freescale Semiconductor Inc.
+ * Copyright 2011-2012 Freescale Semiconductor Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -49,6 +49,9 @@
 
 	soc: soc@fffe00000 {
 		ranges = <0x0 0xf 0xffe00000 0x100000>;
+		tdm@16000 {
+			status = "disabled";
+		};
 	};
 
 	pci0: pcie@fffe09000 {
