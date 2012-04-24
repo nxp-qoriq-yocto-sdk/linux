@@ -130,4 +130,5 @@ source "drivers/virt/Kconfig"
 
 source "drivers/net/dpa/NetCommSw/Kconfig"
 
+source "drivers/tdm/Kconfig"
 endmenu
