@@ -17,9 +17,12 @@
 #include <asm/asm-compat.h>
 #include <asm/asm-offsets.h>
 
-.global epapr_ev_idle
-epapr_ev_idle:
+_GLOBAL(epapr_ev_idle)
+#ifndef CONFIG_PPC64
 	rlwinm	r3, r1, 0, 0, 31-THREAD_SHIFT	/* current thread_info */
+#else
+	clrrdi	r3, r1, THREAD_SHIFT
+#endif
 	PPC_LL	r4, TI_LOCAL_FLAGS(r3)	/* set napping bit */
 	ori	r4, r4,_TLF_NAPPING	/* so when we take an exception */
 	PPC_STL	r4, TI_LOCAL_FLAGS(r3)	/* it will return to our caller */
