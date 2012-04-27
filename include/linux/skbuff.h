@@ -416,6 +416,10 @@ struct sk_buff {
 		__u32		dropcount;
 	};
 
+#ifdef CONFIG_RX_TX_BUFF_XCHG
+	__u8			owner;
+	struct sk_buff		*new_skb;
+#endif
 	__u16			vlan_tci;
 
 	sk_buff_data_t		transport_header;
