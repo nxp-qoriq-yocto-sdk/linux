@@ -515,7 +515,7 @@ static int kvmppc_booke_irqprio_deliver(struct kvm_vcpu *vcpu,
 
 /*
  * Return the number of jiffies until the next timeout.  If the timeout is
- * longer than the kernel timer API supports, we return ULONG_MAX instead.
+ * longer than the MAX_TIMEOUT, that we return MAX_TIMEOUT instead.
  */
 static unsigned long watchdog_next_timeout(struct kvm_vcpu *vcpu)
 {
