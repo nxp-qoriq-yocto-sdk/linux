@@ -237,7 +237,7 @@ int kvmppc_emulate_instruction(struct kvm_run *run, struct kvm_vcpu *vcpu)
 			emulated = kvmppc_handle_store(run, vcpu,
 						       kvmppc_get_gpr(vcpu, rs),
 			                               1, 1);
-			kvmppc_set_gpr(vcpu, rs, ea);
+			kvmppc_set_gpr(vcpu, ra, ea);
 			break;
 
 		case OP_31_XOP_LHAX:
