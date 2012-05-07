@@ -225,7 +225,7 @@ EXPORT_SYMBOL(of_platform_device_create);
  * Creates a platform_device for the provided device_node, and optionally
  * recursively create devices for all the child nodes.
  */
-static int of_platform_bus_create(struct device_node *bus,
+int of_platform_bus_create(struct device_node *bus,
 				  const struct of_device_id *matches,
 				  struct device *parent)
 {
@@ -247,6 +247,7 @@ static int of_platform_bus_create(struct device_node *bus,
 	}
 	return rc;
 }
+EXPORT_SYMBOL(of_platform_bus_create);
 
 /**
  * of_platform_bus_probe() - Probe the device-tree for platform buses
