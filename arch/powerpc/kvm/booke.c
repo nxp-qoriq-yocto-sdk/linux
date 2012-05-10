@@ -1912,8 +1912,9 @@ void kvmppc_update_perfmon_ints(struct kvm_vcpu *vcpu)
 		}
 	} else {
 		/* Interrupt condition goes away, so clear interrupt */
-		if (kvmppc_core_pending_perfmon(vcpu)) {
+		if (kvmppc_core_pending_perfmon(vcpu))
 			kvmppc_core_dequeue_perfmon(vcpu);
+
 #ifdef CONFIG_KVM_BOOKE_HV
 			/* Allow Guest access to PMRs now */
 			mtspr(SPRN_MSRP, mfspr(SPRN_MSRP) & ~MSRP_PMMP);
@@ -1921,7 +1922,6 @@ void kvmppc_update_perfmon_ints(struct kvm_vcpu *vcpu)
 #else
 			mtpmr(PMRN_PMGC0, vcpu->arch.pm_reg.pmgc0);
 #endif
-		}
 	}
 }
 
