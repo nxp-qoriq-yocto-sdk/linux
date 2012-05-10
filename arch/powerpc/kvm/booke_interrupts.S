@@ -228,28 +228,28 @@ _GLOBAL(kvmppc_resume_host)
 
 	addi	r7, r4, VCPU_HOST_DBG
 	mfspr	r9, SPRN_DBCR0
-	lwz	r8, 0(r7)
+	lwz	r8, VCPU_DBCR0(r7)
 	andis.	r9, r9, DBCR0_AC_BITS@h
 	beq	..skip_load_host_debug
 	li	r9, 0
 	mtspr	SPRN_DBCR0, r9		/* disable all debug event */
-	lwzu	r9, 4(r7)
+	lwz	r9, VCPU_DBCR1(r7)
 	mtspr	SPRN_DBCR1, r9
-	lwzu	r9, 4(r7)
+	lwz	r9, VCPU_DBCR2(r7)
 	mtspr	SPRN_DBCR2, r9
-	lwzu	r9, 8(r7)
+	lwz	r9, VCPU_IAC1+4(r7)
 	mtspr	SPRN_IAC1, r9
-	lwzu	r9, 8(r7)
+	lwz	r9, VCPU_IAC2+4(r7)
 	mtspr	SPRN_IAC2, r9
 #ifndef CONFIG_PPC_FSL_BOOK3E
-	lwzu	r9, 8(r7)
+	lwz	r9, VCPU_IAC3+4(r7)
 	mtspr	SPRN_IAC3, r9
-	lwzu	r9, 8(r7)
+	lwz	r9, VCPU_IAC4+4(r7)
 	mtspr	SPRN_IAC4, r9
 #endif
-	lwzu	r9, 8(r7)
+	lwz	r9, VCPU_DAC1+4(r7)
 	mtspr	SPRN_DAC1, r9
-	lwzu	r9, 8(r7)
+	lwz	r9, VCPU_DAC2+4(r7)
 	mtspr	SPRN_DAC2, r9
 ..skip_load_host_debug:
 	/* Clear h/w DBSR and save current(guest) DBSR */
@@ -529,45 +529,45 @@ lightweight_exit:
 	lwz	r6, 0(r5)
 	mfspr	r8, SPRN_DBCR0
 	andis.	r3, r6, DBCR0_AC_BITS@h
-	stw	r8, 0(r7)
+	stw	r8, VCPU_DBCR0(r7)
 	beq	..skip_load_guest_debug
 	mfspr	r8, SPRN_DBCR1
-	stwu	r8, 4(r7)
+	stw	r8, VCPU_DBCR1(r7)
 	mfspr	r8, SPRN_DBCR2
-	stwu	r8, 4(r7)
+	stw	r8, VCPU_DBCR2(r7)
 	mfspr	r8, SPRN_IAC1
-	stwu	r8, 8(r7)
+	stw	r8, VCPU_IAC1+4(r7)
 	mfspr	r8, SPRN_IAC2
-	stwu	r8, 8(r7)
+	stw	r8, VCPU_IAC2+4(r7)
 #ifndef CONFIG_PPC_FSL_BOOK3E
 	mfspr	r8, SPRN_IAC3
-	stwu	r8, 8(r7)
+	stw	r8, VCPU_IAC3+4(r7)
 	mfspr	r8, SPRN_IAC4
-	stwu	r8, 8(r7)
+	stw	r8, VCPU_IAC4+4(r7)
 #endif
 	mfspr	r8, SPRN_DAC1
-	stwu	r8, 8(r7)
+	stw	r8, VCPU_DAC1+4(r7)
 	mfspr	r8, SPRN_DAC2
-	stwu	r8, 8(r7)
+	stw	r8, VCPU_DAC2+4(r7)
 	li	r8, 0
 	mtspr	SPRN_DBCR0, r8		/* disable all debug event */
-	lwzu	r8, 4(r5)
+	lwz	r8, VCPU_DBCR1(r5)
 	mtspr	SPRN_DBCR1, r8
-	lwzu	r8, 4(r5)
+	lwz	r8, VCPU_DBCR2(r5)
 	mtspr	SPRN_DBCR2, r8
-	lwzu	r8, 8(r5)
+	lwz	r8, VCPU_IAC1+4(r5)
 	mtspr	SPRN_IAC1, r8
-	lwzu	r8, 8(r5)
+	lwz	r8, VCPU_IAC2+4(r5)
 	mtspr	SPRN_IAC2, r8
 #ifndef CONFIG_PPC_FSL_BOOK3E
-	lwzu	r8, 8(r5)
+	lwz	r8, VCPU_IAC3+4(r5)
 	mtspr	SPRN_IAC3, r8
-	lwzu	r8, 8(r5)
+	lwz	r8, VCPU_IAC4+4(r5)
 	mtspr	SPRN_IAC4, r8
 #endif
-	lwzu	r8, 8(r5)
+	lwz	r8, VCPU_DAC1+4(r5)
 	mtspr	SPRN_DAC1, r8
-	lwzu	r8, 8(r5)
+	lwz	r8, VCPU_DAC2+4(r5)
 	mtspr	SPRN_DAC2, r8
 ..skip_load_guest_debug:
 	mtspr	SPRN_DBCR0, r6
