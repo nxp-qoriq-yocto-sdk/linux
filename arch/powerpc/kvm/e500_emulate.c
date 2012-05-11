@@ -84,7 +84,7 @@ static int kvmppc_e500_emul_msgsnd(struct kvm_vcpu *vcpu, int rb)
 
 static void kvmppc_set_mcsr(struct kvm_vcpu *vcpu, ulong val)
 {
-#ifndef CONFIG_KVM_E500
+#ifndef CONFIG_KVM_E500V2
 	vcpu->arch.mcsr &= ~val;
 	if (!vcpu->arch.mcsr)
 		kvmppc_core_dequeue_mcheck(vcpu);
