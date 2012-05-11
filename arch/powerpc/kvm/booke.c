@@ -417,6 +417,13 @@ static int kvmppc_booke_irqprio_deliver(struct kvm_vcpu *vcpu,
 		int_class = INT_CLASS_CRIT;
 		break;
 	case BOOKE_IRQPRIO_MACHINE_CHECK:
+#ifndef CONFIG_KVM_E500V2
+		/* In case of e500mc/e5500 the machine check should remain
+		 * pending as long as any bit (indicating the machine
+		 * check condition)is set in mcsr.
+		 */
+		keep_irq = true;
+#endif
 		allowed = vcpu->arch.shared->msr & MSR_ME;
 		allowed = allowed && !crit;
 		int_class = INT_CLASS_MC;
