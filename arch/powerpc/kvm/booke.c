@@ -1395,7 +1395,7 @@ static int set_sregs_base(struct kvm_vcpu *vcpu,
 
 	if (sregs->u.e.update_special & KVM_SREGS_E_UPDATE_MCSR) {
 		vcpu->arch.mcsr = sregs->u.e.mcsr;
-#ifndef CONFIG_KVM_E500 // FIXME
+#ifndef CONFIG_KVM_E500V2
 		if (vcpu->arch.mcsr)
 			kvmppc_core_queue_mcheck(vcpu);
 		else
