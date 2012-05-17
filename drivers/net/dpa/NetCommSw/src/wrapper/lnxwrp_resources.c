@@ -187,11 +187,15 @@ int fm_set_active_fman_ports(struct platform_device *of_dev,
 	 * If active, set their parameters. */
 	for_each_child_of_node(fm_node, fm_port_node) {
 
+		if (!of_device_is_available(fm_port_node))
+			continue;
+
 		/* OH FMan ports */
 		if (of_device_is_compatible(fm_port_node,
-						"fsl,fman-port-oh"))
-			/* all oh ports are active */
+					    "fsl,fman-port-oh")) {
 			p_LnxWrpFmDev->fm_active_ports_info.num_oh_ports++;
+			continue;
+		}
 
 		if (!is_fman_port_active(fm_node, fm_port_node))
 			continue;
