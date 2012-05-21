@@ -835,6 +835,7 @@ Status: feature not supported
 
                 memset(compat_param, 0, sizeof(ioc_compat_fm_pcd_net_env_params_t));
                 compat_copy_fm_pcd_net_env(compat_param, param, COMPAT_K_TO_US);
+
                 if (param->id && !copy_to_user((ioc_compat_fm_pcd_net_env_params_t *) compat_ptr(arg),
                             compat_param,
                             sizeof(ioc_compat_fm_pcd_net_env_params_t)))
@@ -870,7 +871,7 @@ Status: feature not supported
                 if (copy_from_user(&compat_id, (ioc_compat_fm_obj_t *) compat_ptr(arg), sizeof(ioc_compat_fm_obj_t)))
                     break;
 
-                id.obj = compat_ptr(compat_id.obj);
+                compat_copy_fm_net_env_delete(&compat_id, &id, COMPAT_US_TO_K);
             }
             else
 #endif
@@ -987,7 +988,7 @@ Status: feature not supported
                 if (copy_from_user(&compat_id, (ioc_compat_fm_obj_t *) compat_ptr(arg), sizeof(ioc_compat_fm_obj_t)))
                     break;
 
-                id.obj = compat_ptr(compat_id.obj);
+                compat_copy_fm_pcd_scheme_delete(&compat_id, &id, COMPAT_US_TO_K);
             }
             else
 #endif
@@ -1000,9 +1001,9 @@ Status: feature not supported
         }
 
 #if defined(CONFIG_COMPAT)
-        case FM_PCD_IOC_CC_SET_NODE_COMPAT:
+        case FM_PCD_IOC_MATCH_TABLE_SET_COMPAT:
 #endif
-        case FM_PCD_IOC_CC_SET_NODE:
+        case FM_PCD_IOC_MATCH_TABLE_SET:
         {
             ioc_fm_pcd_cc_node_params_t *param;
             uint8_t                     *keys;
@@ -1027,8 +1028,8 @@ Status: feature not supported
                 ioc_compat_fm_pcd_cc_node_params_t *compat_param;
 
                 compat_param = (ioc_compat_fm_pcd_cc_node_params_t *) XX_Malloc(
-                        sizeof(ioc_compat_fm_pcd_cc_node_params_t) +
-                        2 * IOC_FM_PCD_MAX_NUM_OF_KEYS * IOC_FM_PCD_MAX_SIZE_OF_KEY);
+                                    sizeof(ioc_compat_fm_pcd_cc_node_params_t) +
+                                    2 * IOC_FM_PCD_MAX_NUM_OF_KEYS * IOC_FM_PCD_MAX_SIZE_OF_KEY);
                 if (!compat_param)
                 {
                     XX_Free(param);
@@ -1086,9 +1087,6 @@ Status: feature not supported
 
                         param->keys_params.key_params[i].p_key = &keys[k];
                     }
-                    /* else
-                       param->keys_params.key_params[i].p_key = NULL;
-                       was taken care of by memset(0) above */
 
                     if (param->keys_params.key_params[i].p_mask)
                     {
@@ -1102,9 +1100,6 @@ Status: feature not supported
 
                         param->keys_params.key_params[i].p_mask = &masks[k];
                     }
-                    /* else
-                       param->keys_params.key_params[i].p_mask = NULL;
-                       was taken care of by memset(0) above */
                 }
             }
 
@@ -1115,19 +1110,17 @@ Status: feature not supported
             {
                 ioc_compat_fm_pcd_cc_node_params_t *compat_param;
                 compat_param = (ioc_compat_fm_pcd_cc_node_params_t *) XX_Malloc(
-                        sizeof(ioc_compat_fm_pcd_cc_node_params_t) +
-                        2 * IOC_FM_PCD_MAX_NUM_OF_KEYS * IOC_FM_PCD_MAX_SIZE_OF_KEY);
+                                            sizeof(ioc_compat_fm_pcd_cc_node_params_t) +
+                                            2 * IOC_FM_PCD_MAX_NUM_OF_KEYS * IOC_FM_PCD_MAX_SIZE_OF_KEY);
                 if (!compat_param)
                 {
                     XX_Free(param);
                     RETURN_ERROR(MINOR, E_NO_MEMORY, ("IOCTL FM PCD"));
                 }
 
-                /* setup user space structure */
                 memset(compat_param, 0, sizeof(ioc_compat_fm_pcd_cc_node_params_t) +
                         2 * IOC_FM_PCD_MAX_NUM_OF_KEYS * IOC_FM_PCD_MAX_SIZE_OF_KEY);
                 compat_copy_fm_pcd_cc_node(compat_param, param, COMPAT_K_TO_US);
-                compat_param->id = compat_add_ptr2id(param->id);
 
                 if (param->id && !copy_to_user((ioc_compat_fm_pcd_cc_node_params_t *)compat_ptr(arg),
                             compat_param,
@@ -1164,8 +1157,7 @@ Status: feature not supported
                 if (copy_from_user(&compat_id, (ioc_compat_fm_obj_t *) compat_ptr(arg), sizeof(ioc_compat_fm_obj_t)))
                     break;
 
-                id.obj = compat_get_id2ptr(compat_id.obj);
-                compat_del_ptr2id(id.obj);
+                compat_copy_fm_pcd_cc_delete_node(&compat_id, &id, COMPAT_US_TO_K);
             }
             else
 #endif
@@ -1243,8 +1235,7 @@ Status: feature not supported
                 }
 
                 memset(compat_param, 0, sizeof(ioc_compat_fm_pcd_cc_tree_params_t));
-                compat_add_ptr2id(param->id);
-                param->id = (void *)(uint64_t)compat_get_ptr2id(param->id);
+
                 compat_copy_fm_pcd_cc_tree(compat_param, param, COMPAT_K_TO_US);
 
                 if (param->id && !copy_to_user((ioc_compat_fm_pcd_cc_tree_params_t *)compat_ptr(arg),
@@ -1282,7 +1273,7 @@ Status: feature not supported
                 if (copy_from_user(&compat_id, (ioc_compat_fm_obj_t *) compat_ptr(arg), sizeof(ioc_compat_fm_obj_t)))
                     break;
 
-                id.obj = compat_get_id2ptr(compat_id.obj);
+                compat_copy_fm_pcd_cc_delete_tree(&compat_id, &id, COMPAT_US_TO_K);
             }
             else
 #endif
@@ -1453,7 +1444,7 @@ invalid_port_id:
                 if (copy_from_user(&compat_id, (ioc_compat_fm_obj_t *) compat_ptr(arg), sizeof(ioc_compat_fm_obj_t)))
                     break;
 
-                id.obj = compat_ptr(compat_id.obj);
+		compat_copy_fm_pcd_plcr_del_profile(&compat_id, &id, COMPAT_US_TO_K);
             }
             else
 #endif
@@ -2170,7 +2161,6 @@ invalid_port_id:
                 memset(compat_param, 0, sizeof(ioc_compat_fm_pcd_manip_params_t));
 
                 compat_fm_pcd_manip_set_node(compat_param, param, COMPAT_K_TO_US);
-                compat_param->id = compat_add_ptr2id(param->id);
 
                 if (param->id && !copy_to_user((ioc_compat_fm_pcd_manip_params_t *) compat_ptr(arg),
                             compat_param,
@@ -2208,7 +2198,7 @@ invalid_port_id:
                 if (copy_from_user(&compat_id, (ioc_compat_fm_obj_t *) compat_ptr(arg), sizeof(ioc_compat_fm_obj_t)))
                     break;
 
-                id.obj = compat_ptr(compat_id.obj);
+                compat_copy_fm_pcd_manip_delete_node(&compat_id, &id, COMPAT_US_TO_K);
             }
             else
 #endif
@@ -2668,12 +2658,15 @@ t_Error LnxwrpFmPortIOCTL(t_LnxWrpFmPortDev *p_LnxWrpFmPortDev, unsigned int cmd
                 compat_port_pcd_kg_params   = (ioc_compat_fm_port_pcd_kg_params_t *) (compat_port_pcd_cc_params + 1);
                 compat_port_pcd_plcr_params = (ioc_compat_fm_port_pcd_plcr_params_t *) (compat_port_pcd_kg_params + 1);
 
-                /* Pseudo-while */
                 while (!(copy_fail = copy_from_user(compat_port_pcd_params,
                                         (ioc_compat_fm_port_pcd_params_t *)compat_ptr(arg),
                                         sizeof(ioc_compat_fm_port_pcd_params_t))))
                 {
-                    compat_copy_fm_port_pcd(compat_port_pcd_params, port_pcd_params, COMPAT_US_TO_K);
+                    /* set pointers from where to copy from: */
+                    port_pcd_params->p_prs_params = compat_ptr(compat_port_pcd_params->p_prs_params); /* same structure */
+                    port_pcd_params->p_cc_params = compat_ptr(compat_port_pcd_params->p_cc_params);
+                    port_pcd_params->p_kg_params = compat_ptr(compat_port_pcd_params->p_kg_params);
+                    port_pcd_params->p_plcr_params = compat_ptr(compat_port_pcd_params->p_plcr_params);
 
                     /* the prs member is the same, no compat structure...memcpy only */
                     if (port_pcd_params->p_prs_params && !copy_fail)
@@ -2694,10 +2687,7 @@ t_Error LnxwrpFmPortIOCTL(t_LnxWrpFmPortDev *p_LnxWrpFmPortDev, unsigned int cmd
                         if(!(copy_fail = copy_from_user(compat_port_pcd_cc_params,
                                 port_pcd_params->p_cc_params,
                                 sizeof(ioc_compat_fm_port_pcd_cc_params_t))))
-                        {
                             port_pcd_params->p_cc_params = port_pcd_cc_params;
-                            port_pcd_params->p_cc_params->cc_tree_id = compat_get_id2ptr(compat_port_pcd_cc_params->cc_tree_id);
-                        }
                         else
                             break;
                     }
@@ -2707,10 +2697,7 @@ t_Error LnxwrpFmPortIOCTL(t_LnxWrpFmPortDev *p_LnxWrpFmPortDev, unsigned int cmd
                         if(!(copy_fail = copy_from_user(compat_port_pcd_kg_params,
                                 port_pcd_params->p_kg_params,
                                 sizeof(ioc_compat_fm_port_pcd_kg_params_t))))
-                        {
-                            compat_copy_fm_port_pcd_kg(compat_port_pcd_kg_params, port_pcd_kg_params, COMPAT_US_TO_K);
                             port_pcd_params->p_kg_params = port_pcd_kg_params;
-                        }
                         else
                             break;
                     }
@@ -2720,15 +2707,14 @@ t_Error LnxwrpFmPortIOCTL(t_LnxWrpFmPortDev *p_LnxWrpFmPortDev, unsigned int cmd
                         if(!(copy_fail = copy_from_user(compat_port_pcd_plcr_params,
                                 port_pcd_params->p_plcr_params,
                                 sizeof(ioc_compat_fm_port_pcd_plcr_params_t))))
-                        {
                             port_pcd_params->p_plcr_params = port_pcd_plcr_params;
-                            port_pcd_params->p_plcr_params->plcr_profile_id = compat_ptr(compat_port_pcd_plcr_params->plcr_profile_id);
-                        }
                     }
 
                     /* always run once! */
                     break;
                 }
+
+                compat_copy_fm_port_pcd(compat_port_pcd_params, port_pcd_params, COMPAT_US_TO_K);
 
                 XX_Free(compat_port_pcd_params);
             }
@@ -3039,7 +3025,7 @@ t_Error LnxwrpFmPortIOCTL(t_LnxWrpFmPortDev *p_LnxWrpFmPortDev, unsigned int cmd
                 if (copy_from_user(&compat_id, (ioc_compat_fm_obj_t *) compat_ptr(arg), sizeof(ioc_compat_fm_obj_t)))
                     break;
 
-                id.obj = compat_get_id2ptr(compat_id.obj);
+                compat_copy_fm_port_pcd_modify_tree(&compat_id, &id, COMPAT_US_TO_K);
             }
             else
 #endif
