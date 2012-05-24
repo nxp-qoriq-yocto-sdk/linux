@@ -2090,9 +2090,8 @@ invalid_port_id:
 
 #if defined(CONFIG_COMPAT)
         case FM_PCD_IOC_MANIP_SET_NODE_COMPAT:
-#else
-        case FM_PCD_IOC_MANIP_SET_NODE:
 #endif
+        case FM_PCD_IOC_MANIP_SET_NODE:
         {
             ioc_fm_pcd_manip_params_t *param;
 
@@ -2183,9 +2182,8 @@ invalid_port_id:
 
 #if defined(CONFIG_COMPAT)
         case FM_PCD_IOC_MANIP_DELETE_NODE_COMPAT:
-#else
-        case FM_PCD_IOC_MANIP_DELETE_NODE:
 #endif
+        case FM_PCD_IOC_MANIP_DELETE_NODE:
         {
             ioc_fm_obj_t id;
 
@@ -2214,12 +2212,11 @@ invalid_port_id:
 #ifdef FM_CAPWAP_SUPPORT
 #if defined(CONFIG_COMPAT)
         case FM_PCD_IOC_STATISTICS_SET_NODE_COMPAT:
-#else
-        case FM_PCD_IOC_STATISTICS_SET_NODE:
 #endif
+        case FM_PCD_IOC_STATISTICS_SET_NODE:
         {
             ioc_fm_pcd_stats_params_t param;
-#warning "TODO"
+#warning "feature not supported!"
             param->id = FM_PCD_StatisticsSetNode(p_LnxWrpFmDev->h_PcdDev,
                                 (t_FmPcdStatsParams *)&param);
         }
