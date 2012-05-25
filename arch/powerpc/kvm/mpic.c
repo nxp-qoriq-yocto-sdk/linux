@@ -836,19 +836,25 @@ static u32 iack_nolock(struct openpic *opp, struct irq_dest *dst)
 {
 	struct irq_source *src;
 	u32 retval;
-	int n_IRQ;
+	int n_IRQ, irq_in_service;
 
 	pr_debug("Lower OpenPIC INT output\n");
 	mpic_irq_lower(opp, dst);
 
-	/* Interrupt already in service -- return it again */
-	n_IRQ = IRQ_get_next(opp, &dst->servicing);
-	if (n_IRQ >= 0) {
-		src = &opp->src[n_IRQ];
+	irq_in_service = IRQ_get_next(opp, &dst->servicing);
+	n_IRQ = IRQ_get_next(opp, &dst->raised);
+
+	if (irq_in_service >= 0 &&
+	    dst->raised.priority <= dst->servicing.priority) {
+		/*
+		 * Interrupt already in service and no higher
+		 * prio interrupt pending -- return it again
+		 */
+		src = &opp->src[irq_in_service];
 		return IPVP_VECTOR(src->ipvp);
 	}
 
-	n_IRQ = IRQ_get_next(opp, &dst->raised);
+
 	pr_debug("PIAC: irq=%d\n", n_IRQ);
 	if (n_IRQ < 0) {
 		/* No more interrupt pending */
