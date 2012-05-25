@@ -1837,7 +1837,6 @@ invalid_port_id:
             break;
         }
 #if defined(CONFIG_COMPAT)
-#warning TODO: compat ioctl call not implemented!
         case FM_PCD_IOC_HASH_TABLE_SET_COMPAT:
 #endif
         case FM_PCD_IOC_HASH_TABLE_SET:
@@ -1852,9 +1851,11 @@ invalid_port_id:
             memset(param, 0, sizeof(*param)) ;
 
 #if defined(CONFIG_COMPAT)
-#warning TODO: compat ioctl call not implemented!
             if (compat)
             {
+                printk(KERN_WARNING "FM_PCD_IOC_HASH_TABLE_SET: compat ioctl call not implemented! \n");
+                kfree(param);
+                RETURN_ERROR(MINOR, E_INVALID_HANDLE, ("IOCTL FM PCD"));
             }
             else
 #endif
@@ -1867,7 +1868,6 @@ invalid_port_id:
             param->id = FM_PCD_HashTableSet(p_LnxWrpFmDev->h_PcdDev, (t_FmPcdHashTableParams *) param);
 
 #if defined(CONFIG_COMPAT)
-#warning TODO: compat ioctl call not implemented!
             if (compat)
             {
             }
@@ -1911,7 +1911,6 @@ invalid_port_id:
             return FM_PCD_HashTableDelete(id.obj);
         }
 #if defined(CONFIG_COMPAT)
-#warning TODO: compat ioctl call not implemented!
         case FM_PCD_IOC_HASH_TABLE_ADD_KEY_COMPAT:
 #endif
         case FM_PCD_IOC_HASH_TABLE_ADD_KEY:
@@ -1926,9 +1925,11 @@ invalid_port_id:
             memset(param, 0, sizeof(*param)) ;
 
 #if defined(CONFIG_COMPAT)
-#warning TODO: compat ioctl call not implemented!
             if (compat)
             {
+                printk(KERN_WARNING "FM_PCD_IOC_HASH_TABLE_ADD_KEY: compat ioctl call not implemented!");
+                kfree(param);
+                RETURN_ERROR(MINOR, E_INVALID_HANDLE, ("IOCTL FM PCD"));
             }
             else
 #endif
@@ -1945,7 +1946,6 @@ invalid_port_id:
         }
 
 #if defined(CONFIG_COMPAT)
-#warning TODO: compat ioctl call not implemented!
         case FM_PCD_IOC_HASH_TABLE_REMOVE_KEY_COMPAT:
 #endif
         case FM_PCD_IOC_HASH_TABLE_REMOVE_KEY:
@@ -1960,9 +1960,11 @@ invalid_port_id:
             memset(param, 0, sizeof(*param)) ;
 
 #if defined(CONFIG_COMPAT)
-#warning TODO: compat ioctl call not implemented!
             if (compat)
             {
+                printk(KERN_WARNING "FM_PCD_IOC_HASH_TABLE_REMOVE_KEY: compat ioctl call not implemented!");
+                kfree(param);
+                RETURN_ERROR(MINOR, E_INVALID_HANDLE, ("IOCTL FM PCD"));
             }
             else
 #endif
