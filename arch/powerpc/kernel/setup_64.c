@@ -67,6 +67,7 @@
 #include <asm/code-patching.h>
 #include <asm/kvm_ppc.h>
 #include <asm/hugetlb.h>
+#include <asm/epapr_hcalls.h>
 
 #include "setup.h"
 
@@ -593,6 +594,8 @@ void __init setup_arch(char **cmdline_p)
 
 	/* Initialize the MMU context management stuff */
 	mmu_context_init();
+
+	epapr_paravirt_init();
 
 	kvm_linear_init();
 
