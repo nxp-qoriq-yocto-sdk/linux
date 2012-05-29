@@ -473,7 +473,6 @@ static void gfar_init_mac(struct net_device *ndev)
 	if (priv->ptimer) {
 		rctrl &= ~RCTRL_PAL_MASK;
 		rctrl |= RCTRL_PADDING(8) | RCTRL_PRSDEP_INIT;
-		gfar_1588_start(ndev);
 		priv->padding = 8;
 	}
 
@@ -2169,8 +2168,6 @@ void stop_gfar(struct net_device *dev)
 	unlock_rx_qs(priv);
 	unlock_tx_qs(priv);
 	local_irq_restore_nort(flags);
-
-	gfar_1588_stop(dev);
 
 	/* Free the IRQs */
 	if (priv->device_flags & FSL_GIANFAR_DEV_HAS_MULTI_INTR) {
