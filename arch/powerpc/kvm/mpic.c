@@ -850,8 +850,7 @@ static u32 iack_nolock(struct openpic *opp, struct irq_dest *dst)
 		 * Interrupt already in service and no higher
 		 * prio interrupt pending -- return it again
 		 */
-		src = &opp->src[irq_in_service];
-		return IPVP_VECTOR(src->ipvp);
+		n_IRQ = irq_in_service;
 	}
 
 
