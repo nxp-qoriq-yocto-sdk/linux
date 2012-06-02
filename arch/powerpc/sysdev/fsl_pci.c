@@ -840,6 +840,7 @@ u64 fsl_pci_immrbar_base(struct pci_controller *hose)
 	return 0;
 }
 
+#ifdef CONFIG_E500
 static int is_in_pci_mem_space(phys_addr_t addr)
 {
 	struct pci_controller *hose;
@@ -874,6 +875,7 @@ int fsl_pci_mcheck_exception(struct pt_regs *regs)
 
 	return 0;
 }
+#endif
 
 static const struct of_device_id pci_ids[] = {
 	{ .compatible = "fsl,mpc8540-pci", },
