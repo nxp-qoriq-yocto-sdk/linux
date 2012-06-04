@@ -892,23 +892,24 @@ static const struct of_device_id pci_ids[] = {
 };
 
 int primary_phb_addr;
-static int __devinit fsl_pci_probe(struct platform_device *pdev)
+int fsl_pci_setup(struct device_node *np)
 {
 #ifdef CONFIG_SWIOTLB
 	struct pci_controller *hose;
 #endif
-	int ret;
+	int ret = 0;
 	bool is_primary;
 
-	if (of_match_node(pci_ids, pdev->dev.of_node)) {
+	if (of_match_node(pci_ids, np)) {
 		struct resource rsrc;
-		of_address_to_resource(pdev->dev.of_node, 0, &rsrc);
+		of_address_to_resource(np, 0, &rsrc);
 		is_primary = ((rsrc.start & 0xfffff) == primary_phb_addr);
-		ret = fsl_add_bridge(pdev->dev.of_node, is_primary);
+		ret = fsl_add_bridge(np, is_primary);
 
 #ifdef CONFIG_SWIOTLB
 		if (ret == 0) {
-			hose = pci_find_hose_for_OF_device(pdev->dev.of_node);
+			hose = pci_find_hose_for_OF_device(np);
+
 			/*
 			 * if we couldn't map all of DRAM via the dma windows
 			 * we need SWIOTLB to handle buffers located outside of
@@ -924,6 +925,11 @@ static int __devinit fsl_pci_probe(struct platform_device *pdev)
 		}
 #endif
 	}
+	return ret;
+}
+
+static int __devinit fsl_pci_probe(struct platform_device *pdev)
+{
 #ifdef CONFIG_PPC64
 	pci_devs_phb_init();
 #endif

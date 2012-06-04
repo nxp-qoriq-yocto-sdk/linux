@@ -67,8 +67,17 @@ void __init mpc85xx_smp_init(void);
 
 void __init corenet_ds_setup_arch(void)
 {
+#ifdef CONFIG_PCI
+	struct device_node *np;
+#endif
+
 #ifdef CONFIG_SMP
 	mpc85xx_smp_init();
+#endif
+
+#ifdef CONFIG_PCI
+	for_each_node_by_type(np, "pci")
+		fsl_pci_setup(np);
 #endif
 
 #ifdef CONFIG_SWIOTLB

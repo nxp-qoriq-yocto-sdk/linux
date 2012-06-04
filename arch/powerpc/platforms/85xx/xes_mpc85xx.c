@@ -132,6 +132,9 @@ static void __init xes_mpc85xx_setup_arch(void)
 {
 	struct device_node *root;
 	const char *model = "Unknown";
+#ifdef CONFIG_PCI
+	struct device_node *np;
+#endif
 
 	root = of_find_node_by_path("/");
 	if (root == NULL)
@@ -143,6 +146,12 @@ static void __init xes_mpc85xx_setup_arch(void)
 	       model + strlen("xes,"));
 
 	xes_mpc85xx_fixups();
+
+#ifdef CONFIG_PCI
+	for_each_node_by_type(np, "pci")
+		fsl_pci_setup(np);
+#endif
+
 
 #ifdef CONFIG_SMP
 	mpc85xx_smp_init();

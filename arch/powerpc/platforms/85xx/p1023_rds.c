@@ -82,6 +82,11 @@ static void __init mpc85xx_rds_setup_arch(void)
 		}
 	}
 
+#ifdef CONFIG_PCI
+	for_each_node_by_type(np, "pci")
+		fsl_pci_setup(np);
+#endif
+
 #ifdef CONFIG_SMP
 	mpc85xx_smp_init();
 #endif
