@@ -24,31 +24,46 @@
 #include "booke.h"
 
 #define OP_19_XOP_RFI     50
+#define OP_19_XOP_RFCI    51
 
 #define OP_31_XOP_MFMSR   83
 #define OP_31_XOP_WRTEE   131
 #define OP_31_XOP_MTMSR   146
 #define OP_31_XOP_WRTEEI  163
 
+#ifndef CONFIG_KVM_BOOKE_HV
 static void kvmppc_emul_rfi(struct kvm_vcpu *vcpu)
 {
 	vcpu->arch.pc = vcpu->arch.shared->srr0;
 	kvmppc_set_msr(vcpu, vcpu->arch.shared->srr1);
+}
+#endif
+
+static void kvmppc_emul_rfci(struct kvm_vcpu *vcpu)
+{
+	vcpu->arch.pc = vcpu->arch.csrr0;
+	kvmppc_set_msr(vcpu, vcpu->arch.csrr1);
 }
 
 int kvmppc_booke_emulate_op(struct kvm_run *run, struct kvm_vcpu *vcpu,
                             unsigned int inst, int *advance)
 {
 	int emulated = EMULATE_DONE;
-	int rs;
-	int rt;
 
 	switch (get_op(inst)) {
 	case 19:
 		switch (get_xop(inst)) {
+#ifndef CONFIG_KVM_BOOKE_HV
 		case OP_19_XOP_RFI:
 			kvmppc_emul_rfi(vcpu);
 			kvmppc_set_exit_type(vcpu, EMULATED_RFI_EXITS);
+			*advance = 0;
+			break;
+#endif
+
+		case OP_19_XOP_RFCI:
+			kvmppc_emul_rfci(vcpu);
+			kvmppc_set_exit_type(vcpu, EMULATED_RFCI_EXITS);
 			*advance = 0;
 			break;
 
@@ -58,8 +73,11 @@ int kvmppc_booke_emulate_op(struct kvm_run *run, struct kvm_vcpu *vcpu,
 		}
 		break;
 
+#ifndef CONFIG_KVM_BOOKE_HV
 	case 31:
 		switch (get_xop(inst)) {
+			int rs;
+			int rt;
 
 		case OP_31_XOP_MFMSR:
 			rt = get_rt(inst);
@@ -91,6 +109,7 @@ int kvmppc_booke_emulate_op(struct kvm_run *run, struct kvm_vcpu *vcpu,
 		}
 
 		break;
+#endif
 
 	default:
 		emulated = EMULATE_FAIL;
@@ -111,10 +130,16 @@ int kvmppc_booke_emulate_mtspr(struct kvm_vcpu *vcpu, int sprn, int rs)
 	ulong spr_val = kvmppc_get_gpr(vcpu, rs);
 
 	switch (sprn) {
+#ifndef CONFIG_KVM_BOOKE_HV
 	case SPRN_DEAR:
 		vcpu->arch.shared->dar = spr_val; break;
 	case SPRN_ESR:
 		vcpu->arch.shared->esr = spr_val; break;
+#endif
+	case SPRN_CSRR0:
+		vcpu->arch.csrr0 = spr_val; break;
+	case SPRN_CSRR1:
+		vcpu->arch.csrr1 = spr_val; break;
 	case SPRN_DBCR0:
 		vcpu->arch.dbcr0 = spr_val; break;
 	case SPRN_DBCR1:
@@ -215,12 +240,18 @@ int kvmppc_booke_emulate_mfspr(struct kvm_vcpu *vcpu, int sprn, int rt)
 	int emulated = EMULATE_DONE;
 
 	switch (sprn) {
+#ifndef CONFIG_KVM_BOOKE_HV
 	case SPRN_IVPR:
 		kvmppc_set_gpr(vcpu, rt, vcpu->arch.ivpr); break;
 	case SPRN_DEAR:
 		kvmppc_set_gpr(vcpu, rt, vcpu->arch.shared->dar); break;
 	case SPRN_ESR:
 		kvmppc_set_gpr(vcpu, rt, vcpu->arch.shared->esr); break;
+#endif
+	case SPRN_CSRR0:
+		kvmppc_set_gpr(vcpu, rt, vcpu->arch.csrr0); break;
+	case SPRN_CSRR1:
+		kvmppc_set_gpr(vcpu, rt, vcpu->arch.csrr1); break;
 	case SPRN_DBCR0:
 		kvmppc_set_gpr(vcpu, rt, vcpu->arch.dbcr0); break;
 	case SPRN_DBCR1:
