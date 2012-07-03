@@ -78,7 +78,7 @@ int kvmppc_kvm_pv(struct kvm_vcpu *vcpu)
 	}
 
 	switch (nr) {
-	case HC_VENDOR_KVM | KVM_HC_PPC_MAP_MAGIC_PAGE:
+	case KVM_HCALL_TOKEN(KVM_HC_PPC_MAP_MAGIC_PAGE):
 	{
 		vcpu->arch.magic_page_pa = param1;
 		vcpu->arch.magic_page_ea = param2;
@@ -88,11 +88,11 @@ int kvmppc_kvm_pv(struct kvm_vcpu *vcpu)
 		if (irqchip_in_kernel(vcpu->kvm))
 			r2 |= KVM_MAGIC_FEAT_EPR | KVM_MAGIC_FEAT_MPIC_CTPR;
 
-		r = HC_EV_SUCCESS;
+		r = EV_SUCCESS;
 		break;
 	}
-	case HC_VENDOR_KVM | KVM_HC_FEATURES:
-		r = HC_EV_SUCCESS;
+	case KVM_HCALL_TOKEN(KVM_HC_FEATURES):
+		r = EV_SUCCESS;
 #if defined(CONFIG_PPC_BOOK3S) || defined(CONFIG_KVM_E500V2)
 		/* XXX Missing magic page on 44x */
 		r2 |= (1 << KVM_FEATURE_MAGIC_PAGE);
@@ -101,7 +101,7 @@ int kvmppc_kvm_pv(struct kvm_vcpu *vcpu)
 		/* Second return value is in r4 */
 		break;
 	default:
-		r = HC_EV_UNIMPLEMENTED;
+		r = EV_UNIMPLEMENTED;
 		break;
 	}
 
