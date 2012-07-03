@@ -48,9 +48,8 @@ static unsigned int perfmon_refcount;
 
 int kvm_arch_vcpu_runnable(struct kvm_vcpu *v)
 {
-	bool ret = !(v->arch.shared->msr & MSR_WE) ||
-		   !!(v->arch.pending_exceptions) ||
-		   v->requests;
+	bool ret = !!(v->arch.pending_exceptions) ||
+	       v->requests;
 
 #ifdef CONFIG_BOOKE
 	ret = ret || (v->arch.tsr & TCR_WRC_MASK);
@@ -99,6 +98,11 @@ int kvmppc_kvm_pv(struct kvm_vcpu *vcpu)
 #endif
 
 		/* Second return value is in r4 */
+		break;
+	case EV_HCALL_TOKEN(EV_IDLE):
+		r = EV_SUCCESS;
+		kvm_vcpu_block(vcpu);
+		clear_bit(KVM_REQ_UNHALT, &vcpu->requests);
 		break;
 	default:
 		r = EV_UNIMPLEMENTED;
@@ -904,6 +908,8 @@ static int kvm_vm_ioctl_get_pvinfo(struct kvm_ppc_pvinfo *pvinfo)
 	pvinfo->hcall[2] = inst_sc;
 	pvinfo->hcall[3] = inst_nop;
 #endif
+
+	pvinfo->flags = KVM_PPC_PVINFO_FLAGS_EV_IDLE;
 
 	return 0;
 }
