@@ -155,7 +155,7 @@ END_FW_FTR_SECTION_IFSET(FW_FEATURE_ISERIES)
 	REST_2GPRS(7,r1)
 	addi	r9,r1,STACK_FRAME_OVERHEAD
 #endif
-	clrrdi	r11,r1,THREAD_SHIFT
+	CURRENT_THREAD_INFO(r11, r1)
 	ld	r10,TI_FLAGS(r11)
 	andi.	r11,r10,_TIF_SYSCALL_T_OR_A
 	bne-	syscall_dotrace
@@ -190,7 +190,7 @@ syscall_exit:
 	bl	.do_show_syscall_exit
 	ld	r3,RESULT(r1)
 #endif
-	clrrdi	r12,r1,THREAD_SHIFT
+	CURRENT_THREAD_INFO(r12, r1)
 
 	ld	r8,_MSR(r1)
 #ifdef CONFIG_PPC_BOOK3S
@@ -273,7 +273,7 @@ syscall_dotrace:
 	ld	r7,GPR7(r1)
 	ld	r8,GPR8(r1)
 	addi	r9,r1,STACK_FRAME_OVERHEAD
-	clrrdi	r10,r1,THREAD_SHIFT
+	CURRENT_THREAD_INFO(r10, r1)
 	ld	r10,TI_FLAGS(r10)
 	b	syscall_dotrace_cont
 
@@ -516,7 +516,7 @@ END_MMU_FTR_SECTION_IFSET(MMU_FTR_1T_SEGMENT)
 2:
 #endif /* !CONFIG_PPC_BOOK3S */
 
-	clrrdi	r7,r8,THREAD_SHIFT	/* base of new stack */
+	CURRENT_THREAD_INFO(r7, r8)  /* base of new stack */
 	/* Note: this uses SWITCH_FRAME_SIZE rather than INT_FRAME_SIZE
 	   because we don't need to leave the 288-byte ABI gap at the
 	   top of the kernel stack. */
@@ -583,7 +583,7 @@ _GLOBAL(ret_from_except_lite)
 #endif /* CONFIG_PPC_BOOK3E */
 
 #ifdef CONFIG_PREEMPT
-	clrrdi	r9,r1,THREAD_SHIFT	/* current_thread_info() */
+	CURRENT_THREAD_INFO(r9, r1)
 	li	r0,_TIF_NEED_RESCHED	/* bits to check */
 	ld	r3,_MSR(r1)
 	ld	r4,TI_FLAGS(r9)
@@ -598,7 +598,7 @@ _GLOBAL(ret_from_except_lite)
 	beq	restore		/* if not, just restore regs and return */
 
 	/* Check current_thread_info()->flags */
-	clrrdi	r9,r1,THREAD_SHIFT
+	CURRENT_THREAD_INFO(r9, r1)
 	ld	r4,TI_FLAGS(r9)
 	andi.	r0,r4,_TIF_USER_WORK_MASK
 	bne	do_work
@@ -743,7 +743,7 @@ do_work:
 	stb	r0,PACAHARDIRQEN(r13)
 
 	/* Re-test flags and eventually loop */
-	clrrdi	r9,r1,THREAD_SHIFT
+	CURRENT_THREAD_INFO(r9, r1)
 	ld	r4,TI_FLAGS(r9)
 	andi.	r0,r4,_TIF_NEED_RESCHED
 	bne	1b

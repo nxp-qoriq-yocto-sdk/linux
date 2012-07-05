@@ -350,7 +350,7 @@ END_FTR_SECTION_IFSET(CPU_FTR_CTRL)			\
 #ifdef CONFIG_PPC_970_NAP
 #define FINISH_NAP				\
 BEGIN_FTR_SECTION				\
-	clrrdi	r11,r1,THREAD_SHIFT;		\
+	CURRENT_THREAD_INFO(r11, r1);		\
 	ld	r9,TI_LOCAL_FLAGS(r11);		\
 	andi.	r10,r9,_TLF_NAPPING;		\
 	bnel	power4_fixup_nap;		\
