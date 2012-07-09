@@ -529,7 +529,7 @@ static void __init mpic_scan_ht_pic(struct mpic *mpic, u8 __iomem *devbase,
 		mpic->fixups[irq].data = readl(base + 4) | 0x80000000;
 	}
 }
- 
+
 
 static void __init mpic_scan_ht_pics(struct mpic *mpic)
 {
@@ -1192,7 +1192,10 @@ struct mpic * __init mpic_alloc(struct device_node *node,
 	mpic->irq_count = irq_count;
 	mpic->num_sources = 0; /* so far */
 
-	if (flags & MPIC_LARGE_VECTORS)
+	if (of_device_is_compatible(mpic->node, "fsl,mpic"))
+		mpic->flags |= MPIC_FSL | MPIC_LARGE_VECTORS;
+
+	if (mpic->flags & MPIC_LARGE_VECTORS)
 		intvec_top = 2047;
 	else
 		intvec_top = 255;
@@ -1214,8 +1217,6 @@ struct mpic * __init mpic_alloc(struct device_node *node,
 	/* Check for "big-endian" in device-tree */
 	if (of_get_property(mpic->node, "big-endian", NULL) != NULL)
 		mpic->flags |= MPIC_BIG_ENDIAN;
-	if (of_device_is_compatible(mpic->node, "fsl,mpic"))
-		mpic->flags |= MPIC_FSL;
 
 	if (node && of_get_property(node, "fsl,mpic-no-readback", NULL) != NULL)
 		mpic->flags |= MPIC_NO_READBACK;
@@ -1339,7 +1340,8 @@ struct mpic * __init mpic_alloc(struct device_node *node,
 	mpic->irqhost = irq_alloc_host(mpic->node, IRQ_HOST_MAP_LINEAR,
 				       isu_size ? isu_size : mpic->num_sources,
 				       &mpic_host_ops,
-				       flags & MPIC_LARGE_VECTORS ? 2048 : 256);
+				       mpic->flags & MPIC_LARGE_VECTORS ?
+				       2048 : 256);
 	if (mpic->irqhost == NULL)
 		return NULL;
 
@@ -1469,7 +1471,7 @@ void __init mpic_init(struct mpic *mpic)
 			/* start with vector = source number, and masked */
 			u32 vecpri = MPIC_VECPRI_MASK | i |
 				(8 << MPIC_VECPRI_PRIORITY_SHIFT);
-		
+
 			/* check if protected */
 			if (mpic->protected && test_bit(i, mpic->protected))
 				continue;
@@ -1478,7 +1480,7 @@ void __init mpic_init(struct mpic *mpic)
 			mpic_irq_write(i, MPIC_INFO(IRQ_DESTINATION), 1 << cpu);
 		}
 	}
-	
+
 	/* Init spurious vector */
 	mpic_write(mpic->gregs, MPIC_INFO(GREG_SPURIOUS), mpic->spurious_vec);
 
