@@ -189,9 +189,12 @@ static int init_service_irqs(struct pci_dev *dev, int *irqs, int mask)
 {
 	int i, irq = -1;
 
-	/* We have to use INTx if MSI cannot be used for PCIe PME. */
+	/*
+	 * If MSI cannot be used for PCIe PME or hotplug, we have to use
+	 * INTx or other interrupts, e.g. system shared interrupt.
+	 */
 	if ((mask & PCIE_PORT_SERVICE_PME) && pcie_pme_no_msi()) {
-		if (dev->pin)
+		if (dev->irq)
 			irq = dev->irq;
 		goto no_msi;
 	}
@@ -200,8 +203,12 @@ static int init_service_irqs(struct pci_dev *dev, int *irqs, int mask)
 	if (!pcie_port_enable_msix(dev, irqs, mask))
 		return 0;
 
-	/* We're not going to use MSI-X, so try MSI and fall back to INTx */
-	if (!pci_enable_msi(dev) || dev->pin)
+	/*
+	 * We're not going to use MSI-X, so try MSI and fall back to INTx.
+	 * If neither MSI/MSI-X nor INTx available, try other interrupt.  On
+	 * some platforms, root port doesn't support MSI/MSI-X/INTx in RC mode.
+	 */
+	if (!pci_enable_msi(dev) || dev->irq)
 		irq = dev->irq;
 
  no_msi:
