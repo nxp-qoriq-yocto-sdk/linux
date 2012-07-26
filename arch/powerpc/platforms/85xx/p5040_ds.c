@@ -11,6 +11,7 @@
 
 #include <linux/kernel.h>
 #include <linux/pci.h>
+#include <linux/phy.h>
 
 #include <asm/machdep.h>
 #include <asm/udbg.h>
@@ -58,6 +59,18 @@ static int __init p5040_ds_probe(void)
 	return 0;
 }
 
+#if defined(CONFIG_PHYLIB) && defined(CONFIG_VITESSE_PHY)
+int vsc824x_add_skew(struct phy_device *phydev);
+#define PHY_ID_VSC8244                  0x000fc6c0
+static int __init board_fixups(void)
+{
+	phy_register_fixup_for_uid(PHY_ID_VSC8244, 0xfffff, vsc824x_add_skew);
+
+	return 0;
+}
+machine_device_initcall(p5040_ds, board_fixups);
+#endif
+
 define_machine(p5040_ds) {
 	.name			= "P5040 DS",
 	.probe			= p5040_ds_probe,
@@ -80,9 +93,11 @@ define_machine(p5040_ds) {
 #else
 	.power_save		= e500_idle,
 #endif
+	.init_early		= corenet_ds_init_early,
 };
 
-machine_device_initcall(p5040_ds, corenet_ds_publish_devices);
+machine_arch_initcall(p5040_ds, corenet_ds_publish_pci_device);
+machine_device_initcall(p5040_ds, declare_of_platform_devices);
 
 #ifdef CONFIG_SWIOTLB
 machine_arch_initcall(p5040_ds, swiotlb_setup_bus_notifier);

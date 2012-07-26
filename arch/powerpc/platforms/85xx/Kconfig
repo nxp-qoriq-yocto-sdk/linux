@@ -279,6 +279,10 @@ config P5040_DS
 	select MPC8xxx_GPIO
 	select HAS_RAPIDIO
 	select PPC_EPAPR_HV_PIC
+	select HAS_FSL_PAMU
+	select HAS_FSL_QBMAN
+	select HAS_FSL_PME
+	select FSL_HYDRA_DS_MDIO if PHYLIB
 	help
 	  This option enables support for the P5040 DS board
 

@@ -41,12 +41,45 @@
 	#size-cells = <2>;
 	interrupt-parent = <&mpic>;
 
+	aliases {
+		ethernet0 = &enet0;
+		ethernet1 = &enet1;
+		ethernet2 = &enet2;
+		ethernet3 = &enet3;
+		ethernet4 = &enet4;
+		ethernet5 = &enet5;
+		phy_rgmii_0 = &phy_rgmii_0;
+		phy_rgmii_1 = &phy_rgmii_1;
+/*		phy_sgmii_1c = &phy_sgmii_1c;
+		phy_sgmii_1d = &phy_sgmii_1d;
+		phy_sgmii_1e = &phy_sgmii_1e;
+		phy_sgmii_1f = &phy_sgmii_1f;
+		phy_xgmii_1 = &phy_xgmii_1;
+*/		phy_xgmii_2 = &phy_xgmii_slot_2;
+
+		emi1_rgmii = &hydra_rg;
+		emi1_sgmii_slot2 = &hydra_sg_slt2;
+		emi1_sgmii_slot3 = &hydra_sg_slt3;
+		emi1_sgmii_slot5 = &hydra_sg_slt5;
+		emi1_sgmii_slot6 = &hydra_sg_slt6;
+/*		emi2_xgmii_slot1 = &hydra_xg_slt1;*/
+		emi2_xgmii_slot2 = &hydra_xg_slt2;
+	};
+
 	memory {
 		device_type = "memory";
 	};
 
 	dcsr: dcsr@f00000000 {
 		ranges = <0x00000000 0xf 0x00000000 0x01008000>;
+	};
+
+	bportals: bman-portals@ff4000000 {
+		ranges = <0x0 0xf 0xf4000000 0x200000>;
+	};
+
+	qportals: qman-portals@ff4200000 {
+		ranges = <0x0 0xf 0xf4200000 0x200000>;
 	};
 
 	soc: soc@ffe000000 {
@@ -62,14 +95,17 @@
 				partition@u-boot {
 					label = "u-boot";
 					reg = <0x00000000 0x00100000>;
+					read-only;
 				};
 				partition@kernel {
 					label = "kernel";
 					reg = <0x00100000 0x00500000>;
+					read-only;
 				};
 				partition@dtb {
 					label = "dtb";
 					reg = <0x00600000 0x00100000>;
+					read-only;
 				};
 				partition@fs {
 					label = "file system";
@@ -96,6 +132,248 @@
 				interrupts = <0x1 0x1 0 0>;
 			};
 		};
+
+		fman0: fman@400000 {
+			enet0: ethernet@e0000 {
+				tbi-handle = <&tbi0>;
+				//phy-handle = <&phy_sgmii_1c>;
+				phy-connection-type = "sgmii";
+			};
+
+			mdio0: mdio@e1120 {
+				tbi0: tbi-phy@8 {
+					reg = <0x8>;
+					device_type = "tbi-phy";
+				};
+
+				/*
+				 * Virtual MDIO for the two on-board RGMII
+				 * ports.  The fsl,hydra-mdio-muxval property
+				 * is already correct.
+				 */
+				hydra_rg: hydra-rg {
+					#address-cells = <1>;
+					#size-cells = <0>;
+					compatible = "fsl,hydra-mdio";
+					fsl,mdio-handle = <&mdio0>;
+					fsl,hydra-mdio-mux-val = <0x00>;
+					fsl,hydra-mdio-mux-mask = <0x00>;
+					status = "disabled";
+
+					phy_rgmii_0: ethernet-phy@0 {
+						reg = <0x0>;
+					};
+					phy_rgmii_1: ethernet-phy@1 {
+						reg = <0x1>;
+					};
+				};
+
+				/*
+				 * Virtual MDIO for the four-port SGMII card.
+				 * The fsl,hydra-mdio-muxval property will be
+				 * fixed-up by U-Boot based on the slot that
+				 * the SGMII card is in.
+				 *
+				 * Note: we do not support DTSEC5 connected to
+				 * SGMII, so this is the only SGMII node.
+				 */
+				/* This for Slot 2 */
+				hydra_sg_slt2: hydra-sg-slt2 {
+					#address-cells = <1>;
+					#size-cells = <0>;
+					compatible = "fsl,hydra-mdio";
+					fsl,mdio-handle = <&mdio0>;
+					fsl,hydra-mdio-mux-val = <0x00>;
+					fsl,hydra-mdio-mux-mask = <0x00>;
+					status = "disabled";
+
+					phy_sgmii_slot2_1c: ethernet-phy@1c {
+						reg = <0x1c>;
+					};
+					phy_sgmii_slot2_1d: ethernet-phy@1d {
+						reg = <0x1d>;
+					};
+					phy_sgmii_slot2_1e: ethernet-phy@1e {
+						reg = <0x1e>;
+					};
+					phy_sgmii_slot2_1f: ethernet-phy@1f {
+						reg = <0x1f>;
+					};
+				};
+				/* This for Slot 3 */
+				hydra_sg_slt3: hydra-sg-slt3 {
+					#address-cells = <1>;
+					#size-cells = <0>;
+					compatible = "fsl,hydra-mdio";
+					fsl,mdio-handle = <&mdio0>;
+					fsl,hydra-mdio-mux-val = <0x00>;
+					fsl,hydra-mdio-mux-mask = <0x00>;
+					status = "disabled";
+
+					phy_sgmii_slot3_1c: ethernet-phy@1c {
+						reg = <0x1c>;
+					};
+					phy_sgmii_slot3_1d: ethernet-phy@1d {
+						reg = <0x1d>;
+					};
+					phy_sgmii_slot3_1e: ethernet-phy@1e {
+						reg = <0x1e>;
+					};
+					phy_sgmii_slot3_1f: ethernet-phy@1f {
+						reg = <0x1f>;
+					};
+				};
+				/* This for Slot 5 */
+				hydra_sg_slt5: hydra-sg-slt5 {
+					#address-cells = <1>;
+					#size-cells = <0>;
+					compatible = "fsl,hydra-mdio";
+					fsl,mdio-handle = <&mdio0>;
+					fsl,hydra-mdio-mux-val = <0x00>;
+					fsl,hydra-mdio-mux-mask = <0x00>;
+					status = "disabled";
+
+					phy_sgmii_slot5_1c: ethernet-phy@1c {
+						reg = <0x1c>;
+					};
+					phy_sgmii_slot5_1d: ethernet-phy@1d {
+						reg = <0x1d>;
+					};
+					phy_sgmii_slot5_1e: ethernet-phy@1e {
+						reg = <0x1e>;
+					};
+					phy_sgmii_slot5_1f: ethernet-phy@1f {
+						reg = <0x1f>;
+					};
+				};
+				/* This for Slot 6 */
+				hydra_sg_slt6: hydra-sg-slt6 {
+					#address-cells = <1>;
+					#size-cells = <0>;
+					compatible = "fsl,hydra-mdio";
+					fsl,mdio-handle = <&mdio0>;
+					fsl,hydra-mdio-mux-val = <0x00>;
+					fsl,hydra-mdio-mux-mask = <0x00>;
+					status = "disabled";
+
+					phy_sgmii_slot6_1c: ethernet-phy@1c {
+						reg = <0x1c>;
+					};
+					phy_sgmii_slot6_1d: ethernet-phy@1d {
+						reg = <0x1d>;
+					};
+					phy_sgmii_slot6_1e: ethernet-phy@1e {
+						reg = <0x1e>;
+					};
+					phy_sgmii_slot6_1f: ethernet-phy@1f {
+						reg = <0x1f>;
+					};
+				};
+
+			};
+
+			enet1: ethernet@e2000 {
+				tbi-handle = <&tbi1>;
+				//phy-handle = <&phy_sgmii_1d>;
+				phy-connection-type = "sgmii";
+			};
+
+			mdio@e3120 {
+				tbi1: tbi-phy@8 {
+					reg = <8>;
+					device_type = "tbi-phy";
+				};
+			};
+
+			enet2: ethernet@e4000 {
+				tbi-handle = <&tbi2>;
+				//phy-handle = <&phy_sgmii_1e>;
+				phy-connection-type = "sgmii";
+			};
+
+			mdio@e5120 {
+				tbi2: tbi-phy@8 {
+					reg = <8>;
+					device_type = "tbi-phy";
+				};
+			};
+
+			enet3: ethernet@e6000 {
+				tbi-handle = <&tbi3>;
+				//phy-handle = <&phy_sgmii_1f>;
+				phy-connection-type = "sgmii";
+			};
+
+			mdio@e7120 {
+				#address-cells = <1>;
+				#size-cells = <0>;
+				compatible = "fsl,fman-tbi";
+				reg = <0xe7120 0xee0>;
+				interrupts = <100 1 0 0>;
+
+				tbi3: tbi-phy@8 {
+					reg = <8>;
+					device_type = "tbi-phy";
+				};
+			};
+
+			enet4: ethernet@e8000 {
+				tbi-handle = <&tbi4>;
+				/* GETH1 on the board */
+				phy-handle = <&phy_rgmii_0>;
+				phy-connection-type = "rgmii";
+			};
+
+			mdio@e9120 {
+				tbi4: tbi-phy@8 {
+					reg = <8>;
+					device_type = "tbi-phy";
+				};
+			};
+
+			enet5: ethernet@f0000 {
+				/*
+				 * phy-handle will be updated by U-Boot to
+				 * reflect the actual slot the XAUI card is in.
+				 */
+				phy-handle = <&phy_xgmii_slot_2>;
+				phy-connection-type = "xgmii";
+			};
+
+			/*
+			 * We only support one XAUI card, so the MDIO muxing
+			 * is set by U-Boot, and Linux never touches it.
+			 * Therefore, we don't need a virtual MDIO node.
+			 * However, the phy address depends on the slot, so
+			 * only one of the ethernet-phy nodes below will be
+			 * used.
+			 */
+			/* Adding parent xmdio node to add the 2nd mdio bus later */
+			xmdio0: mdio@f1000 {
+
+				hydra_xg_slt2: hydra-xg-slt2 {
+					#address-cells = <1>;
+					#size-cells = <0>;
+					compatible = "fsl,hydra-xmdio";
+					fsl,mdio-handle = <&xmdio0>;
+					fsl,hydra-mdio-mux-val = <0x00>;
+					fsl,hydra-mdio-mux-mask = <0x00>;
+					status = "disabled";
+
+					/* FM1 10GEC1 is always on slot 2 */
+					/* XAUI card in slot 1 */
+					/*phy_xgmii_1: ethernet-phy@4 {
+						reg = <0x4>;
+					};
+					*/
+					/* XAUI card in slot 2 */
+					phy_xgmii_slot_2: ethernet-phy@0 {
+						reg = <0x0>;
+					};
+				};
+			};
+
+		};
 	};
 
 	lbc: localbus@ffe124000 {
@@ -120,6 +398,7 @@
 			partition@0 {
 				label = "NAND U-Boot Image";
 				reg = <0x0 0x02000000>;
+				read-only;
 			};
 
 			partition@2000000 {
@@ -198,6 +477,36 @@
 				  0 0x00010000>;
 		};
 	};
+
+	fsl,dpaa {
+		compatible = "fsl,p5040-dpaa", "fsl,dpaa";
+
+		ethernet@0 {
+			compatible = "fsl,p5040-dpa-ethernet", "fsl,dpa-ethernet";
+			fsl,fman-mac = <&enet0>;
+		};
+		ethernet@1 {
+			compatible = "fsl,p5040-dpa-ethernet", "fsl,dpa-ethernet";
+			fsl,fman-mac = <&enet1>;
+		};
+		ethernet@2 {
+			compatible = "fsl,p5040-dpa-ethernet", "fsl,dpa-ethernet";
+			fsl,fman-mac = <&enet2>;
+		};
+		ethernet@3 {
+			compatible = "fsl,p5040-dpa-ethernet", "fsl,dpa-ethernet";
+			fsl,fman-mac = <&enet3>;
+		};
+		ethernet@4 {
+			compatible = "fsl,p5040-dpa-ethernet", "fsl,dpa-ethernet";
+			fsl,fman-mac = <&enet4>;
+		};
+		ethernet@5 {
+			compatible = "fsl,p5040-dpa-ethernet", "fsl,dpa-ethernet";
+			fsl,fman-mac = <&enet5>;
+		};
+	};
 };
 
 /include/ "fsl/p5040si-post.dtsi"
+/include/ "fsl/qoriq-dpaa-res1.dtsi"
