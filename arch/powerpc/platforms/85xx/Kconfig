@@ -268,6 +268,20 @@ config P5020_DS
 	help
 	  This option enables support for the P5020 DS board
 
+config P5040_DS
+	bool "Freescale P5040 DS"
+	select DEFAULT_UIMAGE
+	select E500
+	select PPC_E500MC
+	select PHYS_64BIT
+	select SWIOTLB
+	select ARCH_REQUIRE_GPIOLIB
+	select MPC8xxx_GPIO
+	select HAS_RAPIDIO
+	select PPC_EPAPR_HV_PIC
+	help
+	  This option enables support for the P5040 DS board
+
 endif # FSL_SOC_BOOKE
 
 config FSL_P4080_DS_MDIO
