@@ -1339,9 +1339,6 @@ struct gfar_private {
 
 	struct gfar_recycle_cntxt *recycle;
 
-	struct vlan_group *vlgrp;
-
-
 	/* Hash registers and their width */
 	u32 __iomem *hash_regs[16];
 	int hash_width;
@@ -1466,6 +1463,7 @@ extern void gfar_configure_rx_coalescing(struct gfar_private *priv,
 void gfar_init_sysfs(struct net_device *dev);
 int gfar_set_features(struct net_device *dev, u32 features);
 extern void gfar_check_rx_parser_mode(struct gfar_private *priv);
+extern void gfar_vlan_mode(struct net_device *dev, u32 features);
 
 extern const struct ethtool_ops gfar_ethtool_ops;
 
