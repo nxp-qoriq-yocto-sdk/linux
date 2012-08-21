@@ -4069,6 +4069,7 @@ static int gfar_process_frame(struct net_device *dev, struct sk_buff *skb,
 
 		/* Drop the packet silently if IP Checksum is not correct */
 		if ((fcb->flags & RXFCB_CIP) && (fcb->flags & RXFCB_EIP)) {
+			skb->dev = dev;
 			gfar_free_skb(skb);
 			return 0;
 		}
