@@ -2096,24 +2096,6 @@ int __init kvmppc_booke_init(void)
 
 		memcpy((void *)kvmppc_booke_handlers + ivor[i],
 		       (void *)handler[i], handler[i + 1] - handler[i]);
-		switch (i) {
-		case BOOKE_INTERRUPT_CRITICAL:
-		case BOOKE_INTERRUPT_MACHINE_CHECK:
-		case BOOKE_INTERRUPT_WATCHDOG: {
-			unsigned int *p, inst;
-
-			p = (void *)kvmppc_booke_handlers + ivor[i];
-			inst = create_branch((void *)kvmppc_booke_handlers,
-			                     mfspr(SPRN_IVPR), 0);
-			if (inst)
-				*p = inst;
-			else
-				printk("Error: KVM: Host exception may fail\n");
-			break;
-		}
-		default:
-			break;
-		}
 	}
 
 	flush_icache_range(kvmppc_booke_handlers,
