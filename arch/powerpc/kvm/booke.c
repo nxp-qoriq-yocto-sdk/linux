@@ -943,7 +943,8 @@ static void kvmppc_restart_interrupt(struct kvm_vcpu *vcpu,
 		break;
 #endif
 	case BOOKE_INTERRUPT_MACHINE_CHECK:
-		/* FIXME */
+		kvmppc_fill_pt_regs(&regs);
+		machine_check_exception(&regs);
 		break;
 	case BOOKE_INTERRUPT_PERFORMANCE_MONITOR:
 		kvmppc_fill_pt_regs(&regs);
@@ -987,12 +988,7 @@ int kvmppc_handle_exit(struct kvm_run *run, struct kvm_vcpu *vcpu,
 
 	switch (exit_nr) {
 	case BOOKE_INTERRUPT_MACHINE_CHECK:
-		printk("MACHINE CHECK: %lx\n", mfspr(SPRN_MCSR));
-		kvmppc_dump_vcpu(vcpu);
-		/* For debugging, send invalid exit reason to user space */
-		run->hw.hardware_exit_reason = ~1ULL << 32;
-		run->hw.hardware_exit_reason |= mfspr(SPRN_MCSR);
-		r = RESUME_HOST;
+		r = RESUME_GUEST;
 		break;
 
 	case BOOKE_INTERRUPT_EXTERNAL:
