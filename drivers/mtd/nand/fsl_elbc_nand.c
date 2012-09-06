@@ -801,7 +801,7 @@ static int fsl_elbc_chip_init(struct fsl_elbc_mtd *priv)
 
 	/* set up nand options */
 	chip->options = NAND_NO_READRDY | NAND_NO_AUTOINCR |
-			NAND_USE_FLASH_BBT;
+			NAND_USE_FLASH_BBT | NAND_NO_SUBPAGE_WRITE;
 
 	chip->controller = &elbc_fcm_ctrl->controller;
 	chip->priv = priv;
