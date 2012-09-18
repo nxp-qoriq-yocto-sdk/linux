@@ -891,7 +891,9 @@ static const struct of_device_id pci_ids[] = {
 int primary_phb_addr;
 static int __devinit fsl_pci_probe(struct platform_device *pdev)
 {
+#ifdef CONFIG_SWIOTLB
 	struct pci_controller *hose;
+#endif
 	int ret;
 	bool is_primary;
 
