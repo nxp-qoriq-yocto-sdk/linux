@@ -1269,10 +1269,10 @@ _GLOBAL(book3e_secondary_core_init)
 	/* Init global core bits */
 2:	bl	.init_core_book3e
 
-#ifdef CONFIG_FSL_THREADS
+BEGIN_FTR_SECTION
 	/* Start threads */
 	bl      .fsl_enable_threads
-#endif
+END_FTR_SECTION_IFSET(CPU_FTR_SMT)
 
 	/* Init per-thread bits */
 3:	bl	.init_thread_book3e
@@ -1309,8 +1309,8 @@ _STATIC(init_core_book3e)
 	sync
 	blr
 
-#ifdef CONFIG_FSL_THREADS
 _GLOBAL(fsl_enable_threads)
+BEGIN_FTR_SECTION
 	/* Configure the MSR per the default */
 	LOAD_REG_IMMEDIATE(r3, MSR_KERNEL);
 	MTTMR(TMRN_IMSR1, 3);
@@ -1327,8 +1327,7 @@ _GLOBAL(fsl_enable_threads)
 	mtspr	SPRN_TENS, r3
 
 	blr
-#endif
-
+END_FTR_SECTION_IFSET(CPU_FTR_SMT)
 
 _STATIC(init_thread_book3e)
 	lis	r3,(SPRN_EPCR_ICM | SPRN_EPCR_GICM)@h

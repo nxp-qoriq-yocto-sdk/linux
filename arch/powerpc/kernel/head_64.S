@@ -169,8 +169,8 @@ exception_marker:
 #include "exceptions-64s.S"
 #endif
 
-#ifdef CONFIG_FSL_THREADS
 _GLOBAL(fsl_secondary_thread_init)
+BEGIN_FTR_SECTION
 	/* Enable branch prediction */
 	lis     r3,BUCSR_INIT@h
 	ori     r3,r3,BUCSR_INIT@l
@@ -180,7 +180,7 @@ _GLOBAL(fsl_secondary_thread_init)
 	mfspr	r3, SPRN_PIR
 	rlwimi	r3, r3, 30, 2, 30
 	mtspr	SPRN_PIR, r3
-#endif
+END_FTR_SECTION_IFSET(CPU_FTR_SMT)
 
 _GLOBAL(generic_secondary_thread_init)
 	mr	r24,r3
@@ -776,9 +776,9 @@ _INIT_GLOBAL(start_here_common)
 
 	bl	.setup_system
 
-#ifdef CONFIG_FSL_THREADS
+BEGIN_FTR_SECTION
 	bl	.fsl_enable_threads
-#endif
+END_FTR_SECTION_IFSET(CPU_FTR_SMT)
 
 	/* Load up the kernel context */
 5:
