@@ -239,6 +239,8 @@ config P4080_DS
 
 endif # PPC32
 
+if PPC64
+
 config B4860_QDS
 	bool "Freescale B4860 QDS"
 	select DEFAULT_UIMAGE
@@ -252,6 +254,8 @@ config B4860_QDS
 	select HAS_FSL_PAMU
 	help
 	  This option enables support for the B4860 QDS board
+
+endif
 
 config P5020_DS
 	bool "Freescale P5020 DS"
@@ -288,11 +292,14 @@ config P5040_DS
 	help
 	  This option enables support for the P5040 DS board
 
+if PPC64
+
 config T4_SIMULATOR_WORKAROUND
 	bool "apply the workaround for t4 simulator"
 	default n
 	help
 	  This option enables the workaround on t4 simulator
+
 
 config T4240_QDS
 	bool "Freescale T4240 QDS"
@@ -316,6 +323,7 @@ config T4240_RLT_ERRATUM
 	   This will enable a workaround for restoring zombie
 	   RLT entries. Only enable on rev1 E6500 parts
 
+endif
 endif # FSL_SOC_BOOKE
 
 config FSL_P4080_DS_MDIO
