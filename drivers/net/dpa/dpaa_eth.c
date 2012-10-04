@@ -71,16 +71,8 @@
 
 #define ARRAY2_SIZE(arr)	(ARRAY_SIZE(arr) * ARRAY_SIZE((arr)[0]))
 
-#ifdef CONFIG_DPAA_ETH_SG_SUPPORT
-/**
- * Skip using the hw qdisc optimization, since it doesn't yield
- * visible improvement in the SG configuration.
- */
-#define DPA_NETIF_FEATURES	0
-#else
-/* The non-SG (forwarding) driver still uses this optimization. */
-#define DPA_NETIF_FEATURES	(NETIF_F_HW_QDISC)
-#endif
+/* DPAA platforms benefit from hardware-assisted queue management */
+#define DPA_NETIF_FEATURES	(NETIF_F_HW_QDISC | NETIF_F_HW_ACCEL_MQ)
 
 #define DEFAULT_COUNT		128
 #define REFILL_THRESHOLD	80
