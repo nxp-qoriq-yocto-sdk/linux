@@ -2926,7 +2926,7 @@ config BNA
 
 config DPA
 	bool "Freescale Data Path Frame Manager Ethernet"
-	depends on FSL_SOC && FSL_BMAN && FSL_QMAN && FSL_FMAN
+	depends on FSL_SOC && FSL_BMAN && FSL_QMAN && FSL_FMAN && LIBFCOE=n
 	select PHYLIB
 
 config DPA_OFFLINE_PORTS
