@@ -1065,7 +1065,13 @@ struct net_device {
 #define NETIF_F_RXCSUM		(1 << 29) /* Receive checksumming offload */
 #define NETIF_F_NOCACHE_COPY	(1 << 30) /* Use no-cache copyfromuser */
 #define NETIF_F_LOOPBACK	(1 << 31) /* Enable loopback */
+/*
+ * FSL temporary hack: until we pull 64-bit feature support
+ * from upstream, we need to override two existing bits from the mask.
+ * Obviously, this means we won't be supporting FCOE traffic.
+ */
 #define NETIF_F_HW_QDISC	(1 << 24) /* Supports hardware Qdisc */
+#define NETIF_F_HW_ACCEL_MQ	(1 << 26) /* Hardware-accelerated multiqueue */
 
 	/* Segmentation offload features */
 #define NETIF_F_GSO_SHIFT	16
