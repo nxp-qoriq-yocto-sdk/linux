@@ -1244,8 +1244,7 @@ static struct of_device_id mpc85xx_mc_err_of_match[] = {
 	{ .compatible = "fsl,p1020-memory-controller", },
 	{ .compatible = "fsl,p1021-memory-controller", },
 	{ .compatible = "fsl,p2020-memory-controller", },
-	{ .compatible = "fsl,qoriq-memory-controller-v4.4", },
-	{ .compatible = "fsl,qoriq-memory-controller-v4.5", },
+	{ .compatible = "fsl,qoriq-memory-controller", },
 	{},
 };
 MODULE_DEVICE_TABLE(of, mpc85xx_mc_err_of_match);
