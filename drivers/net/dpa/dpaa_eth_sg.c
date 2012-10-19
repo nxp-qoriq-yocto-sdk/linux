@@ -525,7 +525,6 @@ void __hot _dpa_rx(struct net_device *net_dev,
 	percpu_priv->stats.rx_bytes += skb_len;
 
 packet_dropped:
-	net_dev->last_rx = jiffies;
 	return;
 
 drop_bad_frame:
