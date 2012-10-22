@@ -922,7 +922,7 @@ Status: feature not supported
                 if (copy_from_user(&compat_id, (ioc_compat_fm_obj_t *) compat_ptr(arg), sizeof(ioc_compat_fm_obj_t)))
                     RETURN_ERROR(MINOR, E_WRITE_FAILED, NO_MSG);
 
-                compat_copy_fm_net_env_delete(&compat_id, &id, COMPAT_US_TO_K);
+                compat_obj_delete(&compat_id, &id);
             }
             else
 #endif
@@ -1050,7 +1050,7 @@ Status: feature not supported
                 if (copy_from_user(&compat_id, (ioc_compat_fm_obj_t *) compat_ptr(arg), sizeof(ioc_compat_fm_obj_t)))
                     RETURN_ERROR(MINOR, E_WRITE_FAILED, NO_MSG);
 
-                compat_copy_fm_pcd_scheme_delete(&compat_id, &id, COMPAT_US_TO_K);
+                compat_obj_delete(&compat_id, &id);
             }
             else
 #endif
@@ -1231,7 +1231,7 @@ Status: feature not supported
                 if (copy_from_user(&compat_id, (ioc_compat_fm_obj_t *) compat_ptr(arg), sizeof(ioc_compat_fm_obj_t)))
                     RETURN_ERROR(MINOR, E_WRITE_FAILED, NO_MSG);
 
-                compat_copy_fm_pcd_cc_delete_node(&compat_id, &id, COMPAT_US_TO_K);
+                compat_obj_delete(&compat_id, &id);
             }
             else
 #endif
@@ -1359,7 +1359,7 @@ Status: feature not supported
                 if (copy_from_user(&compat_id, (ioc_compat_fm_obj_t *) compat_ptr(arg), sizeof(ioc_compat_fm_obj_t)))
                     RETURN_ERROR(MINOR, E_WRITE_FAILED, NO_MSG);
 
-                compat_copy_fm_pcd_cc_delete_tree(&compat_id, &id, COMPAT_US_TO_K);
+                compat_obj_delete(&compat_id, &id);
             }
             else
 #endif
@@ -1543,7 +1543,7 @@ invalid_port_id:
                 if (copy_from_user(&compat_id, (ioc_compat_fm_obj_t *) compat_ptr(arg), sizeof(ioc_compat_fm_obj_t)))
                     RETURN_ERROR(MINOR, E_WRITE_FAILED, NO_MSG);
 
-                compat_copy_fm_pcd_plcr_del_profile(&compat_id, &id, COMPAT_US_TO_K);
+                compat_obj_delete(&compat_id, &id);
             }
             else
 #endif
@@ -2570,7 +2570,7 @@ invalid_port_id:
                 if (copy_from_user(&compat_id, (ioc_compat_fm_obj_t *) compat_ptr(arg), sizeof(ioc_compat_fm_obj_t)))
                     RETURN_ERROR(MINOR, E_WRITE_FAILED, NO_MSG);
 
-                compat_copy_fm_pcd_manip_delete_node(&compat_id, &id, COMPAT_US_TO_K);
+                compat_obj_delete(&compat_id, &id);
             }
             else
 #endif
