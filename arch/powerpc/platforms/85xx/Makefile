@@ -8,7 +8,7 @@ endif
 obj-$(CONFIG_MPC85xx_CPUFREQ) += cpufreq-jog.o
 
 obj-$(CONFIG_BSC9131_RDB) += bsc913x_rdb.o
-obj-$(CONFIG_B4860_QDS)   += b4860_qds.o corenet_ds.o
+obj-$(CONFIG_B4_QDS)   += b4_qds.o corenet_ds.o
 obj-$(CONFIG_MPC8540_ADS) += mpc85xx_ads.o
 obj-$(CONFIG_MPC8560_ADS) += mpc85xx_ads.o
 obj-$(CONFIG_MPC85xx_CDS) += mpc85xx_cds.o
