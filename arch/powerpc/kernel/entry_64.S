@@ -727,8 +727,10 @@ do_work:
 	 * and trace the change
 	 */
 	li	r0,0
+#ifdef CONFIG_PPC_LAZY_EE
 	stb	r0,PACASOFTIRQEN(r13)
 	stb	r0,PACAHARDIRQEN(r13)
+#endif
 	TRACE_DISABLE_INTS
 
 	/* Call the scheduler with soft IRQs off */
@@ -744,7 +746,9 @@ do_work:
 	mtmsrd	r10,1
 #endif /* CONFIG_PPC_BOOK3E */
 	li	r0,0
+#ifdef CONFIG_PPC_LAZY_EE
 	stb	r0,PACAHARDIRQEN(r13)
+#endif
 
 	/* Re-test flags and eventually loop */
 	CURRENT_THREAD_INFO(r9, r1)
