@@ -46,3 +46,4 @@ obj-$(CONFIG_UX500_SOC_DB8500)		+= db8500-cpufreq.o
 ##################################################################################d
 # PowerPC platform drivers
 obj-$(CONFIG_CPU_FREQ_MAPLE)		+= maple-cpufreq.o
+obj-$(CONFIG_PPC_CORENET_CPUFREQ)   += ppc_corenet_cpufreq.o
