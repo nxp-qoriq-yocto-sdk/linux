@@ -168,6 +168,10 @@ struct ehci_hcd {			/* one per controller */
 	 * OTG controllers and transceivers need software interaction
 	 */
 	struct otg_transceiver	*transceiver;
+
+#if defined(CONFIG_FSL_USB2_OTG) || defined(CONFIG_FSL_USB2_OTG_MODULE)
+	struct work_struct change_hcd_work;
+#endif
 };
 
 /* convert between an HCD pointer and the corresponding EHCI_HCD */

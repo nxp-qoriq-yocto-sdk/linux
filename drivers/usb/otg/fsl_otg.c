@@ -453,6 +453,7 @@ void otg_reset_controller(void)
 int fsl_otg_start_host(struct otg_fsm *fsm, int on)
 {
 	struct otg_transceiver *xceiv = fsm->transceiver;
+	struct usb_bus *host = xceiv->host;
 	struct device *dev;
 	struct fsl_otg *otg_dev = container_of(xceiv, struct fsl_otg, otg);
 	u32 retval = 0;
@@ -475,6 +476,8 @@ int fsl_otg_start_host(struct otg_fsm *fsm, int on)
 			otg_reset_controller();
 			VDBG("host on......\n");
 			if (dev->driver->pm && dev->driver->pm->resume) {
+				host->is_otg = 1;
+
 				retval = dev->driver->pm->resume(dev);
 				if (fsm->id) {
 					/* default-b */
@@ -499,6 +502,8 @@ int fsl_otg_start_host(struct otg_fsm *fsm, int on)
 		else {
 			VDBG("host off......\n");
 			if (dev && dev->driver) {
+				host->is_otg = 1;
+
 				if (dev->driver->pm && dev->driver->pm->suspend)
 					retval = dev->driver->pm->suspend(dev);
 				if (fsm->id)
