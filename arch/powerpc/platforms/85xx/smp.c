@@ -316,6 +316,7 @@ static int __cpuinit smp_85xx_kick_cpu(int nr)
 		}
 	}
 
+#ifdef CONFIG_HOTPLUG_CPU
 	/* Starting Thread 0 will reset core, so put both threads down first */
 	if (smt_capable() && system_state == SYSTEM_RUNNING &&
 			cpu_thread_in_core(nr) == 0 && !is_core_down(nr)) {
@@ -323,6 +324,7 @@ static int __cpuinit smp_85xx_kick_cpu(int nr)
 				__func__, nr, cpu_last_thread_sibling(nr));
 			return -ENOENT;
 	}
+#endif
 #endif
 
 	np = of_get_cpu_node(nr, NULL);
