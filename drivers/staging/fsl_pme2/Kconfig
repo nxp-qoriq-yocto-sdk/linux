@@ -1,7 +1,6 @@
 config FSL_PME2
 	bool "Freescale Datapath Pattern Matcher support"
-	depends on HAS_FSL_PME && FSL_QMAN
-	default y
+	depends on FSL_QMAN
 
 menu "Freescale Datapath PME options"
 	depends on FSL_PME2

@@ -201,7 +201,6 @@ config P2041_RDB
 	select PPC_EPAPR_HV_PIC
 	select HAS_FSL_PAMU
 	select HAS_FSL_QBMAN
-	select HAS_FSL_PME
 	help
 	  This option enables support for the P2041 RDB board
 
@@ -216,7 +215,6 @@ config P3041_DS
 	select PPC_EPAPR_HV_PIC
 	select HAS_FSL_PAMU
 	select HAS_FSL_QBMAN
-	select HAS_FSL_PME
 	select FSL_HYDRA_DS_MDIO if PHYLIB
 	help
 	  This option enables support for the P3041 DS board
@@ -232,7 +230,6 @@ config P4080_DS
 	select PPC_EPAPR_HV_PIC
 	select HAS_FSL_PAMU
 	select HAS_FSL_QBMAN
-	select HAS_FSL_PME
 	select FSL_P4080_DS_MDIO if PHYLIB
 	help
 	  This option enables support for the P4080 DS board
@@ -269,7 +266,6 @@ config P5020_DS
 	select PPC_EPAPR_HV_PIC
 	select HAS_FSL_PAMU
 	select HAS_FSL_QBMAN
-	select HAS_FSL_PME
 	select FSL_HYDRA_DS_MDIO if PHYLIB
 	help
 	  This option enables support for the P5020 DS board
@@ -287,7 +283,6 @@ config P5040_DS
 	select PPC_EPAPR_HV_PIC
 	select HAS_FSL_PAMU
 	select HAS_FSL_QBMAN
-	select HAS_FSL_PME
 	select FSL_HYDRA_DS_MDIO if PHYLIB
 	help
 	  This option enables support for the P5040 DS board
