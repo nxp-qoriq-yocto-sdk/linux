@@ -633,3 +633,6 @@ _GLOBAL(kexec_sequence)
 	li	r5,0
 	blr	/* image->start(physid, image->start, 0); */
 #endif /* CONFIG_KEXEC */
+
+_GLOBAL(fsl_erratum_a006198_return)
+	blr

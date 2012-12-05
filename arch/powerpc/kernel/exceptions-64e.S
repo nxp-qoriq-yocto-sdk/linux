@@ -692,6 +692,7 @@ masked_interrupt_book3e_common:
 	mtspr	SPRN_SRR1,r10
 	ld	r10,PACA_EXGEN+EX_R10(r13);	/* restore registers */
 	ld	r11,PACA_EXGEN+EX_R11(r13);
+	fsl_erratum_a006198_restore_srr r13
 	mfspr	r13,SPRN_SPRG_GEN_SCRATCH;
 	rfi
 	b	.
@@ -749,7 +750,7 @@ _GLOBAL(exception_return_book3e)
  */
 	.globl fast_exception_return
 fast_exception_return:
-	wrteei	0
+	fsl_erratum_a006198_wrteei0 r0 r10
 1:	mr	r0,r13
 	ld	r10,_MSR(r1)
 	REST_4GPRS(2, r1)
@@ -785,6 +786,7 @@ fast_exception_return:
 	mtspr	SPRN_SRR1,r11
 	ld	r10,PACA_EXGEN+EX_R10(r13)
 	ld	r11,PACA_EXGEN+EX_R11(r13)
+	fsl_erratum_a006198_restore_srr r13
 	mfspr	r13,SPRN_SPRG_GEN_SCRATCH
 	rfi
 
@@ -1342,7 +1344,7 @@ _STATIC(init_thread_book3e)
 	mtspr	SPRN_EPCR,r3
 
 	/* Make sure interrupts are off */
-	wrteei	0
+	fsl_erratum_a006198_wrteei0 r3 r4
 
 	/* disable all timers and clear out status */
 	li	r3,0

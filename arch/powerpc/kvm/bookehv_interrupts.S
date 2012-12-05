@@ -742,7 +742,7 @@ skip_pmgc0_restore:
 
 	mfmsr	r7
 	rlwinm	r7, r7, 0, ~MSR_DE
-	mtmsr	r7
+	fsl_erratum_a006198_mtmsr r7 r6 r8
 	/*
 	 * Load hw debug registers with guest(shadow) debug registers
 	 * if guest is using the debug facility and also set EPCR.DUVD

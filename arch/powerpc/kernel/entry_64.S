@@ -205,7 +205,7 @@ syscall_exit:
 	 * and so that we don't get interrupted after loading SRR0/1.
 	 */
 #ifdef CONFIG_PPC_BOOK3E
-	wrteei	0
+	fsl_erratum_a006198_wrteei0 r10 r9
 #else
 	mfmsr	r10
 	rldicl	r10,r10,48,1
@@ -576,7 +576,7 @@ _GLOBAL(ret_from_except_lite)
 	 * from the interrupt.
 	 */
 #ifdef CONFIG_PPC_BOOK3E
-	wrteei	0
+	fsl_erratum_a006198_wrteei0 r10 r9
 #else
 	mfmsr	r10		/* Get current interrupt state */
 	rldicl	r9,r10,48,1	/* clear MSR_EE */
@@ -738,7 +738,7 @@ do_work:
 
 	/* Hard-disable interrupts again (and update PACA) */
 #ifdef CONFIG_PPC_BOOK3E
-	wrteei	0
+	fsl_erratum_a006198_wrteei0 r10 r0
 #else
 	mfmsr	r10
 	rldicl	r10,r10,48,1

@@ -26,7 +26,7 @@ _GLOBAL(book3e_idle)
 	std	r0,16(r1)
 
 	/* Hard disable interrupts */
-	wrteei	0
+	fsl_erratum_a006198_wrteei0 r0 r3
 
 #ifdef CONFIG_PPC_LAZY_EE
 	/* Now check if an interrupt came in while we were soft disabled
@@ -59,7 +59,7 @@ _GLOBAL(book3e_idle)
 	bl	1f
 
 	/* Hard disable interrupts again */
-	wrteei	0
+	fsl_erratum_a006198_wrteei0 r0 r3
 
 #ifdef CONFIG_PPC_LAZY_EE
 	/* Mark them off again in the PACA as well */
