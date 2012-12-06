@@ -4106,7 +4106,6 @@ t_Error LnxwrpFmPortIOCTL(t_LnxWrpFmPortDev *p_LnxWrpFmPortDev, unsigned int cmd
             break;
         }
 
-#if (DPAA_VERSION >= 11)
         case FM_PORT_IOC_CONFIG_BUFFER_PREFIX_CONTENT:
         {
             ioc_fm_buffer_prefix_content_t *param;
@@ -4135,6 +4134,7 @@ t_Error LnxwrpFmPortIOCTL(t_LnxWrpFmPortDev *p_LnxWrpFmPortDev, unsigned int cmd
             break;
         }
 
+#if (DPAA_VERSION >= 11)
 #if defined(CONFIG_COMPAT)
         case FM_PORT_IOC_VSP_ALLOC_COMPAT:
 #endif
