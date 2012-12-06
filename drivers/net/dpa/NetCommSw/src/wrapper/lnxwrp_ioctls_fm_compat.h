@@ -480,21 +480,46 @@ typedef struct ioc_compat_fm_pcd_frm_replic_member_params_t {
 } ioc_compat_fm_pcd_frm_replic_member_params_t;
 
 typedef struct ioc_compat_fm_vsp_params_t {
-	compat_uptr_t       h_Fm;               /**< A handle to the FM object this VSP related to */
-	ioc_fm_ext_pools    extBufPools;        /**< Which external buffer pools are used
-						(up to FM_PORT_MAX_NUM_OF_EXT_POOLS), and their sizes.
-						parameter associated with Rx / OP port */
-	uint16_t            liodnOffset;        /**< VSP's LIODN offset */
-	struct {
-		ioc_fm_port_type portType;      /**< Port type */
-		uint8_t          portId;        /**< Port Id - relative to type */
-	} portParams;
-	uint8_t             relativeProfileId;  /**< VSP Id - relative to VSP's range
-						defined in relevant FM object */
-	compat_uptr_t       id;                 /**< return value */
+    compat_uptr_t       p_fm;                 /**< A handle to the FM object this VSP related to */
+    ioc_fm_ext_pools    ext_buf_pools;        /**< Which external buffer pools are used
+                                                   (up to FM_PORT_MAX_NUM_OF_EXT_POOLS), and their sizes.
+                                                   parameter associated with Rx / OP port */
+    uint16_t            liodn_offset;         /**< VSP's LIODN offset */
+    struct {
+        ioc_fm_port_type port_type;           /**< Port type */
+        uint8_t          port_id;             /**< Port Id - relative to type */
+    } portParams;
+    uint8_t             relative_profile_id;  /**< VSP Id - relative to VSP's range
+                                                   defined in relevant FM object */
+    compat_uptr_t       id;                 /**< return value */
 } ioc_compat_fm_vsp_params_t;
 
+
+typedef struct ioc_compat_fm_buf_pool_depletion_params_t {
+    compat_uptr_t p_fm_vsp;
+    ioc_fm_buf_pool_depletion_t fm_buf_pool_depletion;
+} ioc_compat_fm_buf_pool_depletion_params_t;
+
+typedef struct ioc_compat_fm_buffer_prefix_content_params_t {
+    compat_uptr_t p_fm_vsp;
+    ioc_fm_buffer_prefix_content_t fm_buffer_prefix_content;
+} ioc_compat_fm_buffer_prefix_content_params_t;
+
+typedef struct ioc_compat_fm_vsp_config_no_sg_params_t {
+    compat_uptr_t p_fm_vsp;
+    bool no_sg;
+} ioc_compat_fm_vsp_config_no_sg_params_t;
+
+typedef struct ioc_compat_fm_vsp_prs_result_params_t {
+    compat_uptr_t p_fm_vsp;
+    compat_uptr_t p_data;
+} ioc_compat_fm_vsp_prs_result_params_t;
 #endif /* DPAA_VERSION >= 11 */
+
+typedef struct ioc_compat_fm_ctrl_mon_counters_params_t {
+    uint8_t     fm_ctrl_index;
+    compat_uptr_t p_mon;
+} ioc_compat_fm_ctrl_mon_counters_params_t;
 
 /* } pcd compat structures */
 
@@ -573,6 +598,11 @@ void compat_copy_fm_port_pcd(
         ioc_fm_port_pcd_params_t *param,
         uint8_t compat);
 
+void compat_copy_fm_port_vsp_alloc_params(
+        ioc_compat_fm_port_vsp_alloc_params_t *compat_param,
+        ioc_fm_port_vsp_alloc_params_t *param,
+        uint8_t compat);
+
 void compat_copy_fm_pcd_net_env(
         ioc_compat_fm_pcd_net_env_params_t *compat_param,
         ioc_fm_pcd_net_env_params_t *param,
@@ -603,7 +633,7 @@ void compat_copy_fm_port_pcd_modify_tree(
         ioc_fm_obj_t *id,
         uint8_t compat);
 
-#if DPAA_VERSION >= 11
+#if (DPAA_VERSION >= 11)
 void compat_copy_fm_pcd_frm_replic_group_params(
 	ioc_compat_fm_pcd_frm_replic_group_params_t *compat_param,
 	ioc_fm_pcd_frm_replic_group_params_t *param,
@@ -618,6 +648,31 @@ void compat_copy_fm_pcd_frm_replic_member_params(
 	ioc_compat_fm_pcd_frm_replic_member_params_t *compat_param,
 	ioc_fm_pcd_frm_replic_member_params_t *param,
 	uint8_t compat);
-#endif
+
+void compat_copy_fm_vsp_params(
+    ioc_compat_fm_vsp_params_t *compat_param,
+    ioc_fm_vsp_params_t *param,
+    uint8_t compat);
+
+void compat_copy_fm_buf_pool_depletion_params(
+    ioc_compat_fm_buf_pool_depletion_params_t *compat_param,
+    ioc_fm_buf_pool_depletion_params_t *param,
+    uint8_t compat);
+
+void compat_copy_fm_buffer_prefix_content_params(
+    ioc_compat_fm_buffer_prefix_content_params_t *compat_param,
+    ioc_fm_buffer_prefix_content_params_t *param,
+    uint8_t compat);
+
+void compat_copy_fm_vsp_config_no_sg_params(
+    ioc_compat_fm_vsp_config_no_sg_params_t *compat_param,
+    ioc_fm_vsp_config_no_sg_params_t *param,
+    uint8_t compat);
+
+void compat_copy_fm_vsp_prs_result_params(
+    ioc_compat_fm_vsp_prs_result_params_t *compat_param,
+    ioc_fm_vsp_prs_result_params_t *param,
+    uint8_t compat);
+#endif /* (DPAA_VERSION >= 11) */
 /* } pcd compat functions */
 #endif

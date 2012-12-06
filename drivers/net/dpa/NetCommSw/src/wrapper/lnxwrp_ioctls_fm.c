@@ -69,6 +69,7 @@
 #include "fm_ioctls.h"
 #include "fm_pcd_ioctls.h"
 #include "fm_port_ioctls.h"
+#include "fm_vsp_ext.h"
 
 #if defined(CONFIG_COMPAT)
 #include "lnxwrp_ioctls_fm_compat.h"
@@ -565,19 +566,8 @@ Status: not exported, would be nice to have
 
 Status: not exported
 #if DPAA_VERSION >= 11
-    FM_PCD_FrmReplicSetGroup
-    FM_PCD_FrmReplicDeleteGroup
-    FM_PCD_FrmReplicAddMember
-    FM_PCD_FrmReplicRemoveMember
 
-    FM_VSP_Config
-    FM_VSP_Init
-    FM_VSP_Free
-    FM_VSP_ConfigPoolDepletion
-    FM_VSP_ConfigBufferPrefixContent
-    FM_VSP_ConfigNoScatherGather
     FM_VSP_GetStatistics -- it's not available yet
-    FM_VSP_GetBufferPrsResult
 #endif
 
 Status: feature not supported
@@ -2674,7 +2664,7 @@ invalid_port_id:
 				(ioc_compat_fm_pcd_frm_replic_group_params_t *)
 					compat_ptr(arg),
 					compat_param,
-					sizeof(*compat_ptr)))
+					sizeof(*compat_param)))
 				err = E_WRITE_FAILED;
 
 			XX_Free(compat_param);
@@ -2778,7 +2768,243 @@ invalid_port_id:
 		return FM_PCD_FrmReplicRemoveMember(param.h_replic_group, param.member_index);
 	}
 	break;
+
+#if defined(CONFIG_COMPAT)
+    case FM_IOC_VSP_CONFIG_COMPAT:
 #endif
+    case FM_IOC_VSP_CONFIG:
+    {
+        ioc_fm_vsp_params_t param;
+
+#if defined(CONFIG_COMPAT)
+        if (compat)
+        {
+            ioc_compat_fm_vsp_params_t compat_param;
+
+            if (copy_from_user(&compat_param, compat_ptr(arg), sizeof(compat_param)))
+                RETURN_ERROR(MINOR, E_WRITE_FAILED, NO_MSG);
+
+            compat_copy_fm_vsp_params(&compat_param, &param, COMPAT_US_TO_K);
+        }
+        else
+#endif
+            if (copy_from_user(&param, (void *)arg, sizeof(param)))
+                RETURN_ERROR(MINOR, E_WRITE_FAILED, NO_MSG);
+
+        param.id = FM_VSP_Config((t_FmVspParams *)&param);
+
+#if defined(CONFIG_COMPAT)
+        if (compat)
+        {
+            ioc_compat_fm_vsp_params_t compat_param;
+
+            memset(&compat_param, 0, sizeof(compat_param));
+            compat_copy_fm_vsp_params(&compat_param, &param, COMPAT_K_TO_US);
+
+            if (copy_to_user(compat_ptr(arg), &compat_param, sizeof(compat_param)))
+                RETURN_ERROR(MINOR, E_WRITE_FAILED, NO_MSG);
+        }
+        else
+#endif
+            if (copy_to_user((void *)arg, &param, sizeof(param)))
+                RETURN_ERROR(MINOR, E_WRITE_FAILED, NO_MSG);
+        break;
+    }
+
+#if defined(CONFIG_COMPAT)
+    case FM_IOC_VSP_INIT_COMPAT:
+#endif
+    case FM_IOC_VSP_INIT:
+    {
+        ioc_fm_obj_t id;
+
+        memset(&id, 0, sizeof(ioc_fm_obj_t));
+#if defined(CONFIG_COMPAT)
+        if (compat)
+        {
+            ioc_compat_fm_obj_t compat_id;
+
+            if (copy_from_user(&compat_id,
+                    (ioc_compat_fm_obj_t *) compat_ptr(arg),
+                    sizeof(ioc_compat_fm_obj_t)))
+                break;
+            id.obj = compat_pcd_id2ptr(compat_id.obj);
+        }
+        else
+#endif
+        {
+            if (copy_from_user(&id, (ioc_fm_obj_t *) arg,
+                    sizeof(ioc_fm_obj_t)))
+                break;
+        }
+
+        return FM_VSP_Init(id.obj);
+    }
+
+#if defined(CONFIG_COMPAT)
+    case FM_IOC_VSP_FREE_COMPAT:
+#endif
+    case FM_IOC_VSP_FREE:
+    {
+        ioc_fm_obj_t id;
+
+        memset(&id, 0, sizeof(ioc_fm_obj_t));
+#if defined(CONFIG_COMPAT)
+        if (compat)
+        {
+            ioc_compat_fm_obj_t compat_id;
+
+            if (copy_from_user(&compat_id,
+                    (ioc_compat_fm_obj_t *) compat_ptr(arg),
+                    sizeof(ioc_compat_fm_obj_t)))
+                break;
+            compat_obj_delete(&compat_id, &id);
+        }
+        else
+#endif
+        {
+            if (copy_from_user(&id, (ioc_fm_obj_t *) arg,
+                    sizeof(ioc_fm_obj_t)))
+                break;
+        }
+
+        return FM_VSP_Free(id.obj);
+    }
+
+#if defined(CONFIG_COMPAT)
+    case FM_IOC_VSP_CONFIG_POOL_DEPLETION_COMPAT:
+#endif
+    case FM_IOC_VSP_CONFIG_POOL_DEPLETION:
+    {
+        ioc_fm_buf_pool_depletion_params_t param;
+
+#if defined(CONFIG_COMPAT)
+        if (compat)
+        {
+            ioc_compat_fm_buf_pool_depletion_params_t compat_param;
+
+            if (copy_from_user(&compat_param, compat_ptr(arg), sizeof(compat_param)))
+                RETURN_ERROR(MINOR, E_WRITE_FAILED, NO_MSG);
+
+            compat_copy_fm_buf_pool_depletion_params(&compat_param, &param, COMPAT_US_TO_K);
+        }
+        else
+#endif
+            if (copy_from_user(&param, (void *)arg, sizeof(param)))
+                RETURN_ERROR(MINOR, E_WRITE_FAILED, NO_MSG);
+
+        if (FM_VSP_ConfigPoolDepletion(param.p_fm_vsp,
+                    (t_FmBufPoolDepletion *)&param.fm_buf_pool_depletion))
+            RETURN_ERROR(MINOR, E_WRITE_FAILED, NO_MSG);
+
+        break;
+    }
+
+
+#if defined(CONFIG_COMPAT)
+    case FM_IOC_VSP_CONFIG_BUFFER_PREFIX_CONTENT_COMPAT:
+#endif
+    case FM_IOC_VSP_CONFIG_BUFFER_PREFIX_CONTENT:
+    {
+        ioc_fm_buffer_prefix_content_params_t param;
+
+#if defined(CONFIG_COMPAT)
+        if (compat)
+        {
+            ioc_compat_fm_buffer_prefix_content_params_t compat_param;
+
+            if (copy_from_user(&compat_param, compat_ptr(arg), sizeof(compat_param)))
+                RETURN_ERROR(MINOR, E_WRITE_FAILED, NO_MSG);
+
+            compat_copy_fm_buffer_prefix_content_params(&compat_param, &param, COMPAT_US_TO_K);
+        }
+        else
+#endif
+            if (copy_from_user(&param, (void *)arg, sizeof(param)))
+                RETURN_ERROR(MINOR, E_WRITE_FAILED, NO_MSG);
+
+        if (FM_VSP_ConfigBufferPrefixContent(param.p_fm_vsp,
+                (t_FmBufferPrefixContent *)&param.fm_buffer_prefix_content))
+            RETURN_ERROR(MINOR, E_WRITE_FAILED, NO_MSG);
+
+        break;
+    }
+
+#if defined(CONFIG_COMPAT)
+    case FM_IOC_VSP_CONFIG_NO_SG_COMPAT:
+#endif
+    case FM_IOC_VSP_CONFIG_NO_SG:
+    {
+        ioc_fm_vsp_config_no_sg_params_t param;
+
+#if defined(CONFIG_COMPAT)
+        if (compat)
+        {
+            ioc_compat_fm_vsp_config_no_sg_params_t compat_param;
+
+            if (copy_from_user(&compat_param, compat_ptr(arg), sizeof(compat_param)))
+                RETURN_ERROR(MINOR, E_WRITE_FAILED, NO_MSG);
+
+            compat_copy_fm_vsp_config_no_sg_params(&compat_param, &param, COMPAT_US_TO_K);
+        }
+        else
+#endif
+            if (copy_from_user(&param, (void *)arg, sizeof(param)))
+                RETURN_ERROR(MINOR, E_WRITE_FAILED, NO_MSG);
+
+        if (FM_VSP_ConfigNoScatherGather(param.p_fm_vsp, param.no_sg))
+            RETURN_ERROR(MINOR, E_WRITE_FAILED, NO_MSG);
+
+        break;
+    }
+
+#if defined(CONFIG_COMPAT)
+    case FM_IOC_VSP_GET_BUFFER_PRS_RESULT_COMPAT:
+#endif
+    case FM_IOC_VSP_GET_BUFFER_PRS_RESULT:
+    {
+        ioc_fm_vsp_prs_result_params_t param;
+
+#if defined(CONFIG_COMPAT)
+        if (compat)
+        {
+            ioc_compat_fm_vsp_prs_result_params_t compat_param;
+
+            if (copy_from_user(&compat_param, compat_ptr(arg), sizeof(compat_param)))
+                RETURN_ERROR(MINOR, E_WRITE_FAILED, NO_MSG);
+
+            compat_copy_fm_vsp_prs_result_params(&compat_param, &param, COMPAT_US_TO_K);
+        }
+        else
+#endif
+            if (copy_from_user(&param, (void *)arg, sizeof(param)))
+                RETURN_ERROR(MINOR, E_WRITE_FAILED, NO_MSG);
+
+        /* this call just adds the parse results offset to p_data */
+        param.p_data = FM_VSP_GetBufferPrsResult(param.p_fm_vsp, param.p_data);
+
+        if (!param.p_data)
+            RETURN_ERROR(MINOR, E_WRITE_FAILED, NO_MSG);
+
+#if defined(CONFIG_COMPAT)
+        if (compat)
+        {
+            ioc_compat_fm_vsp_prs_result_params_t compat_param;
+
+            memset(&compat_param, 0, sizeof(compat_param));
+            compat_copy_fm_vsp_prs_result_params(&compat_param, &param, COMPAT_K_TO_US);
+
+            if (copy_to_user(compat_ptr(arg), &compat_param, sizeof(compat_param)))
+                RETURN_ERROR(MINOR, E_WRITE_FAILED, NO_MSG);
+        }
+        else
+#endif
+            if (copy_to_user((void *)arg, &param, sizeof(param)))
+                RETURN_ERROR(MINOR, E_WRITE_FAILED, NO_MSG);
+
+        break;
+    }
+#endif /* (DPAA_VERSION >= 11) */
 
 #ifdef FM_CAPWAP_SUPPORT
 #warning "feature not supported!"
@@ -3017,6 +3243,54 @@ t_Error LnxwrpFmIOCTL(t_LnxWrpFmDev *p_LnxWrpFmDev, unsigned int cmd, unsigned l
 		}
 	}
 	break;
+
+        case FM_IOC_CTRL_MON_START:
+        {
+            FM_CtrlMonStart(p_LnxWrpFmDev->h_Dev);
+        }
+        break;
+
+        case FM_IOC_CTRL_MON_STOP:
+        {
+            FM_CtrlMonStop(p_LnxWrpFmDev->h_Dev);
+        }
+        break;
+
+#if defined(CONFIG_COMPAT)
+        case FM_IOC_CTRL_MON_GET_COUNTERS_COMPAT:
+#endif
+        case FM_IOC_CTRL_MON_GET_COUNTERS:
+        {
+            ioc_fm_ctrl_mon_counters_params_t param;
+            t_FmCtrlMon mon;
+
+#if defined(CONFIG_COMPAT)
+            ioc_compat_fm_ctrl_mon_counters_params_t compat_param;
+
+            if (compat)
+            {
+                if (copy_from_user(&compat_param, (void *)compat_ptr(arg),
+                            sizeof(compat_param)))
+                    RETURN_ERROR(MINOR, E_WRITE_FAILED, NO_MSG);
+
+                param.fm_ctrl_index = compat_param.fm_ctrl_index;
+                param.p_mon = (fm_ctrl_mon_t *)compat_ptr(compat_param.p_mon);
+            }
+            else
+#endif
+            {
+                if (copy_from_user(&param, (void *)arg, sizeof(ioc_fm_counters_params_t)))
+                    RETURN_ERROR(MINOR, E_WRITE_FAILED, NO_MSG);
+            }
+
+            if (FM_CtrlMonGetCounters(p_LnxWrpFmDev->h_Dev, param.fm_ctrl_index, &mon))
+                RETURN_ERROR(MINOR, E_WRITE_FAILED, NO_MSG);
+
+            if (copy_to_user(param.p_mon, &mon, sizeof(t_FmCtrlMon)))
+                RETURN_ERROR(MINOR, E_WRITE_FAILED, NO_MSG);
+        }
+        break;
+
         default:
             return LnxwrpFmPcdIOCTL(p_LnxWrpFmDev, cmd, arg, compat);
     }
@@ -3030,13 +3304,7 @@ t_Error LnxwrpFmIOCTL(t_LnxWrpFmDev *p_LnxWrpFmDev, unsigned int cmd, unsigned l
 t_Error LnxwrpFmPortIOCTL(t_LnxWrpFmPortDev *p_LnxWrpFmPortDev, unsigned int cmd, unsigned long arg, bool compat)
 {
     t_Error err = E_OK;
-/*
-Status: not exported
-#if (DPAA_VERSION >= 11)
-    FM_PORT_ConfigBufferPrefixContent
-    FM_PORT_VSPAlloc
-#endif
- */
+
     _fm_ioctl_dbg("cmd:0x%08x(type:0x%02x, nr:%u).\n",
         cmd, _IOC_TYPE(cmd), _IOC_NR(cmd) - 50);
 
@@ -3807,6 +4075,7 @@ Status: not exported
             XX_Free(param);
             break;
         }
+
         case FM_PORT_IOC_SET_TX_PAUSE_FRAMES:
         {
             t_LnxWrpFmDev *p_LnxWrpFmDev =
@@ -3833,6 +4102,126 @@ Status: not exported
                 err = E_NOT_AVAILABLE;
                 REPORT_ERROR(MINOR, err, ("Port not initialized or other error!"));
             }
+
+            break;
+        }
+
+#if (DPAA_VERSION >= 11)
+        case FM_PORT_IOC_CONFIG_BUFFER_PREFIX_CONTENT:
+        {
+            ioc_fm_buffer_prefix_content_t *param;
+
+            param = (ioc_fm_buffer_prefix_content_t*) XX_Malloc(sizeof(ioc_fm_buffer_prefix_content_t));
+            if (!param)
+                RETURN_ERROR(MINOR, E_NO_MEMORY, ("IOCTL FM PORT"));
+
+            memset(param, 0, sizeof(ioc_fm_buffer_prefix_content_t));
+
+            if (copy_from_user(param, (ioc_fm_buffer_prefix_content_t*) arg,
+                        sizeof(ioc_fm_buffer_prefix_content_t)))
+            {
+                XX_Free(param);
+                RETURN_ERROR(MINOR, E_WRITE_FAILED, NO_MSG);
+            }
+
+            if (FM_PORT_ConfigBufferPrefixContent(p_LnxWrpFmPortDev->h_Dev,
+                    (t_FmBufferPrefixContent *)param))
+            {
+                XX_Free(param);
+                RETURN_ERROR(MINOR, E_WRITE_FAILED, NO_MSG);
+            }
+
+            XX_Free(param);
+            break;
+        }
+
+#if defined(CONFIG_COMPAT)
+        case FM_PORT_IOC_VSP_ALLOC_COMPAT:
+#endif
+        case FM_PORT_IOC_VSP_ALLOC:
+        {
+            ioc_fm_port_vsp_alloc_params_t *param;
+
+            param = (ioc_fm_port_vsp_alloc_params_t *) XX_Malloc(
+                    sizeof(ioc_fm_port_vsp_alloc_params_t));
+            if (!param)
+                RETURN_ERROR(MINOR, E_NO_MEMORY, ("IOCTL FM PORT"));
+
+            memset(param, 0, sizeof(ioc_fm_port_vsp_alloc_params_t));
+
+#if defined(CONFIG_COMPAT)
+            if (compat)
+            {
+                ioc_compat_fm_port_vsp_alloc_params_t *compat_param;
+
+                compat_param = (ioc_compat_fm_port_vsp_alloc_params_t *) XX_Malloc(
+                        sizeof(ioc_compat_fm_port_vsp_alloc_params_t));
+                if (!compat_param)
+                {
+                    XX_Free(param);
+                    RETURN_ERROR(MINOR, E_NO_MEMORY, ("IOCTL FM PORT"));
+                }
+
+                memset(compat_param, 0, sizeof(ioc_compat_fm_port_vsp_alloc_params_t));
+                if (copy_from_user(compat_param,
+                                   (ioc_compat_fm_port_vsp_alloc_params_t *) compat_ptr(arg),
+                                   sizeof(ioc_compat_fm_port_vsp_alloc_params_t)))
+                {
+                    XX_Free(compat_param);
+                    XX_Free(param);
+                    RETURN_ERROR(MINOR, E_WRITE_FAILED, NO_MSG);
+                }
+
+                compat_copy_fm_port_vsp_alloc_params(compat_param, param, COMPAT_US_TO_K);
+
+                XX_Free(compat_param);
+            }
+            else
+#endif
+            {
+                if (copy_from_user(param, (ioc_fm_port_vsp_alloc_params_t *)arg,
+                                   sizeof(ioc_fm_port_vsp_alloc_params_t)))
+                {
+                    XX_Free(param);
+                    RETURN_ERROR(MINOR, E_WRITE_FAILED, NO_MSG);
+                }
+            }
+
+            if (FM_PORT_VSPAlloc(p_LnxWrpFmPortDev->h_Dev, (t_FmPortVSPAllocParams *)param))
+            {
+                XX_Free(param);
+                RETURN_ERROR(MINOR, E_WRITE_FAILED, NO_MSG);
+            }
+
+            XX_Free(param);
+            break;
+        }
+#endif /* (DPAA_VERSION >= 11) */
+
+        case FM_PORT_IOC_GET_MAC_STATISTICS:
+        {
+            t_LnxWrpFmDev *p_LnxWrpFmDev =
+                    (t_LnxWrpFmDev *)p_LnxWrpFmPortDev->h_LnxWrpFmDev;
+            ioc_fm_port_mac_statistics_t param;
+            int mac_id = p_LnxWrpFmPortDev->id;
+
+            if (!p_LnxWrpFmDev)
+                RETURN_ERROR(MINOR, E_NOT_AVAILABLE, ("Port not initialized or other error!"));
+
+            if (&p_LnxWrpFmDev->txPorts[mac_id] != p_LnxWrpFmPortDev &&
+                &p_LnxWrpFmDev->rxPorts[mac_id] != p_LnxWrpFmPortDev)
+                mac_id += FM_MAX_NUM_OF_1G_MACS; /* 10G port */
+
+            if (!p_LnxWrpFmDev->macs[mac_id].h_Dev)
+                RETURN_ERROR(MINOR, E_NOT_AVAILABLE, ("Port not initialized or other error!"));
+
+            if (FM_MAC_GetStatistics(p_LnxWrpFmDev->macs[mac_id].h_Dev,
+                        (t_FmMacStatistics *)&param))
+                RETURN_ERROR(MINOR, E_WRITE_FAILED, NO_MSG);
+
+            if (copy_to_user((ioc_fm_port_mac_statistics_t *)arg, &param,
+                        sizeof(ioc_fm_port_mac_statistics_t)))
+                RETURN_ERROR(MINOR, E_WRITE_FAILED, NO_MSG);
 
             break;
         }

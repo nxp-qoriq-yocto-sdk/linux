@@ -815,6 +815,21 @@ void compat_copy_fm_port_pcd_modify_tree(
         id->obj = compat_pcd_id2ptr(compat_id->obj);
 }
 
+void compat_copy_fm_port_vsp_alloc_params(
+        ioc_compat_fm_port_vsp_alloc_params_t *compat_param,
+        ioc_fm_port_vsp_alloc_params_t *param,
+        uint8_t compat)
+{
+    if (compat == COMPAT_US_TO_K)
+    {
+        _fm_cpt_dbg(compat," param->p_fm_tx_port=%p  \n", param->p_fm_tx_port);
+
+        param->dflt_relative_id = compat_param->dflt_relative_id;
+        param->num_of_profiles = compat_param->num_of_profiles;
+        param->p_fm_tx_port = compat_pcd_id2ptr(compat_param->p_fm_tx_port);
+    }
+}
+
 void compat_copy_fm_pcd_net_env(
         ioc_compat_fm_pcd_net_env_params_t *compat_param,
         ioc_fm_pcd_net_env_params_t *param,
@@ -1023,7 +1038,7 @@ void compat_fm_pcd_manip_set_node(
     }
 }
 
-#if DPAA_VERSION >= 11
+#if (DPAA_VERSION >= 11)
 void compat_copy_fm_pcd_frm_replic_group_params(
 	ioc_compat_fm_pcd_frm_replic_group_params_t *compat_param,
 	ioc_fm_pcd_frm_replic_group_params_t *param,
@@ -1087,4 +1102,110 @@ void compat_copy_fm_pcd_frm_replic_member_params(
 
 	_fm_cpt_dbg (compat, " ...->}\n");
 }
-#endif
+
+void compat_copy_fm_vsp_params(
+    ioc_compat_fm_vsp_params_t *compat_param,
+    ioc_fm_vsp_params_t *param,
+    uint8_t compat)
+{
+    _fm_cpt_dbg (compat, " {->...\n");
+
+    if (compat == COMPAT_US_TO_K)
+    {
+        param->p_fm = compat_pcd_id2ptr(compat_param->p_fm);
+        memcpy(&param->ext_buf_pools, &compat_param->ext_buf_pools, sizeof(ioc_fm_ext_pools));
+        param->liodn_offset = compat_param->liodn_offset;
+        param->portParams.port_id = compat_param->portParams.port_id;
+        param->portParams.port_type = compat_param->portParams.port_type;
+        param->relative_profile_id = compat_param->relative_profile_id;
+        param->id = compat_pcd_id2ptr(compat_param->id);
+    }
+    else
+    {
+        compat_param->p_fm = compat_pcd_ptr2id(param->p_fm);
+        memcpy(&compat_param->ext_buf_pools, &param->ext_buf_pools, sizeof(ioc_fm_ext_pools));
+        compat_param->liodn_offset = param->liodn_offset;
+        compat_param->portParams.port_id = param->portParams.port_id;
+        compat_param->portParams.port_type = param->portParams.port_type;
+        compat_param->relative_profile_id = param->relative_profile_id;
+        compat_param->id = compat_add_ptr2id(param->id, FM_MAP_TYPE_PCD_NODE);
+    }
+
+    _fm_cpt_dbg (compat, " ...->}\n");
+}
+
+void compat_copy_fm_buf_pool_depletion_params(
+    ioc_compat_fm_buf_pool_depletion_params_t *compat_param,
+    ioc_fm_buf_pool_depletion_params_t *param,
+    uint8_t compat)
+{
+    _fm_cpt_dbg (compat, " {->...\n");
+
+    if (compat == COMPAT_US_TO_K)
+    {
+        param->p_fm_vsp = compat_pcd_id2ptr(compat_param->p_fm_vsp);
+        memcpy(&param->fm_buf_pool_depletion,
+                &compat_param->fm_buf_pool_depletion,
+                sizeof(ioc_fm_buf_pool_depletion_t));
+    }
+
+    _fm_cpt_dbg (compat, " ...->}\n");
+}
+
+void compat_copy_fm_buffer_prefix_content_params(
+    ioc_compat_fm_buffer_prefix_content_params_t *compat_param,
+    ioc_fm_buffer_prefix_content_params_t *param,
+    uint8_t compat)
+{
+    _fm_cpt_dbg (compat, " {->...\n");
+
+    if (compat == COMPAT_US_TO_K)
+    {
+        param->p_fm_vsp = compat_pcd_id2ptr(compat_param->p_fm_vsp);
+        memcpy(&param->fm_buffer_prefix_content,
+                &compat_param->fm_buffer_prefix_content,
+                sizeof(ioc_fm_buffer_prefix_content_t));
+    }
+
+    _fm_cpt_dbg (compat, " ...->}\n");
+}
+
+void compat_copy_fm_vsp_config_no_sg_params(
+    ioc_compat_fm_vsp_config_no_sg_params_t *compat_param,
+    ioc_fm_vsp_config_no_sg_params_t *param,
+    uint8_t compat)
+{
+    _fm_cpt_dbg (compat, " {->...\n");
+
+    if (compat == COMPAT_US_TO_K)
+    {
+        param->p_fm_vsp = compat_pcd_id2ptr(compat_param->p_fm_vsp);
+        param->no_sg = compat_param->no_sg;
+    }
+
+    _fm_cpt_dbg (compat, " ...->}\n");
+}
+
+void compat_copy_fm_vsp_prs_result_params(
+    ioc_compat_fm_vsp_prs_result_params_t *compat_param,
+    ioc_fm_vsp_prs_result_params_t *param,
+    uint8_t compat)
+{
+    _fm_cpt_dbg (compat, " {->...\n");
+
+    if (compat == COMPAT_US_TO_K)
+    {
+        param->p_fm_vsp = compat_pcd_id2ptr(compat_param->p_fm_vsp);
+        /* p_data is an user-space pointer that needs to remain unmodified */
+        param->p_data = (void *)(unsigned long long)compat_param->p_data;
+    }
+    else
+    {
+        compat_param->p_fm_vsp = compat_pcd_ptr2id(param->p_fm_vsp);
+        /* p_data is an user-space pointer that needs to remain unmodified */
+        compat_param->p_data = (compat_uptr_t)((unsigned long long)param->p_data & 0xFFFFFFFF);
+    }
+
+    _fm_cpt_dbg (compat, " ...->}\n");
+}
+#endif /* (DPAA_VERSION >= 11) */
