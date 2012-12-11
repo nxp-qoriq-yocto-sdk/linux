@@ -59,13 +59,13 @@
 	#address-cells = <3>;
 	bus-range = <0x0 0xff>;
 	clock-frequency = <33333333>;
-	interrupts = <16 2 1 15>;
+	interrupts = <20 2 0 0>;
 	pcie@0 {
 		#interrupt-cells = <1>;
 		#size-cells = <2>;
 		#address-cells = <3>;
 		device_type = "pci";
-		interrupts = <16 2 1 15>;
+		interrupts = <20 2 0 0>;
 		interrupt-map-mask = <0xf800 0 0 7>;
 		interrupt-map = <
 			/* IDSEL 0x0 */
@@ -85,13 +85,13 @@
 	#address-cells = <3>;
 	bus-range = <0 0xff>;
 	clock-frequency = <33333333>;
-	interrupts = <16 2 1 14>;
+	interrupts = <21 2 0 0>;
 	pcie@0 {
 		#interrupt-cells = <1>;
 		#size-cells = <2>;
 		#address-cells = <3>;
 		device_type = "pci";
-		interrupts = <16 2 1 14>;
+		interrupts = <21 2 0 0>;
 		interrupt-map-mask = <0xf800 0 0 7>;
 		interrupt-map = <
 			/* IDSEL 0x0 */
@@ -111,13 +111,13 @@
 	#address-cells = <3>;
 	bus-range = <0x0 0xff>;
 	clock-frequency = <33333333>;
-	interrupts = <16 2 1 13>;
+	interrupts = <22 2 0 0>;
 	pcie@0 {
 		#interrupt-cells = <1>;
 		#size-cells = <2>;
 		#address-cells = <3>;
 		device_type = "pci";
-		interrupts = <16 2 1 13>;
+		interrupts = <22 2 0 0>;
 		interrupt-map-mask = <0xf800 0 0 7>;
 		interrupt-map = <
 			/* IDSEL 0x0 */
@@ -137,13 +137,13 @@
 	#address-cells = <3>;
 	bus-range = <0x0 0xff>;
 	clock-frequency = <33333333>;
-	interrupts = <16 2 1 12>;
+	interrupts = <23 2 0 0>;
 	pcie@0 {
 		#interrupt-cells = <1>;
 		#size-cells = <2>;
 		#address-cells = <3>;
 		device_type = "pci";
-		interrupts = <16 2 1 12>;
+		interrupts = <23 2 0 0>;
 		interrupt-map-mask = <0xf800 0 0 7>;
 		interrupt-map = <
 			/* IDSEL 0x0 */
