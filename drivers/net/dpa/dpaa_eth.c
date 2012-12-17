@@ -3114,6 +3114,7 @@ static const struct net_device_ops dpa_shared_ops = {
 	.ndo_get_stats = dpa_get_stats,
 	.ndo_set_mac_address = dpa_set_mac_address,
 	.ndo_validate_addr = eth_validate_addr,
+	.ndo_select_queue = dpa_select_queue,
 	.ndo_set_rx_mode = dpa_set_rx_mode,
 #ifdef CONFIG_FSL_DPA_1588
 	.ndo_do_ioctl = dpa_ioctl,
