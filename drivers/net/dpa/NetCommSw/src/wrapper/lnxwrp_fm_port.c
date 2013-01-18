@@ -622,7 +622,7 @@ static t_Error InitFmPortDev(t_LnxWrpFmPortDev *p_LnxWrpFmPortDev)
 }
 
 void fm_set_rx_port_params(struct fm_port *port,
-			   struct fm_port_rx_params *params)
+			   struct fm_port_params *params)
 {
 	t_LnxWrpFmPortDev *p_LnxWrpFmPortDev = (t_LnxWrpFmPortDev *) port;
 	int i;
@@ -666,7 +666,7 @@ EXPORT_SYMBOL(fm_set_rx_port_params);
 /* this function is called from oh_probe as well, thus it contains oh port
  * specific parameters (make sure everything is checked) */
 void fm_set_tx_port_params(struct fm_port *port,
-			   struct fm_port_non_rx_params *params)
+			   struct fm_port_params *params)
 {
 	t_LnxWrpFmPortDev *p_LnxWrpFmPortDev = (t_LnxWrpFmPortDev *) port;
 

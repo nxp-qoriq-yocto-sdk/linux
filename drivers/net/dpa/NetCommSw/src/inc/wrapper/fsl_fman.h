@@ -100,37 +100,22 @@ struct fm_port_pool_param {
 };
 
 /**************************************************************************//**
- @Description   structure for additional Rx port parameters
+ @Description   structure for additional port parameters
 *//***************************************************************************/
-struct fm_port_rx_params {
+struct fm_port_params {
     uint32_t                    errq;               /**< Error Queue Id. */
-    uint32_t                    defq;               /**< Default Queue Id.  */
+    uint32_t                    defq;               /**< For Tx and HC - Default Confirmation queue,
+                                                         0 means no Tx confirmation for processed frames.
+                                                         For Rx and OP - default Rx queue. */
     uint8_t                     num_pools;          /**< Number of pools use by this port */
     struct fm_port_pool_param   pool_param[FM_PORT_MAX_NUM_OF_EXT_POOLS];
                                                     /**< Parameters for each pool */
     uint16_t                    priv_data_size;     /**< Area that user may save for his own need (E.g. save the SKB) */
-    bool                        parse_results;      /**< Whether to have the parser-results in the Received buffer */
-    bool                        hash_results;       /**< Whether to have the hash-results in the Received buffer */
-    bool                        time_stamp;         /**< Whether to have the time-stamp in the Received buffer */
+    bool                        parse_results;      /**< Whether to have the parser-results in the Rx/Tx buffer */
+    bool                        hash_results;       /**< Whether to have the hash-results in the Rx/Tx buffer */
+    bool                        time_stamp;         /**< Whether to have the time-stamp in the Rx/Tx buffer */
+    bool                        frag_enable;        /**< Whether to enable fragmentation support, for OP only */
 };
-
-/**************************************************************************//**
- @Description   structure for additional non-Rx port parameters
-*//***************************************************************************/
-struct fm_port_non_rx_params {
-    uint32_t                errq;               /**< Error Queue Id. */
-    uint32_t                defq;               /**< For Tx and HC - Default Confirmation queue,
-                                                     0 means no Tx confirmation for processed
-                                                     frames. For OP - default Rx queue. */
-    uint16_t                priv_data_size;     /**< Area that user may save for his own need (E.g. save the SKB) */
-    bool                    parse_results;      /**< Whether to put the parser-results in the Transmitted buffer */
-    bool                    hash_results;       /**< Whether to have the hash-results in the Received buffer */
-    bool                    time_stamp;         /**< Whether to have the time-stamp in the Received buffer */
-    bool                    frag_enable;        /**< Whether to call extra config functions for OH, to enable fragmentation */
-    struct fm_port_pool_param pool_param[FM_PORT_MAX_NUM_OF_EXT_POOLS]; /**< External Buffer Pool params for OH port only */
-    uint8_t                 num_pools;          /**< Number of pools use by this port */
-};
-
 
 /**************************************************************************//**
  @Function      fm_bind
@@ -194,7 +179,7 @@ void fm_port_unbind(struct fm_port *port);
 
  @Cautions      Allowed only after the port is binded.
 *//***************************************************************************/
-void fm_set_rx_port_params(struct fm_port *port, struct fm_port_rx_params *params);
+void fm_set_rx_port_params(struct fm_port *port, struct fm_port_params *params);
 
 /**************************************************************************//**
  @Function      fm_port_pcd_bind
@@ -231,7 +216,7 @@ int fm_get_tx_port_channel(struct fm_port *port);
 
  @Cautions      Allowed only after the port is binded.
 *//***************************************************************************/
-void fm_set_tx_port_params(struct fm_port *port, struct fm_port_non_rx_params *params);
+void fm_set_tx_port_params(struct fm_port *port, struct fm_port_params *params);
 
 /**************************************************************************//**
  @Function      fm_mac_set_handle

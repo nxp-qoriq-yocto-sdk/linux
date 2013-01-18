@@ -3324,7 +3324,7 @@ static void __devinit
 dpaa_eth_init_tx_port(struct fm_port *port, struct dpa_fq *errq,
 		struct dpa_fq *defq, bool has_timer)
 {
-	struct fm_port_non_rx_params tx_port_param;
+	struct fm_port_params tx_port_param;
 
 	dpaa_eth_init_port(tx, port, tx_port_param, errq->fqid, defq->fqid,
 			DPA_TX_PRIV_DATA_SIZE, has_timer);
@@ -3334,7 +3334,7 @@ static void __devinit
 dpaa_eth_init_rx_port(struct fm_port *port, struct dpa_bp *bp, size_t count,
 		struct dpa_fq *errq, struct dpa_fq *defq, bool has_timer)
 {
-	struct fm_port_rx_params rx_port_param;
+	struct fm_port_params rx_port_param;
 	int i;
 
 	count = min(ARRAY_SIZE(rx_port_param.pool_param), count);
