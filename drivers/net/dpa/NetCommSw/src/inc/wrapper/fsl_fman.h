@@ -127,7 +127,8 @@ struct fm_port_non_rx_params {
     bool                    hash_results;       /**< Whether to have the hash-results in the Received buffer */
     bool                    time_stamp;         /**< Whether to have the time-stamp in the Received buffer */
     bool                    frag_enable;        /**< Whether to call extra config functions for OH, to enable fragmentation */
-    t_FmExtPools            op_ext_pools;       /**< External Buffer Pool params for OH port only */
+    struct fm_port_pool_param pool_param[FM_PORT_MAX_NUM_OF_EXT_POOLS]; /**< External Buffer Pool params for OH port only */
+    uint8_t                 num_pools;          /**< Number of pools use by this port */
 };
 
 
