@@ -477,6 +477,9 @@ static inline int dpa_check_rx_mtu(struct sk_buff *skb, int mtu)
 
 void fm_mac_dump_regs(struct mac_device *mac_dev);
 
+void dpaa_eth_sysfs_remove(struct device *dev);
+void dpaa_eth_sysfs_init(struct device *dev);
+
 /* Equivalent to a memset(0), but works faster */
 static inline void clear_fd(struct qm_fd *fd)
 {
