@@ -3565,26 +3565,28 @@ static ssize_t dpaa_eth_show_fqids(struct device *dev,
 	char *prevstr = NULL;
 
 	list_for_each_entry_safe(fq, tmp, &priv->dpa_fq_list, list) {
-		void *dqrr = fq->fq_base.cb.dqrr;
-		if (dqrr == ingress_rx_error_dqrr)
-			str = "error";
-		else if (i == 1 && dqrr == ingress_rx_default_dqrr)
-			str = "default";
-		else if (dqrr == ingress_rx_error_dqrr ||
-				dqrr == ingress_rx_default_dqrr)
-			str = "RX";
-		else if (dqrr == ingress_tx_default_dqrr)
-			str = "TX confirmation";
-		else if (dqrr == ingress_tx_error_dqrr)
-			str = "TX error";
-		else if (dqrr == shared_tx_default_dqrr)
-			str = "Shared TX confirmation";
-		else if (dqrr == shared_tx_error_dqrr)
-			str = "Shared TX error";
-		else if (dqrr == NULL)
-			str = "TX";
-		else
-			str = "unknown";
+		switch (fq->fq_type) {
+		case FQ_TYPE_RX_DEFAULT:
+			str = "Rx default";
+			break;
+		case FQ_TYPE_RX_ERROR:
+			str = "Rx error";
+			break;
+		case FQ_TYPE_RX_PCD:
+			str = "Rx PCD";
+			break;
+		case FQ_TYPE_TX_CONFIRM:
+			str = "Tx confirmation";
+			break;
+		case FQ_TYPE_TX_ERROR:
+			str = "Tx error";
+			break;
+		case FQ_TYPE_TX:
+			str = "Tx";
+			break;
+		default:
+			str = "Unknown";
+		}
 
 		if (prev && (abs(fq->fqid - prev->fqid) != 1 ||
 					str != prevstr)) {
