@@ -21,7 +21,7 @@
 #include "sdhci-esdhc.h"
 
 #define VENDOR_V_22	0x12
-#define VENDOR_V_23    0x13
+#define VENDOR_V_23	0x13
 static u32 esdhc_readl(struct sdhci_host *host, int reg)
 {
 	u32 ret;
@@ -82,6 +82,12 @@ static u8 esdhc_readb(struct sdhci_host *host, int reg)
 		ret |= dma_bits;
 	}
 
+	if (reg == SDHCI_SOFTWARE_RESET) {
+		unsigned int temp;
+		temp = sdhci_be32bs_readl(host, ESDHC_SYSTEM_CONTROL);
+		ret = temp >> 24;
+	}
+
 	return ret;
 }
 
@@ -130,6 +136,17 @@ static void esdhc_writeb(struct sdhci_host *host, u8 val, int reg)
 	/* Prevent SDHCI core from writing reserved bits (e.g. HISPD). */
 	if (reg == SDHCI_HOST_CONTROL)
 		val &= ~ESDHC_HOST_CONTROL_RES;
+
+	if (reg == SDHCI_SOFTWARE_RESET) {
+		unsigned int temp;
+
+		temp = sdhci_be32bs_readl(host, ESDHC_SYSTEM_CONTROL);
+		temp |= val << 24;
+		sdhci_be32bs_writel(host, temp, ESDHC_SYSTEM_CONTROL);
+
+		return;
+	}
+
 	sdhci_be32bs_writeb(host, val, reg);
 }
 
@@ -201,6 +218,35 @@ static void esdhc_of_resume(struct sdhci_host *host)
 }
 #endif
 
+
+static void esdhc_of_platform_reset_enter(struct sdhci_host *host, u8 mask)
+{
+	unsigned int temp;
+
+	if (!(mask & SDHCI_RESET_ALL))
+		return;
+
+	if (esdhc_version_check(host)) {
+		temp = sdhci_readl(host, ESDHC_SYSTEM_CONTROL);
+		temp &= ~ESDHC_CLOCK_ENABLE;
+		sdhci_writel(host, temp, ESDHC_SYSTEM_CONTROL);
+	}
+}
+
+static void esdhc_of_platform_reset_exit(struct sdhci_host *host, u8 mask)
+{
+	unsigned int temp;
+
+	if (!(mask & SDHCI_RESET_ALL))
+		return;
+
+	if (esdhc_version_check(host)) {
+		temp = sdhci_readl(host, ESDHC_SYSTEM_CONTROL);
+		temp |= ESDHC_CLOCK_ENABLE;
+		sdhci_writel(host, temp, ESDHC_SYSTEM_CONTROL);
+	}
+}
+
 struct sdhci_of_data sdhci_esdhc = {
 	/*
 	 * card detection could be handled via GPIO
@@ -220,6 +266,8 @@ struct sdhci_of_data sdhci_esdhc = {
 		.enable_dma = esdhc_of_enable_dma,
 		.get_max_clock = esdhc_of_get_max_clock,
 		.get_min_clock = esdhc_of_get_min_clock,
+		.platform_reset_enter = esdhc_of_platform_reset_enter,
+		.platform_reset_exit = esdhc_of_platform_reset_exit,
 #ifdef CONFIG_PM
 		.platform_suspend = esdhc_of_suspend,
 		.platform_resume = esdhc_of_resume,
