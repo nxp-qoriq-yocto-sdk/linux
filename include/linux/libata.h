@@ -198,6 +198,8 @@ enum {
 	ATA_FLAG_SW_ACTIVITY	= (1 << 22), /* driver supports sw activity
 					      * led */
 	ATA_FLAG_NO_DIPM	= (1 << 23), /* host not happy with DIPM */
+	ATA_FLAG_BROKENAA	= (1 << 24),  /* host not support DMA AA
+						 enabled by default */
 
 	/* bits 24:31 of ap->flags are reserved for LLD specific flags */
 

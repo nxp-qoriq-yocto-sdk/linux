@@ -1578,7 +1578,7 @@ static int sata_fsl_probe(struct platform_device *ofdev)
 		}
 	}
 
-	if (of_device_is_compatible(ofdev->dev.of_node, "fsl,pq-sata-v2"))
+	if (of_device_is_compatible(ofdev->dev.of_node, "fsl,pq-sata-v2")) {
 		/*
 		 * if SATA_FSL_QUIRK_P3P5_ERRATA is applied already,
 		 * we will not apply the SATA_FSL_QUIRK_V2_ERRATA, the former
@@ -1586,6 +1586,22 @@ static int sata_fsl_probe(struct platform_device *ofdev)
 		 */
 		if (!(host_priv->quirks & SATA_FSL_QUIRK_P3P5_ERRATA))
 			host_priv->quirks |= SATA_FSL_QUIRK_V2_ERRATA;
+
+		/*
+		 * workaround A-005636.
+		 * This erratum will only be fixed on T4 Rev2.0, Any
+		 * platforms except T4 rev2.0 will have this workaround.
+		 */
+		pi.flags |= ATA_FLAG_BROKENAA;
+
+		if (of_device_is_compatible(ofdev->dev.of_node,
+					"fsl,t4240-rev1.0-sata")) {
+			if ((mfspr(SPRN_SVR) & 0xff) != 0x10) {
+				/* remove workaround A-005636 if not rev1.0 */
+				pi.flags &= ~ATA_FLAG_BROKENAA;
+			}
+		}
+	}
 
 	/* allocate host structure */
 	host = ata_host_alloc_pinfo(&ofdev->dev, ppi, SATA_FSL_MAX_PORTS);

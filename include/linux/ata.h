@@ -567,6 +567,8 @@ static inline int ata_is_data(u8 prot)
 #define ata_id_has_fpdma_aa(id)	\
 	( (((id)[76] != 0x0000) && ((id)[76] != 0xffff)) && \
 	  ((id)[78] & (1 << 2)) )
+#define ata_id_enabled_fpdma_aa(id)	\
+	  ((id)[79] & (1 << 2))
 #define ata_id_iordy_disable(id) ((id)[ATA_ID_CAPABILITY] & (1 << 10))
 #define ata_id_has_iordy(id) ((id)[ATA_ID_CAPABILITY] & (1 << 11))
 #define ata_id_u32(id,n)	\
