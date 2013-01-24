@@ -490,6 +490,9 @@ struct pme_ctx {
 	struct qm_fqd_stashing stashing;
 	struct qm_fd update_fd;
 	struct pme_nostash *us_data;
+	u32 pme_rev1;
+	u32 pme_rev2;
+	int max_scan_size;
 };
 
 /* Flags for pme_ctx_init() */

@@ -177,3 +177,39 @@ int pme2_exclusive_unset(void);
 	struct pme_hw_residue *__f913 = (residue); \
 	pme_map(__f913); \
 })
+
+/* 4k minus residue */
+#define PME_MAX_SCAN_SIZE_BUG_2_1_4	(4095 - 127)
+
+#define PME_PM_IP_REV_1_IP_MJ_MASK 0x0000ff00UL
+#define PME_PM_IP_REV_1_IP_MJ_SHIFT 8UL
+#define PME_PM_IP_REV_1_IP_MN_MASK 0x000000ffUL
+#define PME_PM_IP_REV_1_IP_MN_SHIFT 0UL
+#define PME_PM_IP_REV_2_IP_ERR_MASK 0x0000ff00UL
+#define PME_PM_IP_REV_2_IP_ERR_SHIFT 8UL
+
+static inline int get_major_rev(u32 pme_rev1)
+{
+	return (pme_rev1 & PME_PM_IP_REV_1_IP_MJ_MASK) >>
+		PME_PM_IP_REV_1_IP_MJ_SHIFT;
+}
+
+static inline int get_minor_rev(u32 pme_rev1)
+{
+	return (pme_rev1 & PME_PM_IP_REV_1_IP_MN_MASK) >>
+		PME_PM_IP_REV_1_IP_MN_SHIFT;
+}
+
+static inline int get_errata_rev(u32 pme_rev2)
+{
+	return (pme_rev2 & PME_PM_IP_REV_2_IP_ERR_MASK) >>
+		PME_PM_IP_REV_2_IP_ERR_SHIFT;
+}
+
+static inline int is_version_2_1_4(u32 pme_rev1, u32 pme_rev2)
+{
+	return  (get_major_rev(pme_rev1) == 2) &&
+		(get_minor_rev(pme_rev1) == 1) &&
+		(get_errata_rev(pme_rev2) == 4);
+}
+

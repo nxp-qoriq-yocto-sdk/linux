@@ -461,6 +461,18 @@ static int process_scan_cmd(
 	memset(token_p, 0, sizeof(*token_p));
 	/* Copy the command to kernel space */
 	memcpy(&token_p->kernel_op, user_cmd, sizeof(struct pme_scan_cmd));
+
+#ifdef CONFIG_FSL_PME_BUG_4K_SCAN_REV_2_1_4
+	if (session->ctx.max_scan_size) {
+		if (token_p->kernel_op.input.size >
+				session->ctx.max_scan_size) {
+			if (!synchronous)
+				kfree(token_p);
+			return -EINVAL;
+		}
+	}
+#endif
+
 	/* Copy the input */
 	token_p->synchronous = synchronous;
 	token_p->tx_size = token_p->kernel_op.input.size;

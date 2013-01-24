@@ -140,6 +140,7 @@ config FSL_PME2_TEST_HIGH
 
 config FSL_PME2_TEST_SCAN
 	tristate "PME2 scan self-test"
+	depends on FSL_PME2_CTRL
 	default n
 	---help---
 	  This uses the high-level Qman driver (and the cpu-affine portals it
@@ -197,6 +198,17 @@ config FSL_PME2_SCAN_DEBUG
         ---help---
           The PME2_SCAN driver can optionally trace with more verbosity
           of verbosity.
+
+config FSL_PME_BUG_4K_SCAN_REV_2_1_4
+	bool "workaround for errata in PME version 2.1.4"
+	default y
+	---help---
+          If this option is selected, the driver will be compiled with a
+          workaround for this errata. This prevents scans of SUIs greater
+          than 4095 - 127 bytes when this revision of HW is detected.
+
+	  If in doubt, say Y.
+
 
 endif
 

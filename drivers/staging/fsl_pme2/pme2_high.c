@@ -250,6 +250,58 @@ static int empty_pipeline(struct pme_ctx *ctx, __maybe_unused u32 flags)
 	return ret;
 }
 
+/**
+ * set_pme_revision - set the pme revision in the ctx
+ *
+ * In order to make decisions based on PME HW version, read this
+ * information and store it on the ctx object.
+ */
+static int set_pme_revision(struct pme_ctx *ctx)
+{
+	int ret = 0;
+	u32 rev1, rev2;
+	struct device_node *dn;
+	const u32 *dt_rev;
+	int len;
+
+#ifdef CONFIG_FSL_PME2_CTRL
+	/* Can try and read it from CCSR */
+	if (pme2_have_control()) {
+		ret = pme_attr_get(pme_attr_rev1, &rev1);
+		if (ret)
+			return ret;
+		ret = pme_attr_get(pme_attr_rev2, &rev2);
+		if (ret)
+			return ret;
+		ctx->pme_rev1 = rev1;
+		ctx->pme_rev2 = rev2;
+		return 0;
+	}
+#endif
+
+	/* Not on control-plane, try and get it from pme portal node */
+	dn = of_find_node_with_property(NULL, "fsl,pme-rev1");
+	if (!dn)
+		return -ENODEV;
+	dt_rev = of_get_property(dn, "fsl,pme-rev1", &len);
+	if (!dt_rev || len != 4) {
+		of_node_put(dn);
+		return -ENODEV;
+	}
+	rev1 = *dt_rev;
+
+	dt_rev = of_get_property(dn, "fsl,pme-rev2", &len);
+	if (!dt_rev || len != 4) {
+		of_node_put(dn);
+		return -ENODEV;
+	}
+	rev2 = *dt_rev;
+	of_node_put(dn);
+	ctx->pme_rev1 = rev1;
+	ctx->pme_rev2 = rev2;
+	return ret;
+}
+
 int pme_ctx_init(struct pme_ctx *ctx, u32 flags, u32 bpid, u8 qosin,
 			u8 qosout, u16 dest,
 			const struct qm_fqd_stashing *stashing)
@@ -267,7 +319,13 @@ int pme_ctx_init(struct pme_ctx *ctx, u32 flags, u32 bpid, u8 qosin,
 	INIT_LIST_HEAD(&ctx->tokens);
 	ctx->hw_flow = NULL;
 	ctx->hw_residue = NULL;
-
+	ret = set_pme_revision(ctx);
+	if (ret)
+		goto err;
+#ifdef CONFIG_FSL_PME_BUG_4K_SCAN_REV_2_1_4
+	if (is_version_2_1_4(ctx->pme_rev1, ctx->pme_rev2))
+		ctx->max_scan_size = PME_MAX_SCAN_SIZE_BUG_2_1_4;
+#endif
 	ctx->us_data = kzalloc(sizeof(struct pme_nostash), GFP_KERNEL);
 	if (!ctx->us_data)
 		goto err;
@@ -709,18 +767,40 @@ int pme_ctx_ctrl_nop(struct pme_ctx *ctx, u32 flags,
 }
 EXPORT_SYMBOL(pme_ctx_ctrl_nop);
 
-static inline void __prep_scan(__maybe_unused struct pme_ctx *ctx,
+static inline int __prep_scan(__maybe_unused struct pme_ctx *ctx,
 			struct qm_fd *fd, u32 args, struct pme_ctx_token *token)
 {
 	BUG_ON(ctx->flags & PME_CTX_FLAG_PMTCC);
 	token->cmd_type = pme_cmd_scan;
 	pme_fd_cmd_scan(fd, args);
+#ifdef CONFIG_FSL_PME_BUG_4K_SCAN_REV_2_1_4
+	pr_info("max_scan_size %d\n", ctx->max_scan_size);
+	if (ctx->max_scan_size) {
+		if (fd->format == qm_fd_contig || fd->format == qm_fd_sg) {
+			if (fd->length20 > ctx->max_scan_size) {
+				pr_info("Length = %d\n", fd->length20);
+				return -EINVAL;
+			}
+		} else if (fd->format == qm_fd_contig_big ||
+				fd->format == qm_fd_sg_big) {
+			if (fd->length29 > ctx->max_scan_size) {
+				pr_info("Length = %d\n", fd->length29);
+				return -EINVAL;
+			}
+		}
+	}
+#endif
+	return 0;
 }
 
 int pme_ctx_scan(struct pme_ctx *ctx, u32 flags, struct qm_fd *fd, u32 args,
 		struct pme_ctx_token *token)
 {
-	__prep_scan(ctx, fd, args, token);
+	int ret;
+
+	ret = __prep_scan(ctx, fd, args, token);
+	if (ret)
+		return ret;
 	return do_work(ctx, flags, fd, token, NULL, 0);
 }
 EXPORT_SYMBOL(pme_ctx_scan);
