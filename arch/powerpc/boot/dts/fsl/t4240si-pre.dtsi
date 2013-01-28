@@ -51,6 +51,7 @@
 		qman = &qman;
 		pme = &pme;
 		dce = &dce;
+		crypto = &crypto;
 		fman0 = &fman0;
 		fman1 = &fman1;
 		ethernet0 = &enet0;
