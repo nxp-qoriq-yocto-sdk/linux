@@ -171,6 +171,13 @@ config FSL_QMAN_FQD_SZ
 	  ex: 10 => PAGE_SIZE * (2^10)
 	  Note: Default device-trees now require minimum Kconfig setting of 10.
 
+config FSL_QMAN_PFDR_SZ
+	int "size of the PFDR pool"
+	default 13
+	---help---
+	  This is the size of the PFDR pool defined as: PAGE_SIZE * (2^value)
+	  ex: 13 => PAGE_SIZE * (2^13)
+
 # Corenet initiator settings. Stash request queues are 4-deep to match cores'
 # ability to snart. Stash priority is 3, other priorities are 2.
 config FSL_QMAN_CI_SCHED_CFG_SRCCIV

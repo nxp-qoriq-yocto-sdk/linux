@@ -534,9 +534,8 @@ static int qm_init_pfdr(struct qman *qm, u32 pfdr_start, u32 num)
 /* Config driver */
 /*****************/
 
-/* TODO: Kconfig these? */
 #define DEFAULT_FQD_SZ	(PAGE_SIZE << CONFIG_FSL_QMAN_FQD_SZ)
-#define DEFAULT_PFDR_SZ	(PAGE_SIZE << 12)
+#define DEFAULT_PFDR_SZ	(PAGE_SIZE << CONFIG_FSL_QMAN_PFDR_SZ)
 
 /* We support only one of these */
 static struct qman *qm;
