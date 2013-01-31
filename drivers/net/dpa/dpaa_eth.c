@@ -2990,6 +2990,9 @@ static int __cold dpa_debugfs_show(struct seq_file *file, void *offset)
 		"Current congestion state is: %s.\n",
 		priv->cgr_data.cgr_congested_count,
 		query_cgr.cgr.cs ? "congested" : "not congested");
+	/* Reset congestion stats (like QMan CGR API does) */
+	priv->cgr_data.congested_jiffies = 0;
+	priv->cgr_data.cgr_congested_count = 0;
 
 	/* Rx Errors demultiplexing */
 	seq_printf(file, "\nDPA RX Errors:\nCPU        dma err  phys err" \
@@ -3322,7 +3325,7 @@ static void __devinit
 dpaa_eth_init_tx_port(struct fm_port *port, struct dpa_fq *errq,
 		struct dpa_fq *defq, bool has_timer)
 {
-	struct fm_port_non_rx_params tx_port_param;
+	struct fm_port_params tx_port_param;
 
 	dpaa_eth_init_port(tx, port, tx_port_param, errq->fqid, defq->fqid,
 			DPA_TX_PRIV_DATA_SIZE, has_timer);
@@ -3332,7 +3335,7 @@ static void __devinit
 dpaa_eth_init_rx_port(struct fm_port *port, struct dpa_bp *bp, size_t count,
 		struct dpa_fq *errq, struct dpa_fq *defq, bool has_timer)
 {
-	struct fm_port_rx_params rx_port_param;
+	struct fm_port_params rx_port_param;
 	int i;
 
 	count = min(ARRAY_SIZE(rx_port_param.pool_param), count);
@@ -3533,156 +3536,6 @@ int dpa_free_pcd_fqids(struct device *dev, uint32_t base_fqid)
 	BUG();
 
 	return 0;
-}
-
-static ssize_t dpaa_eth_show_addr(struct device *dev,
-		struct device_attribute *attr, char *buf)
-{
-	struct dpa_priv_s *priv = netdev_priv(to_net_dev(dev));
-	struct mac_device *mac_dev = priv->mac_dev;
-
-	if (mac_dev)
-		return sprintf(buf, "%llx",
-				(unsigned long long)mac_dev->res->start);
-	else
-		return sprintf(buf, "none");
-}
-
-static DEVICE_ATTR(device_addr, S_IRUGO, dpaa_eth_show_addr, NULL);
-
-static ssize_t dpaa_eth_show_fqids(struct device *dev,
-		struct device_attribute *attr, char *buf)
-{
-	struct dpa_priv_s *priv = netdev_priv(to_net_dev(dev));
-	ssize_t bytes = 0;
-	int i = 0;
-	char *str;
-	struct dpa_fq *fq;
-	struct dpa_fq *tmp;
-	struct dpa_fq *prev = NULL;
-	u32 first_fqid = 0;
-	u32 last_fqid = 0;
-	char *prevstr = NULL;
-
-	list_for_each_entry_safe(fq, tmp, &priv->dpa_fq_list, list) {
-		void *dqrr = fq->fq_base.cb.dqrr;
-		if (dqrr == ingress_rx_error_dqrr)
-			str = "error";
-		else if (i == 1 && dqrr == ingress_rx_default_dqrr)
-			str = "default";
-		else if (dqrr == ingress_rx_error_dqrr ||
-				dqrr == ingress_rx_default_dqrr)
-			str = "RX";
-		else if (dqrr == ingress_tx_default_dqrr)
-			str = "TX confirmation";
-		else if (dqrr == ingress_tx_error_dqrr)
-			str = "TX error";
-		else if (dqrr == shared_tx_default_dqrr)
-			str = "Shared TX confirmation";
-		else if (dqrr == shared_tx_error_dqrr)
-			str = "Shared TX error";
-		else if (dqrr == NULL)
-			str = "TX";
-		else
-			str = "unknown";
-
-		if (prev && (abs(fq->fqid - prev->fqid) != 1 ||
-					str != prevstr)) {
-			if (last_fqid == first_fqid)
-				bytes += sprintf(buf + bytes,
-					"%s: %d\n", prevstr, prev->fqid);
-			else
-				bytes += sprintf(buf + bytes,
-					"%s: %d - %d\n", prevstr,
-					first_fqid, last_fqid);
-		}
-
-		if (prev && abs(fq->fqid - prev->fqid) == 1 && str == prevstr)
-			last_fqid = fq->fqid;
-		else
-			first_fqid = last_fqid = fq->fqid;
-
-		prev = fq;
-		prevstr = str;
-		i++;
-	}
-
-	if (prev) {
-		if (last_fqid == first_fqid)
-			bytes += sprintf(buf + bytes, "%s: %d\n", prevstr,
-					prev->fqid);
-		else
-			bytes += sprintf(buf + bytes, "%s: %d - %d\n", prevstr,
-					first_fqid, last_fqid);
-	}
-
-	return bytes;
-}
-
-static DEVICE_ATTR(fqids, S_IRUGO, dpaa_eth_show_fqids, NULL);
-
-static ssize_t dpaa_eth_show_dflt_bpid(struct device *dev,
-		struct device_attribute *attr, char *buf)
-{
-	ssize_t bytes = 0;
-	struct dpa_priv_s *priv = netdev_priv(to_net_dev(dev));
-	struct dpa_bp *dpa_bp = priv->dpa_bp;
-
-	if (priv->bp_count != 1)
-		bytes += snprintf(buf, PAGE_SIZE, "-1\n");
-	else
-		bytes += snprintf(buf, PAGE_SIZE, "%u\n", dpa_bp->bpid);
-
-	return bytes;
-}
-
-static DEVICE_ATTR(dflt_bpid, S_IRUGO, dpaa_eth_show_dflt_bpid, NULL);
-
-static ssize_t dpaa_eth_show_mac_regs(struct device *dev,
-		struct device_attribute *attr, char *buf)
-{
-	struct dpa_priv_s *priv = netdev_priv(to_net_dev(dev));
-	struct mac_device *mac_dev = priv->mac_dev;
-
-	fm_mac_dump_regs(mac_dev);
-
-	return 0;
-}
-
-static DEVICE_ATTR(mac_regs, S_IRUGO, dpaa_eth_show_mac_regs, NULL);
-
-static void __devinit dpaa_eth_sysfs_init(struct device *dev)
-{
-	struct dpa_priv_s *priv = netdev_priv(to_net_dev(dev));
-	int i = 0;
-
-	if (device_create_file(dev, &dev_attr_device_addr))
-		dev_err(dev, "Error creating dpaa_eth addr file\n");
-	priv->sysfs_attrs[i++] = &dev_attr_device_addr;
-
-	if (device_create_file(dev, &dev_attr_fqids))
-		dev_err(dev, "Error creating dpaa_eth fqids file\n");
-	priv->sysfs_attrs[i++] = &dev_attr_fqids;
-
-	if (device_create_file(dev, &dev_attr_dflt_bpid))
-		dev_err(dev, "Error creating dpaa_eth dflt_bpid file\n");
-	priv->sysfs_attrs[i++] = &dev_attr_dflt_bpid;
-
-	if (device_create_file(dev, &dev_attr_mac_regs))
-		dev_err(dev, "Error creating dpaa_eth mac_regs file\n");
-	priv->sysfs_attrs[i++] = &dev_attr_mac_regs;
-
-	/* last entry must be NULL */
-	priv->sysfs_attrs[i] = NULL;
-}
-
-static void dpaa_eth_sysfs_remove(struct net_device *net_dev)
-{
-	struct dpa_priv_s *priv = netdev_priv(net_dev);
-	struct device_attribute **p = &priv->sysfs_attrs[0];
-
-	while (p)
-		device_remove_file(&net_dev->dev, *p++);
 }
 
 static int dpaa_eth_add_channel(void *__arg)
@@ -4035,7 +3888,7 @@ static int __devexit __cold dpa_remove(struct platform_device *of_dev)
 	net_dev = dev_get_drvdata(dev);
 	priv = netdev_priv(net_dev);
 
-	dpaa_eth_sysfs_remove(net_dev);
+	dpaa_eth_sysfs_remove(dev);
 
 	dev_set_drvdata(dev, NULL);
 	unregister_netdev(net_dev);

@@ -108,7 +108,7 @@ oh_port_probe(struct platform_device *_of_dev)
 	uint32_t		 queues_count;
 	uint32_t		 crt_fqid_base;
 	uint32_t		 crt_fq_count;
-	struct fm_port_non_rx_params	oh_port_tx_params;
+	struct fm_port_params	 oh_port_tx_params;
 	struct fm_port_pcd_param	oh_port_pcd_params;
 	/* True if the current partition owns the OH port. */
 	bool init_oh_port;

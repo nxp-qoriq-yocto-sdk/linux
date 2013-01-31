@@ -622,7 +622,7 @@ static t_Error InitFmPortDev(t_LnxWrpFmPortDev *p_LnxWrpFmPortDev)
 }
 
 void fm_set_rx_port_params(struct fm_port *port,
-			   struct fm_port_rx_params *params)
+			   struct fm_port_params *params)
 {
 	t_LnxWrpFmPortDev *p_LnxWrpFmPortDev = (t_LnxWrpFmPortDev *) port;
 	int i;
@@ -666,7 +666,7 @@ EXPORT_SYMBOL(fm_set_rx_port_params);
 /* this function is called from oh_probe as well, thus it contains oh port
  * specific parameters (make sure everything is checked) */
 void fm_set_tx_port_params(struct fm_port *port,
-			   struct fm_port_non_rx_params *params)
+			   struct fm_port_params *params)
 {
 	t_LnxWrpFmPortDev *p_LnxWrpFmPortDev = (t_LnxWrpFmPortDev *) port;
 
@@ -708,8 +708,17 @@ void fm_set_tx_port_params(struct fm_port *port,
 	if ((params->frag_enable == TRUE) &&
 	    (p_LnxWrpFmPortDev->settings.param.portType ==
 	     e_FM_PORT_TYPE_OH_OFFLINE_PARSING)) {
+		t_FmExtPools opExtPools;
+		int i;
+
+		memset(&opExtPools, 0, sizeof(opExtPools));
+		opExtPools.numOfPoolsUsed = params->num_pools;
+		for (i = 0; i < params->num_pools; i++) {
+			opExtPools.extBufPool[i].id = params->pool_param[i].id;
+			opExtPools.extBufPool[i].size = params->pool_param[i].size;
+		}
 		ADD_ADV_CONFIG_NO_RET(FM_PORT_ConfigExtBufPools,
-				      ARGS(1, (&params->op_ext_pools)));
+				      ARGS(1, (&opExtPools)));
 	}
 
 	ADD_ADV_CONFIG_END InitFmPortDev(p_LnxWrpFmPortDev);

@@ -2790,7 +2790,7 @@ invalid_port_id:
 #endif
             if (copy_from_user(&param, (void *)arg, sizeof(param)))
                 RETURN_ERROR(MINOR, E_WRITE_FAILED, NO_MSG);
-
+	param.p_fm = p_LnxWrpFmDev->h_Dev;
         param.id = FM_VSP_Config((t_FmVspParams *)&param);
 
 #if defined(CONFIG_COMPAT)
@@ -4141,6 +4141,8 @@ t_Error LnxwrpFmPortIOCTL(t_LnxWrpFmPortDev *p_LnxWrpFmPortDev, unsigned int cmd
         case FM_PORT_IOC_VSP_ALLOC:
         {
             ioc_fm_port_vsp_alloc_params_t *param;
+            t_LnxWrpFmDev *p_LnxWrpFmDev;
+            t_LnxWrpFmPortDev *p_LnxWrpFmTxPortDev;
 
             param = (ioc_fm_port_vsp_alloc_params_t *) XX_Malloc(
                     sizeof(ioc_fm_port_vsp_alloc_params_t));
@@ -4185,6 +4187,16 @@ t_Error LnxwrpFmPortIOCTL(t_LnxWrpFmPortDev *p_LnxWrpFmPortDev, unsigned int cmd
                     XX_Free(param);
                     RETURN_ERROR(MINOR, E_WRITE_FAILED, NO_MSG);
                 }
+            }
+
+            /* Userspace may not have the Tx port t_handle when issuing the IOCTL */
+            if (p_LnxWrpFmPortDev->settings.param.portType == e_FM_PORT_TYPE_RX ||
+                    p_LnxWrpFmPortDev->settings.param.portType == e_FM_PORT_TYPE_RX_10G)
+            {
+                /* Determine the Tx port t_Handle from the Rx port id */
+                p_LnxWrpFmDev = p_LnxWrpFmPortDev->h_LnxWrpFmDev;
+                p_LnxWrpFmTxPortDev = &p_LnxWrpFmDev->txPorts[p_LnxWrpFmPortDev->id];
+                param->p_fm_tx_port = p_LnxWrpFmTxPortDev->h_Dev;
             }
 
             if (FM_PORT_VSPAlloc(p_LnxWrpFmPortDev->h_Dev, (t_FmPortVSPAllocParams *)param))
