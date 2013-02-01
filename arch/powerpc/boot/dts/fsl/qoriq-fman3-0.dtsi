@@ -124,6 +124,11 @@ fman0: fman@400000 {
 		reg = <0xc7000 0x1000>;
 	};
 
+	vsps@dc000 {
+		compatible = "fsl,fman-vsps";
+		reg = <0xdc000 0x1000>;
+	};
+
         mdio@fc000 {
                 #address-cells = <1>;
                 #size-cells = <0>;
