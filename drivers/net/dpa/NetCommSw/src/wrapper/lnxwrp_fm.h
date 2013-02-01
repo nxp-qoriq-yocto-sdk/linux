@@ -195,6 +195,9 @@ typedef struct {
     uint64_t                    fmRtcPhysBaseAddr;
     uint64_t                    fmRtcBaseAddr;
     uint32_t                    fmRtcMemSize;
+    uint64_t                    fmVspPhysBaseAddr;
+    uint64_t                    fmVspBaseAddr;
+    uint32_t                    fmVspMemSize;
     int                         irq;
     int                         err_irq;
     t_WrpFmDevSettings          fmDevSettings;

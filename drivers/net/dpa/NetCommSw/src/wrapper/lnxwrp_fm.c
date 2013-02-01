@@ -569,6 +569,22 @@ static t_LnxWrpFmDev * ReadFmDevTreeNode (struct platform_device *of_dev)
         }
     }
 
+#if (DPAA_VERSION >= 11)
+    /* Get the VSP base address */
+    for_each_child_of_node(fm_node, dev_node) {
+        if (of_device_is_compatible(dev_node, "fsl,fman-vsps")) {
+            _errno = of_address_to_resource(dev_node, 0, &res);
+            if (unlikely(_errno < 0)) {
+                REPORT_ERROR(MAJOR, E_INVALID_VALUE, ("of_address_to_resource() = %d", _errno));
+                return NULL;
+            }
+            p_LnxWrpFmDev->fmVspBaseAddr = 0;
+            p_LnxWrpFmDev->fmVspPhysBaseAddr = res.start;
+            p_LnxWrpFmDev->fmVspMemSize = res.end + 1 - res.start;
+        }
+    }
+#endif
+
     /* Get all PCD nodes */
     memset(&name, 0, sizeof(struct of_device_id));
     if (WARN_ON(strlen("parser") >= sizeof(name.name)))
@@ -730,6 +746,18 @@ static t_Error ConfigureFmDev(t_LnxWrpFmDev  *p_LnxWrpFmDev)
             RETURN_ERROR(MAJOR, E_INVALID_STATE, ("FM-RTC memory map"));
     }
 
+#if (DPAA_VERSION >= 11)
+    if (p_LnxWrpFmDev->fmVspPhysBaseAddr) {
+        dev_res = __devm_request_region(p_LnxWrpFmDev->dev, p_LnxWrpFmDev->res, p_LnxWrpFmDev->fmVspPhysBaseAddr, p_LnxWrpFmDev->fmVspMemSize, "fman-vsp");
+        if (unlikely(dev_res == NULL))
+            RETURN_ERROR(MAJOR, E_INVALID_STATE, ("__devm_request_region() failed"));
+
+        p_LnxWrpFmDev->fmVspBaseAddr = PTR_TO_UINT(devm_ioremap(p_LnxWrpFmDev->dev, p_LnxWrpFmDev->fmVspPhysBaseAddr, p_LnxWrpFmDev->fmVspMemSize));
+        if (unlikely(p_LnxWrpFmDev->fmVspBaseAddr == 0))
+	    RETURN_ERROR(MAJOR, E_INVALID_STATE, ("devm_ioremap() failed"));
+    }
+#endif
+
     p_LnxWrpFmDev->fmDevSettings.param.baseAddr     = p_LnxWrpFmDev->fmBaseAddr;
     p_LnxWrpFmDev->fmDevSettings.param.fmId         = p_LnxWrpFmDev->id;
     p_LnxWrpFmDev->fmDevSettings.param.irq          = NO_IRQ;
@@ -770,6 +798,14 @@ static t_Error InitFmDev(t_LnxWrpFmDev  *p_LnxWrpFmDev)
     }
 
     p_LnxWrpFmDev->fmDevSettings.param.h_FmMuram = p_LnxWrpFmDev->h_MuramDev;
+
+#if (DPAA_VERSION >= 11)
+    if (p_LnxWrpFmDev->fmVspBaseAddr) {
+        p_LnxWrpFmDev->fmDevSettings.param.vspBaseAddr = p_LnxWrpFmDev->fmVspBaseAddr;
+        p_LnxWrpFmDev->fmDevSettings.param.partVSPBase = 0;
+        p_LnxWrpFmDev->fmDevSettings.param.partNumOfVSPs = FM_VSP_MAX_NUM_OF_ENTRIES;
+    }
+#endif
 
     if ((p_LnxWrpFmDev->h_Dev = FM_Config(&p_LnxWrpFmDev->fmDevSettings.param)) == NULL)
         RETURN_ERROR(MAJOR, E_INVALID_HANDLE, ("FM"));
