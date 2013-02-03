@@ -58,51 +58,44 @@ void dtsec_start_rx(struct dtsec_regs *regs)
 	iowrite32be(ioread32be(&regs->rctrl) & ~RCTRL_GRS, &regs->rctrl);
 }
 
-
 void dtsec_defconfig(struct dtsec_cfg *cfg)
 {
-	cfg->halfdup_on = FALSE;
-	cfg->halfdup_retransmit = 0xf;
-	cfg->halfdup_coll_window = 0x37;
-	cfg->halfdup_excess_defer = TRUE;
-	cfg->halfdup_no_backoff = FALSE;
-	cfg->halfdup_bp_no_backoff = FALSE;
-	cfg->halfdup_alt_backoff_val = 0x0A;
-	cfg->halfdup_alt_backoff_en = FALSE;
-
-	cfg->rx_drop_bcast = FALSE;
-	cfg->rx_short_frm = TRUE;
-	cfg->rx_len_check = FALSE;
-	cfg->tx_pad_crc = TRUE;
-	cfg->tx_crc = FALSE;
-	cfg->rx_ctrl_acc = FALSE;
-	cfg->tx_pause_time = 0xf000;
-	cfg->tbipa = 5; /* PHY address 0 is reserved (DPAA RM)*/
-
-	cfg->rx_prepend = 0;
-
-	cfg->ptp_tsu_en = TRUE;
-	cfg->ptp_exception_en = TRUE;
-
-	cfg->preamble_len = 7;
-	cfg->rx_preamble = FALSE;
-	cfg->tx_preamble = FALSE;
-
-	cfg->loopback = FALSE;
-	cfg->rx_time_stamp_en = FALSE;
-	cfg->tx_time_stamp_en = FALSE;
-	cfg->rx_flow = TRUE;
-	cfg->tx_flow = TRUE;
-	cfg->rx_group_hash_exd = FALSE;
-	cfg->tx_pause_time_extd = 0;
-	cfg->rx_promisc = FALSE;
-	cfg->non_back_to_back_ipg1 = 0x40;
-	cfg->non_back_to_back_ipg2 = 0x60;
-	cfg->min_ifg_enforcement = 0x50;
-	cfg->back_to_back_ipg = 0x60;
-	cfg->maximum_frame = 0x600;
-
-	cfg->tbi_phy_addr = 5;
+	cfg->halfdup_on = DEFAULT_HALFDUP_ON;
+	cfg->halfdup_retransmit = DEFAULT_HALFDUP_RETRANSMIT;
+	cfg->halfdup_coll_window = DEFAULT_HALFDUP_COLL_WINDOW;
+	cfg->halfdup_excess_defer = DEFAULT_HALFDUP_EXCESS_DEFER;
+	cfg->halfdup_no_backoff = DEFAULT_HALFDUP_NO_BACKOFF;
+	cfg->halfdup_bp_no_backoff = DEFAULT_HALFDUP_BP_NO_BACKOFF;
+	cfg->halfdup_alt_backoff_val = DEFAULT_HALFDUP_ALT_BACKOFF_VAL;
+	cfg->halfdup_alt_backoff_en = DEFAULT_HALFDUP_ALT_BACKOFF_EN;
+	cfg->rx_drop_bcast = DEFAULT_RX_DROP_BCAST;
+	cfg->rx_short_frm = DEFAULT_RX_SHORT_FRM;
+	cfg->rx_len_check = DEFAULT_RX_LEN_CHECK;
+	cfg->tx_pad_crc = DEFAULT_TX_PAD_CRC;
+	cfg->tx_crc = DEFAULT_TX_CRC;
+	cfg->rx_ctrl_acc = DEFAULT_RX_CTRL_ACC;
+	cfg->tx_pause_time = DEFAULT_TX_PAUSE_TIME;
+	cfg->tbipa = DEFAULT_TBIPA; /* PHY address 0 is reserved (DPAA RM)*/
+	cfg->rx_prepend = DEFAULT_RX_PREPEND;
+	cfg->ptp_tsu_en = DEFAULT_PTP_TSU_EN;
+	cfg->ptp_exception_en = DEFAULT_PTP_EXCEPTION_EN;
+	cfg->preamble_len = DEFAULT_PREAMBLE_LEN;
+	cfg->rx_preamble = DEFAULT_RX_PREAMBLE;
+	cfg->tx_preamble = DEFAULT_TX_PREAMBLE;
+	cfg->loopback = DEFAULT_LOOPBACK;
+	cfg->rx_time_stamp_en = DEFAULT_RX_TIME_STAMP_EN;
+	cfg->tx_time_stamp_en = DEFAULT_TX_TIME_STAMP_EN;
+	cfg->rx_flow = DEFAULT_RX_FLOW;
+	cfg->tx_flow = DEFAULT_TX_FLOW;
+	cfg->rx_group_hash_exd = DEFAULT_RX_GROUP_HASH_EXD;
+	cfg->tx_pause_time_extd = DEFAULT_TX_PAUSE_TIME_EXTD;
+	cfg->rx_promisc = DEFAULT_RX_PROMISC;
+	cfg->non_back_to_back_ipg1 = DEFAULT_NON_BACK_TO_BACK_IPG1;
+	cfg->non_back_to_back_ipg2 = DEFAULT_NON_BACK_TO_BACK_IPG2;
+	cfg->min_ifg_enforcement = DEFAULT_MIN_IFG_ENFORCEMENT;
+	cfg->back_to_back_ipg = DEFAULT_BACK_TO_BACK_IPG;
+	cfg->maximum_frame = DEFAULT_MAXIMUM_FRAME;
+	cfg->tbi_phy_addr = DEFAULT_TBI_PHY_ADDR;
 }
 
 int dtsec_init(struct dtsec_regs *regs, struct dtsec_cfg *cfg,
@@ -129,32 +122,33 @@ UNUSED(fm_rev_maj);UNUSED(fm_rev_min);
 	tmp =  ioread32be(&regs->tsec_id2);
 
 	/* check RGMII support */
-	if (iface_mode == enet_if_rgmii ||
-			iface_mode == enet_if_rmii)
+	if (iface_mode == E_ENET_IF_RGMII ||
+			iface_mode == E_ENET_IF_RMII)
 		if (tmp & DTSEC_ID2_INT_REDUCED_OFF)
 			return -EINVAL;
 
-	if (iface_mode == enet_if_sgmii ||
-			iface_mode == enet_if_mii)
+	if (iface_mode == E_ENET_IF_SGMII ||
+			iface_mode == E_ENET_IF_MII)
 		if (tmp & DTSEC_ID2_INT_REDUCED_OFF)
 			return -EINVAL;
 
 	/***************ECNTRL************************/
 
-	is_rgmii = (bool)((iface_mode == enet_if_rgmii) ? TRUE : FALSE);
-	is_sgmii = (bool)((iface_mode == enet_if_sgmii) ? TRUE : FALSE);
-	is_qsgmii = (bool)((iface_mode == enet_if_qsgmii) ? TRUE : FALSE);
+	is_rgmii = (bool)((iface_mode == E_ENET_IF_RGMII) ? TRUE : FALSE);
+	is_sgmii = (bool)((iface_mode == E_ENET_IF_SGMII) ? TRUE : FALSE);
+	is_qsgmii = (bool)((iface_mode == E_ENET_IF_QSGMII) ? TRUE : FALSE);
 
 	tmp = 0;
-	if (is_rgmii || iface_mode == enet_if_gmii)
+	if (is_rgmii || iface_mode == E_ENET_IF_GMII)
 		tmp |= DTSEC_ECNTRL_GMIIM;
 	if (is_sgmii)
 		tmp |= (DTSEC_ECNTRL_SGMIIM | DTSEC_ECNTRL_TBIM);
 	if (is_qsgmii)
-		tmp |= (DTSEC_ECNTRL_SGMIIM | DTSEC_ECNTRL_TBIM | DTSEC_ECNTRL_QSGMIIM);
+		tmp |= (DTSEC_ECNTRL_SGMIIM | DTSEC_ECNTRL_TBIM |
+				DTSEC_ECNTRL_QSGMIIM);
 	if (is_rgmii)
 		tmp |= DTSEC_ECNTRL_RPM;
-	if (iface_speed == enet_speed_100)
+	if (iface_speed == E_ENET_SPEED_100)
 		tmp |= DTSEC_ECNTRL_R100M;
 
 	iowrite32be(tmp, &regs->ecntrl);
@@ -241,9 +235,9 @@ UNUSED(fm_rev_maj);UNUSED(fm_rev_min);
 	/***************MACCFG2***********************/
 	tmp = 0;
 
-	if (iface_speed < enet_speed_1000)
+	if (iface_speed < E_ENET_SPEED_1000)
 		tmp |= MACCFG2_NIBBLE_MODE;
-	else if (iface_speed == enet_speed_1000)
+	else if (iface_speed == E_ENET_SPEED_1000)
 		tmp |= MACCFG2_BYTE_MODE;
 
 	tmp |= ((uint32_t) cfg->preamble_len & 0x0000000f)
@@ -385,47 +379,6 @@ void dtsec_get_mac_address(struct dtsec_regs *regs, uint8_t *macaddr)
 	macaddr[5] = (uint8_t)((tmp1 & 0xff000000) >> 24);
 }
 
-int dtsec_compute_bucket(struct dtsec_regs *regs, unsigned char addr[6],
-			 int32_t *bucket)
-{
-	uint64_t _addr;
-	uint32_t crc;
-	bool ghtx;
-	bool mcast;
-
-	_addr = (*(uint64_t *)addr) >> 16;
-	ghtx = (bool)((ioread32be(&regs->rctrl) & RCTRL_GHTX) ? TRUE : FALSE);
-	mcast = (bool)((_addr & MAC_GROUP_ADDRESS) ? TRUE : FALSE);
-
-	if (ghtx && !mcast) /* Cannot handle unicast mac addr when GHTX is on */
-		return -EINVAL;
-
-
-	/* CRC calculation - returns 32 bit CRC */
-	crc = ether_crc(6, addr);
-
-	/* considering the 9 highest order bits in crc H[8:0]:
-	 * if ghtx = 0 H[8:6] (highest order 3 bits) identify the hash register
-	 * and H[5:1] (next 5 bits) identify the hash bit
-	 * if ghts = 1 H[8:5] (highest order 4 bits) identify the hash register
-	 * and H[4:0] (next 5 bits) identify the hash bit.
-	 *
-	 * In bucket index output the low 5 bits identify the hash register bit,
-	 * while the higher 4 bits identify the hash register
-	 */
-	if (ghtx)
-		*bucket = (int32_t)((crc >> 23) & 0x1ff);
-	else {
-		*bucket = (int32_t)((crc >> 24) & 0xff);
-	  /* if !ghtx and mcast the bit must be set in gaddr
-	   * instead of igaddr.
-	   */
-	  if (mcast)
-		*bucket += 0x100;
-	}
-	return 0;
-}
-
 void dtsec_set_bucket(struct dtsec_regs *regs, int bucket, bool enable)
 {
 	int reg_idx = (bucket >> 5) & 0xf;
@@ -478,8 +431,7 @@ int dtsec_adjust_link(struct dtsec_regs *regs,
 {
 	uint32_t		tmp;
 
-	if ((iface_mode == enet_if_xgmii || iface_mode == enet_if_sgmii ||
-		iface_mode == enet_if_qsgmii) && !full_dx)
+	if ((speed == E_ENET_SPEED_1000) && !full_dx)
 		return -EINVAL;
 
 	tmp = ioread32be(&regs->maccfg2);
@@ -489,14 +441,14 @@ int dtsec_adjust_link(struct dtsec_regs *regs,
 		tmp |= MACCFG2_FULL_DUPLEX;
 
 	tmp &= ~(MACCFG2_NIBBLE_MODE | MACCFG2_BYTE_MODE);
-	if (speed < enet_speed_1000)
+	if (speed < E_ENET_SPEED_1000)
 		tmp |= MACCFG2_NIBBLE_MODE;
-	else if (speed == enet_speed_1000)
+	else if (speed == E_ENET_SPEED_1000)
 		tmp |= MACCFG2_BYTE_MODE;
 	iowrite32be(tmp, &regs->maccfg2);
 
 	tmp = ioread32be(&regs->ecntrl);
-	if (speed == enet_speed_100)
+	if (speed == E_ENET_SPEED_100)
 		tmp |= DTSEC_ECNTRL_R100M;
 	else
 		tmp &= ~DTSEC_ECNTRL_R100M;
@@ -552,13 +504,14 @@ bool dtsec_get_clear_carry_regs(struct dtsec_regs *regs,
 void dtsec_reset_stat(struct dtsec_regs *regs)
 {
 	/* clear HW counters */
-	iowrite32be(ioread32be(&regs->ecntrl) | DTSEC_ECNTRL_CLRCNT, &regs->ecntrl);
+	iowrite32be(ioread32be(&regs->ecntrl) |
+			DTSEC_ECNTRL_CLRCNT, &regs->ecntrl);
 }
 
 int dtsec_set_stat_level(struct dtsec_regs *regs, enum mac_stat_level level)
 {
 	switch (level) {
-	case mac_stat_none:
+	case E_MAC_STAT_NONE:
 		iowrite32be(0xffffffff, &regs->cam1);
 		iowrite32be(0xffffffff, &regs->cam2);
 		iowrite32be(ioread32be(&regs->ecntrl) & ~DTSEC_ECNTRL_STEN,
@@ -566,7 +519,7 @@ int dtsec_set_stat_level(struct dtsec_regs *regs, enum mac_stat_level level)
 		iowrite32be(ioread32be(&regs->imask) & ~DTSEC_IMASK_MSROEN,
 				&regs->imask);
 		break;
-	case mac_stat_partial:
+	case E_MAC_STAT_PARTIAL:
 		iowrite32be(CAM1_ERRORS_ONLY, &regs->cam1);
 		iowrite32be(CAM2_ERRORS_ONLY, &regs->cam2);
 		iowrite32be(ioread32be(&regs->ecntrl) | DTSEC_ECNTRL_STEN,
@@ -574,7 +527,7 @@ int dtsec_set_stat_level(struct dtsec_regs *regs, enum mac_stat_level level)
 		iowrite32be(ioread32be(&regs->imask) | DTSEC_IMASK_MSROEN,
 				&regs->imask);
 		break;
-	case mac_stat_mib_grp1:
+	case E_MAC_STAT_MIB_GRP1:
 		iowrite32be((uint32_t)~CAM1_MIB_GRP_1, &regs->cam1);
 		iowrite32be((uint32_t)~CAM2_MIB_GRP_1, &regs->cam2);
 		iowrite32be(ioread32be(&regs->ecntrl) | DTSEC_ECNTRL_STEN,
@@ -582,7 +535,7 @@ int dtsec_set_stat_level(struct dtsec_regs *regs, enum mac_stat_level level)
 		iowrite32be(ioread32be(&regs->imask) | DTSEC_IMASK_MSROEN,
 				&regs->imask);
 		break;
-	case mac_stat_full:
+	case E_MAC_STAT_FULL:
 		iowrite32be(0, &regs->cam1);
 		iowrite32be(0, &regs->cam2);
 		iowrite32be(ioread32be(&regs->ecntrl) | DTSEC_ECNTRL_STEN,
@@ -633,33 +586,28 @@ void dtsec_clear_addr_in_paddr(struct dtsec_regs *regs, uint8_t paddr_num)
     iowrite32be(0, &regs->macaddr[paddr_num].exact_match2);
 }
 
-/* ........................................................................... */
-
 void dtsec_add_addr_in_paddr(struct dtsec_regs *regs,
-                             uint64_t addr,
-                             uint8_t paddr_num)
+				uint64_t addr,
+				uint8_t paddr_num)
 {
-    uint32_t tmp;
+	uint32_t tmp;
 
-    tmp = (uint32_t)(addr);
-    /* swap */
-    tmp = (((tmp & 0x000000FF) << 24) |
-           ((tmp & 0x0000FF00) <<  8) |
-           ((tmp & 0x00FF0000) >>  8) |
-           ((tmp & 0xFF000000) >> 24));
-    iowrite32be(tmp, &regs->macaddr[paddr_num].exact_match1);
+	tmp = (uint32_t)(addr);
+	/* swap */
+	tmp = (((tmp & 0x000000FF) << 24) |
+		((tmp & 0x0000FF00) <<  8) |
+		((tmp & 0x00FF0000) >>  8) |
+		((tmp & 0xFF000000) >> 24));
+	iowrite32be(tmp, &regs->macaddr[paddr_num].exact_match1);
 
-    tmp = (uint32_t)(addr>>32);
-    /* swap */
-    tmp = (((tmp & 0x000000FF) << 24) |
-           ((tmp & 0x0000FF00) <<  8) |
-           ((tmp & 0x00FF0000) >>  8) |
-           ((tmp & 0xFF000000) >> 24));
-    iowrite32be(tmp, &regs->macaddr[paddr_num].exact_match2);
+	tmp = (uint32_t)(addr>>32);
+	/* swap */
+	tmp = (((tmp & 0x000000FF) << 24) |
+		((tmp & 0x0000FF00) <<  8) |
+		((tmp & 0x00FF0000) >>  8) |
+		((tmp & 0xFF000000) >> 24));
+	iowrite32be(tmp, &regs->macaddr[paddr_num].exact_match2);
 }
-
-/* ........................................................................... */
-
 
 void dtsec_disable(struct dtsec_regs *regs, bool apply_rx, bool apply_tx)
 {
@@ -678,7 +626,7 @@ void dtsec_disable(struct dtsec_regs *regs, bool apply_rx, bool apply_tx)
 
 void dtsec_set_tx_pause_time(struct dtsec_regs *regs, uint16_t time)
 {
-	uint32_t		ptv = 0;
+	uint32_t ptv = 0;
 
 	/* fixme: don't enable tx pause for half-duplex */
 
@@ -698,7 +646,7 @@ void dtsec_set_tx_pause_time(struct dtsec_regs *regs, uint16_t time)
 
 void dtsec_handle_rx_pause(struct dtsec_regs *regs, bool en)
 {
-	uint32_t		tmp;
+	uint32_t tmp;
 
 	/* todo: check if mac is set to full-duplex */
 
@@ -708,6 +656,11 @@ void dtsec_handle_rx_pause(struct dtsec_regs *regs, bool en)
 	else
 		tmp &= ~MACCFG1_RX_FLOW;
 	iowrite32be(tmp, &regs->maccfg1);
+}
+
+uint32_t dtsec_get_rctrl(struct dtsec_regs *regs)
+{
+	return ioread32be(&regs->rctrl);
 }
 
 uint32_t dtsec_get_revision(struct dtsec_regs *regs)
@@ -745,13 +698,13 @@ uint32_t dtsec_check_and_clear_tmr_event(struct dtsec_regs *regs)
 void dtsec_enable_tmr_interrupt(struct dtsec_regs *regs)
 {
 	iowrite32be(ioread32be(&regs->tmr_pemask) | TMR_PEMASK_TSREEN,
-		    &regs->tmr_pemask);
+			&regs->tmr_pemask);
 }
 
 void dtsec_disable_tmr_interrupt(struct dtsec_regs *regs)
 {
 	iowrite32be(ioread32be(&regs->tmr_pemask) & ~TMR_PEMASK_TSREEN,
-		    &regs->tmr_pemask);
+			&regs->tmr_pemask);
 }
 
 void dtsec_enable_interrupt(struct dtsec_regs *regs, uint32_t ev_mask)

@@ -324,7 +324,10 @@ t_Error FmPortImInit(t_FmPort *p_FmPort)
     if ((p_FmPort->portType == e_FM_PORT_TYPE_RX) ||
         (p_FmPort->portType == e_FM_PORT_TYPE_RX_10G))
     {
-        p_FmPort->im.p_BdRing = (t_FmImBd *)XX_MallocSmart((uint32_t)(sizeof(t_FmImBd)*p_FmPort->im.bdRingSize), p_FmPort->im.fwExtStructsMemId, 4);
+        p_FmPort->im.p_BdRing =
+            (t_FmImBd *)XX_MallocSmart((uint32_t)(sizeof(t_FmImBd)*p_FmPort->im.bdRingSize),
+                                       p_FmPort->im.fwExtStructsMemId,
+                                       4);
         if (!p_FmPort->im.p_BdRing)
             RETURN_ERROR(MAJOR, E_NO_MEMORY, ("Independent-Mode Rx BD ring!!!"));
         IOMemSet32(p_FmPort->im.p_BdRing, 0, (uint32_t)(sizeof(t_FmImBd)*p_FmPort->im.bdRingSize));

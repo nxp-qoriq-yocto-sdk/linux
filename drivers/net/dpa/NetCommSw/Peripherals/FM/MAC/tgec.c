@@ -43,6 +43,7 @@
 #include "xx_ext.h"
 #include "endian_ext.h"
 #include "debug_ext.h"
+#include "crc_mac_addr_ext.h"
 
 #include "fm_common.h"
 #include "fsl_fman_tgec.h"
@@ -75,7 +76,21 @@ static t_Error CheckInitParameters(t_Tgec    *p_Tgec)
     return E_OK;
 }
 
-/* .............................................................................. */
+/* ......................................................................... */
+
+static uint32_t GetMacAddrHashCode(uint64_t ethAddr)
+{
+    uint32_t crc;
+
+    /* CRC calculation */
+    GET_MAC_ADDR_CRC(ethAddr, crc);
+
+    crc = GetMirror32(crc);
+
+    return crc;
+}
+
+/* ......................................................................... */
 
 static void TgecErrException(t_Handle h_Tgec)
 {
@@ -121,6 +136,8 @@ static void TgecErrException(t_Handle h_Tgec)
         p_Tgec->f_Exception(p_Tgec->h_App, e_FM_MAC_EX_10G_RX_ALIGN_ER);
 }
 
+/* ......................................................................... */
+
 static void TgecException(t_Handle h_Tgec)
 {
      t_Tgec             *p_Tgec = (t_Tgec *)h_Tgec;
@@ -138,6 +155,8 @@ static void TgecException(t_Handle h_Tgec)
      if (event & TGEC_IMASK_MDIO_CMD_CMPL)
          p_Tgec->f_Event(p_Tgec->h_App, e_FM_MAC_EX_10G_MDIO_CMD_CMPL);
 }
+
+/* ......................................................................... */
 
 static void FreeInitResources(t_Tgec *p_Tgec)
 {
@@ -159,14 +178,12 @@ static void FreeInitResources(t_Tgec *p_Tgec)
     p_Tgec->p_UnicastAddrHash =     NULL;
 }
 
-/* ........................................................................... */
-
 
 /*****************************************************************************/
 /*                     10G MAC API routines                                  */
 /*****************************************************************************/
 
-/* .............................................................................. */
+/* ......................................................................... */
 
 static t_Error TgecEnable(t_Handle h_Tgec,  e_CommMode mode)
 {
@@ -180,7 +197,7 @@ static t_Error TgecEnable(t_Handle h_Tgec,  e_CommMode mode)
     return E_OK;
 }
 
-/* .............................................................................. */
+/* ......................................................................... */
 
 static t_Error TgecDisable (t_Handle h_Tgec, e_CommMode mode)
 {
@@ -194,7 +211,7 @@ static t_Error TgecDisable (t_Handle h_Tgec, e_CommMode mode)
     return E_OK;
 }
 
-/* .............................................................................. */
+/* ......................................................................... */
 
 static t_Error TgecSetPromiscuous(t_Handle h_Tgec, bool newVal)
 {
@@ -213,7 +230,7 @@ static t_Error TgecSetPromiscuous(t_Handle h_Tgec, bool newVal)
 /*                      Tgec Configs modification functions                 */
 /*****************************************************************************/
 
-/* .............................................................................. */
+/* ......................................................................... */
 
 static t_Error TgecConfigLoopback(t_Handle h_Tgec, bool newVal)
 {
@@ -227,7 +244,7 @@ static t_Error TgecConfigLoopback(t_Handle h_Tgec, bool newVal)
     return E_OK;
 }
 
-/* .............................................................................. */
+/* ......................................................................... */
 
 static t_Error TgecConfigWan(t_Handle h_Tgec, bool newVal)
 {
@@ -241,7 +258,7 @@ static t_Error TgecConfigWan(t_Handle h_Tgec, bool newVal)
     return E_OK;
 }
 
-/* .............................................................................. */
+/* ......................................................................... */
 
 static t_Error TgecConfigMaxFrameLength(t_Handle h_Tgec, uint16_t newVal)
 {
@@ -255,7 +272,7 @@ static t_Error TgecConfigMaxFrameLength(t_Handle h_Tgec, uint16_t newVal)
     return E_OK;
 }
 
-/* .............................................................................. */
+/* ......................................................................... */
 
 static t_Error TgecConfigLengthCheck(t_Handle h_Tgec, bool newVal)
 {
@@ -271,7 +288,7 @@ static t_Error TgecConfigLengthCheck(t_Handle h_Tgec, bool newVal)
     return E_OK;
 }
 
-/* .............................................................................. */
+/* ......................................................................... */
 
 static t_Error TgecConfigException(t_Handle h_Tgec, e_FmMacExceptions exception, bool enable)
 {
@@ -296,7 +313,7 @@ static t_Error TgecConfigException(t_Handle h_Tgec, e_FmMacExceptions exception,
 }
 
 #ifdef FM_TX_ECC_FRMS_ERRATA_10GMAC_A004
-/* .............................................................................. */
+/* ......................................................................... */
 
 static t_Error TgecConfigSkipFman11Workaround(t_Handle h_Tgec)
 {
@@ -316,7 +333,7 @@ static t_Error TgecConfigSkipFman11Workaround(t_Handle h_Tgec)
 /*                      Tgec Run Time API functions                         */
 /*****************************************************************************/
 
-/* .............................................................................. */
+/* ......................................................................... */
 /* backward compatibility. will be removed in the future. */
 static t_Error TgecTxMacPause(t_Handle h_Tgec, uint16_t pauseTime)
 {
@@ -324,11 +341,13 @@ static t_Error TgecTxMacPause(t_Handle h_Tgec, uint16_t pauseTime)
 
     SANITY_CHECK_RETURN_ERROR(p_Tgec, E_INVALID_STATE);
     SANITY_CHECK_RETURN_ERROR(!p_Tgec->p_TgecDriverParam, E_INVALID_STATE);
-
     tgec_tx_mac_pause(p_Tgec->p_MemMap, pauseTime);
+
 
     return E_OK;
 }
+
+/* ......................................................................... */
 
 static t_Error TgecSetTxPauseFrames(t_Handle h_Tgec,
                                     uint8_t  priority,
@@ -347,7 +366,7 @@ static t_Error TgecSetTxPauseFrames(t_Handle h_Tgec,
     return E_OK;
 }
 
-/* .............................................................................. */
+/* ......................................................................... */
 
 static t_Error TgecRxIgnoreMacPause(t_Handle h_Tgec, bool en)
 {
@@ -361,7 +380,7 @@ static t_Error TgecRxIgnoreMacPause(t_Handle h_Tgec, bool en)
     return E_OK;
 }
 
-/* .............................................................................. */
+/* ......................................................................... */
 
 static t_Error TgecGetStatistics(t_Handle h_Tgec, t_FmMacStatistics *p_Statistics)
 {
@@ -396,27 +415,29 @@ static t_Error TgecGetStatistics(t_Handle h_Tgec, t_FmMacStatistics *p_Statistic
 
 /* MIB II */
     p_Statistics->ifInOctets            = tgec_get_counter(p_TgecMemMap, E_TGEC_COUNTER_ROCT);
+    p_Statistics->ifInUcastPkts         = tgec_get_counter(p_TgecMemMap, E_TGEC_COUNTER_RUCA);
     p_Statistics->ifInMcastPkts         = tgec_get_counter(p_TgecMemMap, E_TGEC_COUNTER_RMCA);
     p_Statistics->ifInBcastPkts         = tgec_get_counter(p_TgecMemMap, E_TGEC_COUNTER_RBCA);
-    p_Statistics->ifInPkts              = tgec_get_counter(p_TgecMemMap, E_TGEC_COUNTER_RUCA)
+    p_Statistics->ifInPkts              = p_Statistics->ifInUcastPkts
                                         + p_Statistics->ifInMcastPkts
                                         + p_Statistics->ifInBcastPkts;
     p_Statistics->ifInDiscards          = 0;
     p_Statistics->ifInErrors            = tgec_get_counter(p_TgecMemMap, E_TGEC_COUNTER_RERR);
 
     p_Statistics->ifOutOctets           = tgec_get_counter(p_TgecMemMap, E_TGEC_COUNTER_TOCT);
+    p_Statistics->ifOutUcastPkts        = tgec_get_counter(p_TgecMemMap, E_TGEC_COUNTER_TUCA);
     p_Statistics->ifOutMcastPkts        = tgec_get_counter(p_TgecMemMap, E_TGEC_COUNTER_TMCA);
     p_Statistics->ifOutBcastPkts        = tgec_get_counter(p_TgecMemMap, E_TGEC_COUNTER_TBCA);
-    p_Statistics->ifOutPkts             = tgec_get_counter(p_TgecMemMap, E_TGEC_COUNTER_TUCA)
-                                            + p_Statistics->ifOutMcastPkts
-                                            + p_Statistics->ifOutBcastPkts;
+    p_Statistics->ifOutPkts             = p_Statistics->ifOutUcastPkts
+                                        + p_Statistics->ifOutMcastPkts
+                                        + p_Statistics->ifOutBcastPkts;
     p_Statistics->ifOutDiscards         = 0;
     p_Statistics->ifOutErrors           = tgec_get_counter(p_TgecMemMap, E_TGEC_COUNTER_TERR);
 
     return E_OK;
 }
 
-/* .............................................................................. */
+/* ......................................................................... */
 
 static t_Error TgecEnable1588TimeStamp(t_Handle h_Tgec)
 {
@@ -430,7 +451,7 @@ static t_Error TgecEnable1588TimeStamp(t_Handle h_Tgec)
     return E_OK;
 }
 
-/* .............................................................................. */
+/* ......................................................................... */
 
 static t_Error TgecDisable1588TimeStamp(t_Handle h_Tgec)
 {
@@ -444,7 +465,7 @@ static t_Error TgecDisable1588TimeStamp(t_Handle h_Tgec)
     return E_OK;
 }
 
-/* .............................................................................. */
+/* ......................................................................... */
 
 static t_Error TgecModifyMacAddress (t_Handle h_Tgec, t_EnetAddr *p_EnetAddr)
 {
@@ -459,7 +480,7 @@ static t_Error TgecModifyMacAddress (t_Handle h_Tgec, t_EnetAddr *p_EnetAddr)
     return E_OK;
 }
 
-/* .............................................................................. */
+/* ......................................................................... */
 
 static t_Error TgecResetCounters (t_Handle h_Tgec)
 {
@@ -473,7 +494,7 @@ static t_Error TgecResetCounters (t_Handle h_Tgec)
     return E_OK;
 }
 
-/* .............................................................................. */
+/* ......................................................................... */
 
 static t_Error TgecAddExactMatchMacAddress(t_Handle h_Tgec, t_EnetAddr *p_EthAddr)
 {
@@ -518,7 +539,7 @@ static t_Error TgecAddExactMatchMacAddress(t_Handle h_Tgec, t_EnetAddr *p_EthAdd
     RETURN_ERROR(MAJOR, E_FULL, NO_MSG);
 }
 
-/* .............................................................................. */
+/* ......................................................................... */
 
 static t_Error TgecDelExactMatchMacAddress(t_Handle h_Tgec, t_EnetAddr *p_EthAddr)
 {
@@ -550,7 +571,7 @@ static t_Error TgecDelExactMatchMacAddress(t_Handle h_Tgec, t_EnetAddr *p_EthAdd
     RETURN_ERROR(MAJOR, E_NOT_FOUND, NO_MSG);
 }
 
-/* .............................................................................. */
+/* ......................................................................... */
 
 static t_Error TgecAddHashMacAddress(t_Handle h_Tgec, t_EnetAddr *p_EthAddr)
 {
@@ -570,7 +591,7 @@ static t_Error TgecAddHashMacAddress(t_Handle h_Tgec, t_EnetAddr *p_EthAddr)
         RETURN_ERROR(MAJOR, E_NOT_SUPPORTED, ("Unicast Address"));
 
     /* CRC calculation */
-    crc = get_mac_addr_crc(ethAddr);
+    crc = GetMacAddrHashCode(ethAddr);
 
     hash = (crc >> TGEC_HASH_MCAST_SHIFT) & TGEC_HASH_ADR_MSK;        /* Take 9 MSB bits */
 
@@ -585,7 +606,7 @@ static t_Error TgecAddHashMacAddress(t_Handle h_Tgec, t_EnetAddr *p_EthAddr)
     return E_OK;
 }
 
-/* .............................................................................. */
+/* ......................................................................... */
 
 static t_Error TgecDelHashMacAddress(t_Handle h_Tgec, t_EnetAddr *p_EthAddr)
 {
@@ -602,7 +623,7 @@ static t_Error TgecDelHashMacAddress(t_Handle h_Tgec, t_EnetAddr *p_EthAddr)
     ethAddr = ((*(uint64_t *)p_EthAddr) >> 16);
 
     /* CRC calculation */
-    crc = get_mac_addr_crc(ethAddr);
+    crc = GetMacAddrHashCode(ethAddr);
 
     hash = (crc >> TGEC_HASH_MCAST_SHIFT) & TGEC_HASH_ADR_MSK;        /* Take 9 MSB bits */
 
@@ -622,7 +643,7 @@ static t_Error TgecDelHashMacAddress(t_Handle h_Tgec, t_EnetAddr *p_EthAddr)
     return E_OK;
 }
 
-/* .............................................................................. */
+/* ......................................................................... */
 
 static t_Error TgecGetId(t_Handle h_Tgec, uint32_t *macId)
 {
@@ -636,7 +657,7 @@ static t_Error TgecGetId(t_Handle h_Tgec, uint32_t *macId)
     RETURN_ERROR(MINOR, E_NOT_SUPPORTED, ("TgecGetId Not Supported"));
 }
 
-/* .............................................................................. */
+/* ......................................................................... */
 
 static t_Error TgecGetVersion(t_Handle h_Tgec, uint32_t *macVersion)
 {
@@ -650,7 +671,7 @@ static t_Error TgecGetVersion(t_Handle h_Tgec, uint32_t *macVersion)
     return E_OK;
 }
 
-/* .............................................................................. */
+/* ......................................................................... */
 
 static t_Error TgecSetExcpetion(t_Handle h_Tgec, e_FmMacExceptions exception, bool enable)
 {
@@ -679,7 +700,7 @@ static t_Error TgecSetExcpetion(t_Handle h_Tgec, e_FmMacExceptions exception, bo
     return E_OK;
 }
 
-/* .............................................................................. */
+/* ......................................................................... */
 
 static uint16_t TgecGetMaxFrameLength(t_Handle h_Tgec)
 {
@@ -691,7 +712,7 @@ static uint16_t TgecGetMaxFrameLength(t_Handle h_Tgec)
     return tgec_get_max_frame_len(p_Tgec->p_MemMap);
 }
 
-/* .............................................................................. */
+/* ......................................................................... */
 
 #ifdef FM_TX_ECC_FRMS_ERRATA_10GMAC_A004
 static t_Error TgecTxEccWorkaround(t_Tgec *p_Tgec)
@@ -699,7 +720,7 @@ static t_Error TgecTxEccWorkaround(t_Tgec *p_Tgec)
     t_Error err;
 
 #if defined(DEBUG_ERRORS) && (DEBUG_ERRORS > 0)
-    XX_Print("Applying 10G TX ECC workaround (10GMAC-A004) ...");
+    XX_Print("Applying 10G TX ECC workaround (10GMAC-A004) ... ");
 #endif /* (DEBUG_ERRORS > 0) */
     /* enable and set promiscuous */
     tgec_enable(p_Tgec->p_MemMap, TRUE, TRUE);
@@ -720,7 +741,7 @@ static t_Error TgecTxEccWorkaround(t_Tgec *p_Tgec)
 }
 #endif /* FM_TX_ECC_FRMS_ERRATA_10GMAC_A004 */
 
-/* .............................................................................. */
+/* ......................................................................... */
 
 #if (defined(DEBUG_ERRORS) && (DEBUG_ERRORS > 0))
 static t_Error TgecDumpRegs(t_Handle h_Tgec)
@@ -733,7 +754,6 @@ static t_Error TgecDumpRegs(t_Handle h_Tgec)
     {
         DUMP_TITLE(p_Tgec->p_MemMap, ("10G MAC %d: ", p_Tgec->macId));
         DUMP_VAR(p_Tgec->p_MemMap, tgec_id);
-        DUMP_VAR(p_Tgec->p_MemMap, scratch);
         DUMP_VAR(p_Tgec->p_MemMap, command_config);
         DUMP_VAR(p_Tgec->p_MemMap, mac_addr_0);
         DUMP_VAR(p_Tgec->p_MemMap, mac_addr_1);
@@ -769,7 +789,7 @@ static t_Error TgecDumpRegs(t_Handle h_Tgec)
 /*                      FM Init & Free API                                   */
 /*****************************************************************************/
 
-/* .............................................................................. */
+/* ......................................................................... */
 
 static t_Error TgecInit(t_Handle h_Tgec)
 {
@@ -810,8 +830,21 @@ static t_Error TgecInit(t_Handle h_Tgec)
     }
 #endif /* FM_10G_REM_N_LCL_FLT_EX_10GMAC_ERRATA_SW005 */
 
+#ifdef FM_TX_ECC_FRMS_ERRATA_10GMAC_A004
+    if (p_Tgec->fmMacControllerDriver.fmRevInfo.majorRev <= 6 /*fixed for rev3 */)
+    {
+        if (!p_Tgec->p_TgecDriverParam->skip_fman11_workaround &&
+            ((err = TgecTxEccWorkaround(p_Tgec)) != E_OK))
+        {
+            FreeInitResources(p_Tgec);
+            REPORT_ERROR(MINOR, err, ("TgecTxEccWorkaround FAILED"));
+        }
+    }
+#endif /* FM_TX_ECC_FRMS_ERRATA_10GMAC_A004 */
+
     err = tgec_init(p_Tgec->p_MemMap, p_TgecDriverParam, p_Tgec->exceptions);
-    if (err) {
+    if (err)
+    {
         FreeInitResources(p_Tgec);
         RETURN_ERROR(MAJOR, err, ("This TGEC version does not support the required i/f mode"));
     }
@@ -821,13 +854,8 @@ static t_Error TgecInit(t_Handle h_Tgec)
                            e_FM_MAC_10G,
                            p_Tgec->fmMacControllerDriver.macId,
                            p_TgecDriverParam->max_frame_length);
-/* we consider having no IPC a non crasher... */
-/*    if (err)
-    {
-        FreeInitResources(p_Tgec);
-        RETURN_ERROR(MAJOR, err, NO_MSG);
-    }
-*/
+    /* we consider having no IPC a non crasher... */
+
 #ifdef FM_TX_FIFO_CORRUPTION_ERRATA_10GMAC_A007
     if (p_Tgec->fmMacControllerDriver.fmRevInfo.majorRev == 2)
         tgec_fm_tx_fifo_corruption_errata_10gmac_a007(p_Tgec->p_MemMap);
@@ -867,7 +895,7 @@ static t_Error TgecInit(t_Handle h_Tgec)
     return E_OK;
 }
 
-/* .............................................................................. */
+/* ......................................................................... */
 
 static t_Error TgecFree(t_Handle h_Tgec)
 {
@@ -887,7 +915,7 @@ static t_Error TgecFree(t_Handle h_Tgec)
     return E_OK;
 }
 
-/* .............................................................................. */
+/* ......................................................................... */
 
 static void InitFmMacControllerDriver(t_FmMacControllerDriver *p_FmMacControllerDriver)
 {
@@ -951,7 +979,7 @@ static void InitFmMacControllerDriver(t_FmMacControllerDriver *p_FmMacController
 /*                      Tgec Config  Main Entry                             */
 /*****************************************************************************/
 
-/* .............................................................................. */
+/* ......................................................................... */
 
 t_Handle TGEC_Config(t_FmMacParams *p_FmMacParam)
 {

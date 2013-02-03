@@ -1351,6 +1351,18 @@ t_Handle FM_PCD_NetEnvCharacteristicsSet(t_Handle h_FmPcd, t_FmPcdNetEnvParams  
                 p_FmPcd->netEnvs[netEnvCurrId].units[i].hdrs[k].hdr = HEADER_TYPE_USER_DEFINED_SHIM1;
                 p_FmPcd->netEnvs[netEnvCurrId].units[i].hdrs[k].opt = 0;
             }
+#ifdef FM_CAPWAP_SUPPORT
+            /* UDP_LITE  */
+            if (p_FmPcd->netEnvs[netEnvCurrId].units[i].hdrs[k].hdr == HEADER_TYPE_UDP_LITE)
+            {
+                /* IPSec UDP encapsulation is currently set to use SHIM1 */
+                p_FmPcd->netEnvs[netEnvCurrId].aliasHdrs[specialUnits].hdr = HEADER_TYPE_UDP_LITE;
+                p_FmPcd->netEnvs[netEnvCurrId].aliasHdrs[specialUnits++].aliasHdr = HEADER_TYPE_UDP;
+                p_FmPcd->netEnvs[netEnvCurrId].units[i].hdrs[k].hdr = HEADER_TYPE_UDP;
+                p_FmPcd->netEnvs[netEnvCurrId].units[i].hdrs[k].opt = 0;
+            }
+#endif /* FM_CAPWAP_SUPPORT */
+
             /* IP FRAG  */
             if ((p_FmPcd->netEnvs[netEnvCurrId].units[i].hdrs[k].hdr == HEADER_TYPE_IPv4) &&
                 (p_FmPcd->netEnvs[netEnvCurrId].units[i].hdrs[k].opt == IPV4_FRAG_1))
@@ -1662,41 +1674,41 @@ uint32_t FM_PCD_GetCounter(t_Handle h_FmPcd, e_FmPcdCounters counter)
     {
         /* Parser statistics */
         case (e_FM_PCD_PRS_COUNTERS_PARSE_DISPATCH):
-               return GET_UINT32(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs->pds);
+               return GET_UINT32(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs->fmpr_pds);
         case (e_FM_PCD_PRS_COUNTERS_L2_PARSE_RESULT_RETURNED):
-               return GET_UINT32(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs->l2rrs);
+               return GET_UINT32(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs->fmpr_l2rrs);
         case (e_FM_PCD_PRS_COUNTERS_L3_PARSE_RESULT_RETURNED):
-               return GET_UINT32(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs->l3rrs);
+               return GET_UINT32(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs->fmpr_l3rrs);
         case (e_FM_PCD_PRS_COUNTERS_L4_PARSE_RESULT_RETURNED):
-               return GET_UINT32(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs->l4rrs);
+               return GET_UINT32(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs->fmpr_l4rrs);
         case (e_FM_PCD_PRS_COUNTERS_SHIM_PARSE_RESULT_RETURNED):
-               return GET_UINT32(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs->srrs);
+               return GET_UINT32(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs->fmpr_srrs);
         case (e_FM_PCD_PRS_COUNTERS_L2_PARSE_RESULT_RETURNED_WITH_ERR):
-               return GET_UINT32(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs->l2rres);
+               return GET_UINT32(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs->fmpr_l2rres);
         case (e_FM_PCD_PRS_COUNTERS_L3_PARSE_RESULT_RETURNED_WITH_ERR):
-               return GET_UINT32(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs->l3rres);
+               return GET_UINT32(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs->fmpr_l3rres);
         case (e_FM_PCD_PRS_COUNTERS_L4_PARSE_RESULT_RETURNED_WITH_ERR):
-               return GET_UINT32(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs->l4rres);
+               return GET_UINT32(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs->fmpr_l4rres);
         case (e_FM_PCD_PRS_COUNTERS_SHIM_PARSE_RESULT_RETURNED_WITH_ERR):
-               return GET_UINT32(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs->srres);
+               return GET_UINT32(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs->fmpr_srres);
         case (e_FM_PCD_PRS_COUNTERS_SOFT_PRS_CYCLES):
-               return GET_UINT32(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs->spcs);
+               return GET_UINT32(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs->fmpr_spcs);
         case (e_FM_PCD_PRS_COUNTERS_SOFT_PRS_STALL_CYCLES):
-               return GET_UINT32(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs->spscs);
+               return GET_UINT32(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs->fmpr_spscs);
         case (e_FM_PCD_PRS_COUNTERS_HARD_PRS_CYCLE_INCL_STALL_CYCLES):
-               return GET_UINT32(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs->hxscs);
+               return GET_UINT32(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs->fmpr_hxscs);
         case (e_FM_PCD_PRS_COUNTERS_MURAM_READ_CYCLES):
-               return GET_UINT32(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs->mrcs);
+               return GET_UINT32(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs->fmpr_mrcs);
         case (e_FM_PCD_PRS_COUNTERS_MURAM_READ_STALL_CYCLES):
-               return GET_UINT32(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs->mrscs);
+               return GET_UINT32(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs->fmpr_mrscs);
         case (e_FM_PCD_PRS_COUNTERS_MURAM_WRITE_CYCLES):
-               return GET_UINT32(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs->mwcs);
+               return GET_UINT32(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs->fmpr_mwcs);
         case (e_FM_PCD_PRS_COUNTERS_MURAM_WRITE_STALL_CYCLES):
-               return GET_UINT32(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs->mwscs);
+               return GET_UINT32(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs->fmpr_mwscs);
         case (e_FM_PCD_PRS_COUNTERS_FPM_COMMAND_STALL_CYCLES):
-               return GET_UINT32(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs->fcscs);
+               return GET_UINT32(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs->fmpr_fcscs);
         case (e_FM_PCD_KG_COUNTERS_TOTAL):
-               return GET_UINT32(p_FmPcd->p_FmPcdKg->p_FmPcdKgRegs->kgtpc);
+               return GET_UINT32(p_FmPcd->p_FmPcdKg->p_FmPcdKgRegs->fmkg_tpc);
 
         /* Policer statistics */
         case (e_FM_PCD_PLCR_COUNTERS_YELLOW):
@@ -1800,36 +1812,36 @@ t_Error FM_PCD_SetException(t_Handle h_FmPcd, e_FmPcdExceptions exception, bool 
         switch (exception)
         {
             case (e_FM_PCD_KG_EXCEPTION_DOUBLE_ECC):
-                tmpReg = GET_UINT32(p_FmPcd->p_FmPcdKg->p_FmPcdKgRegs->kgeeer);
+                tmpReg = GET_UINT32(p_FmPcd->p_FmPcdKg->p_FmPcdKgRegs->fmkg_eeer);
                 if (enable)
-                    tmpReg |= FM_PCD_KG_DOUBLE_ECC;
+                    tmpReg |= FM_EX_KG_DOUBLE_ECC;
                 else
-                    tmpReg &= ~FM_PCD_KG_DOUBLE_ECC;
-                WRITE_UINT32(p_FmPcd->p_FmPcdKg->p_FmPcdKgRegs->kgeeer, tmpReg);
+                    tmpReg &= ~FM_EX_KG_DOUBLE_ECC;
+                WRITE_UINT32(p_FmPcd->p_FmPcdKg->p_FmPcdKgRegs->fmkg_eeer, tmpReg);
                 break;
             case (e_FM_PCD_KG_EXCEPTION_KEYSIZE_OVERFLOW):
-                tmpReg = GET_UINT32(p_FmPcd->p_FmPcdKg->p_FmPcdKgRegs->kgeeer);
+                tmpReg = GET_UINT32(p_FmPcd->p_FmPcdKg->p_FmPcdKgRegs->fmkg_eeer);
                 if (enable)
-                    tmpReg |= FM_PCD_KG_KEYSIZE_OVERFLOW;
+                    tmpReg |= FM_EX_KG_KEYSIZE_OVERFLOW;
                 else
-                    tmpReg &= ~FM_PCD_KG_KEYSIZE_OVERFLOW;
-                WRITE_UINT32(p_FmPcd->p_FmPcdKg->p_FmPcdKgRegs->kgeeer, tmpReg);
+                    tmpReg &= ~FM_EX_KG_KEYSIZE_OVERFLOW;
+                WRITE_UINT32(p_FmPcd->p_FmPcdKg->p_FmPcdKgRegs->fmkg_eeer, tmpReg);
                 break;
             case (e_FM_PCD_PRS_EXCEPTION_DOUBLE_ECC):
-                tmpReg = GET_UINT32(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs->perer);
+                tmpReg = GET_UINT32(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs->fmpr_perer);
                 if (enable)
                     tmpReg |= FM_PCD_PRS_DOUBLE_ECC;
                 else
                     tmpReg &= ~FM_PCD_PRS_DOUBLE_ECC;
-                WRITE_UINT32(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs->perer, tmpReg);
+                WRITE_UINT32(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs->fmpr_perer, tmpReg);
                 break;
             case (e_FM_PCD_PRS_EXCEPTION_SINGLE_ECC):
-                tmpReg = GET_UINT32(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs->pever);
+                tmpReg = GET_UINT32(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs->fmpr_pever);
                 if (enable)
                     tmpReg |= FM_PCD_PRS_SINGLE_ECC;
                 else
                     tmpReg &= ~FM_PCD_PRS_SINGLE_ECC;
-                WRITE_UINT32(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs->pever, tmpReg);
+                WRITE_UINT32(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs->fmpr_pever, tmpReg);
                 break;
             case (e_FM_PCD_PLCR_EXCEPTION_DOUBLE_ECC):
                 tmpReg = GET_UINT32(p_FmPcd->p_FmPcdPlcr->p_FmPcdPlcrRegs->fmpl_eier);
@@ -1923,22 +1935,20 @@ t_Error FM_PCD_ForceIntr (t_Handle h_FmPcd, e_FmPcdExceptions exception)
         case e_FM_PCD_PRS_EXCEPTION_DOUBLE_ECC:
             if (!(p_FmPcd->exceptions & FM_PCD_EX_PRS_DOUBLE_ECC))
                 RETURN_ERROR(MINOR, E_NOT_SUPPORTED, ("The selected exception is masked"));
-            WRITE_UINT32(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs->perfr, FM_PCD_PRS_DOUBLE_ECC);
             break;
         case e_FM_PCD_PRS_EXCEPTION_SINGLE_ECC:
             if (!(p_FmPcd->exceptions & FM_PCD_EX_PRS_SINGLE_ECC))
                 RETURN_ERROR(MINOR, E_NOT_SUPPORTED, ("The selected exception is masked"));
-            WRITE_UINT32(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs->pevfr, FM_PCD_PRS_SINGLE_ECC);
             break;
         case e_FM_PCD_KG_EXCEPTION_DOUBLE_ECC:
-            if (!(p_FmPcd->exceptions & FM_PCD_EX_KG_DOUBLE_ECC))
+            if (!(p_FmPcd->exceptions & FM_EX_KG_DOUBLE_ECC))
                 RETURN_ERROR(MINOR, E_NOT_SUPPORTED, ("The selected exception is masked"));
-            WRITE_UINT32(p_FmPcd->p_FmPcdKg->p_FmPcdKgRegs->kgfeer, FM_PCD_KG_DOUBLE_ECC);
+            WRITE_UINT32(p_FmPcd->p_FmPcdKg->p_FmPcdKgRegs->fmkg_feer, FM_EX_KG_DOUBLE_ECC);
             break;
         case e_FM_PCD_KG_EXCEPTION_KEYSIZE_OVERFLOW:
-            if (!(p_FmPcd->exceptions & FM_PCD_EX_KG_KEYSIZE_OVERFLOW))
+            if (!(p_FmPcd->exceptions & FM_EX_KG_KEYSIZE_OVERFLOW))
                 RETURN_ERROR(MINOR, E_NOT_SUPPORTED, ("The selected exception is masked"));
-            WRITE_UINT32(p_FmPcd->p_FmPcdKg->p_FmPcdKgRegs->kgfeer, FM_PCD_KG_KEYSIZE_OVERFLOW);
+            WRITE_UINT32(p_FmPcd->p_FmPcdKg->p_FmPcdKgRegs->fmkg_feer, FM_EX_KG_KEYSIZE_OVERFLOW);
             break;
         case e_FM_PCD_PLCR_EXCEPTION_DOUBLE_ECC:
             if (!(p_FmPcd->exceptions & FM_PCD_EX_PLCR_DOUBLE_ECC))
@@ -2021,58 +2031,58 @@ t_Error FM_PCD_ModifyCounter(t_Handle h_FmPcd, e_FmPcdCounters counter, uint32_t
     switch (counter)
     {
         case (e_FM_PCD_PRS_COUNTERS_PARSE_DISPATCH):
-               WRITE_UINT32(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs->pds, value);
+               WRITE_UINT32(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs->fmpr_pds, value);
             break;
         case (e_FM_PCD_PRS_COUNTERS_L2_PARSE_RESULT_RETURNED):
-               WRITE_UINT32(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs->l2rrs, value);
+               WRITE_UINT32(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs->fmpr_l2rrs, value);
             break;
         case (e_FM_PCD_PRS_COUNTERS_L3_PARSE_RESULT_RETURNED):
-               WRITE_UINT32(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs->l3rrs, value);
+               WRITE_UINT32(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs->fmpr_l3rrs, value);
              break;
        case (e_FM_PCD_PRS_COUNTERS_L4_PARSE_RESULT_RETURNED):
-               WRITE_UINT32(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs->l4rrs, value);
+               WRITE_UINT32(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs->fmpr_l4rrs, value);
             break;
         case (e_FM_PCD_PRS_COUNTERS_SHIM_PARSE_RESULT_RETURNED):
-               WRITE_UINT32(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs->srrs, value);
+               WRITE_UINT32(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs->fmpr_srrs, value);
             break;
         case (e_FM_PCD_PRS_COUNTERS_L2_PARSE_RESULT_RETURNED_WITH_ERR):
-               WRITE_UINT32(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs->l2rres, value);
+               WRITE_UINT32(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs->fmpr_l2rres, value);
             break;
         case (e_FM_PCD_PRS_COUNTERS_L3_PARSE_RESULT_RETURNED_WITH_ERR):
-               WRITE_UINT32(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs->l3rres, value);
+               WRITE_UINT32(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs->fmpr_l3rres, value);
             break;
         case (e_FM_PCD_PRS_COUNTERS_L4_PARSE_RESULT_RETURNED_WITH_ERR):
-               WRITE_UINT32(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs->l4rres, value);
+               WRITE_UINT32(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs->fmpr_l4rres, value);
             break;
         case (e_FM_PCD_PRS_COUNTERS_SHIM_PARSE_RESULT_RETURNED_WITH_ERR):
-               WRITE_UINT32(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs->srres, value);
+               WRITE_UINT32(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs->fmpr_srres, value);
             break;
         case (e_FM_PCD_PRS_COUNTERS_SOFT_PRS_CYCLES):
-               WRITE_UINT32(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs->spcs, value);
+               WRITE_UINT32(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs->fmpr_spcs, value);
             break;
         case (e_FM_PCD_PRS_COUNTERS_SOFT_PRS_STALL_CYCLES):
-               WRITE_UINT32(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs->spscs, value);
+               WRITE_UINT32(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs->fmpr_spscs, value);
             break;
         case (e_FM_PCD_PRS_COUNTERS_HARD_PRS_CYCLE_INCL_STALL_CYCLES):
-               WRITE_UINT32(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs->hxscs, value);
+               WRITE_UINT32(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs->fmpr_hxscs, value);
             break;
         case (e_FM_PCD_PRS_COUNTERS_MURAM_READ_CYCLES):
-               WRITE_UINT32(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs->mrcs, value);
+               WRITE_UINT32(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs->fmpr_mrcs, value);
             break;
         case (e_FM_PCD_PRS_COUNTERS_MURAM_READ_STALL_CYCLES):
-               WRITE_UINT32(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs->mrscs, value);
+               WRITE_UINT32(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs->fmpr_mrscs, value);
             break;
         case (e_FM_PCD_PRS_COUNTERS_MURAM_WRITE_CYCLES):
-               WRITE_UINT32(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs->mwcs, value);
+               WRITE_UINT32(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs->fmpr_mwcs, value);
             break;
         case (e_FM_PCD_PRS_COUNTERS_MURAM_WRITE_STALL_CYCLES):
-               WRITE_UINT32(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs->mwscs, value);
+               WRITE_UINT32(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs->fmpr_mwscs, value);
             break;
         case (e_FM_PCD_PRS_COUNTERS_FPM_COMMAND_STALL_CYCLES):
-               WRITE_UINT32(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs->fcscs, value);
+               WRITE_UINT32(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs->fmpr_fcscs, value);
              break;
         case (e_FM_PCD_KG_COUNTERS_TOTAL):
-            WRITE_UINT32(p_FmPcd->p_FmPcdKg->p_FmPcdKgRegs->kgtpc,value);
+            WRITE_UINT32(p_FmPcd->p_FmPcdKg->p_FmPcdKgRegs->fmkg_tpc,value);
             break;
 
         /*Policer counters*/

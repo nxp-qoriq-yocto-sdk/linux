@@ -1366,7 +1366,7 @@ t_Error FmPcdRegisterReassmPort(t_Handle h_FmPcd, t_Handle h_IpReasmCommonPramTb
         case (2):
             RETURN_ERROR(MAJOR, E_NO_MEMORY, ("failed to allocate internal buffer"));
         case (3):
-            RETURN_ERROR(MAJOR, E_INVALID_VALUE, ("’Disable Timeout Task’ with invalid IPRCPT"));
+            RETURN_ERROR(MAJOR, E_INVALID_VALUE, ("'Disable Timeout Task' with invalid IPRCPT"));
         case (4):
             RETURN_ERROR(MAJOR, E_FULL, ("too many timeout tasks"));
         case (5):
@@ -1408,8 +1408,8 @@ static t_Error CreateIpReassCommonTable(t_FmPcdManip *p_Manip)
     tmpReg32 |= p_Manip->ipReassmParams.fqidForTimeOutFrames;
     WRITE_UINT32(p_Manip->ipReassmParams.p_IpReassCommonTbl->timeoutModeAndFqid, tmpReg32);
 
-    /* Calculation the size of IP Reassembly Frame Descriptor - number of frames that are allowed to be reassembled simultaneously + 128.*/
-    size = p_Manip->ipReassmParams.maxNumFramesInProcess + 128;
+    /* Calculation the size of IP Reassembly Frame Descriptor - number of frames that are allowed to be reassembled simultaneously + 129.*/
+    size = p_Manip->ipReassmParams.maxNumFramesInProcess + 129;
 
     /*Allocation of IP Reassembly Frame Descriptor Indexes Pool - This pool resides in the MURAM */
     p_Manip->ipReassmParams.reassFrmDescrIndxPoolTblAddr =
@@ -1440,7 +1440,7 @@ static t_Error CreateIpReassCommonTable(t_FmPcdManip *p_Manip)
     if (!p_Manip->ipReassmParams.reassFrmDescrPoolTblAddr)
         RETURN_ERROR(MAJOR, E_NO_MEMORY, ("Memory allocation FAILED"));
 
-    IOMemSet32(UINT_TO_PTR(p_Manip->ipReassmParams.reassFrmDescrPoolTblAddr), 0,  (uint32_t)(size * 32));
+    IOMemSet32(UINT_TO_PTR(p_Manip->ipReassmParams.reassFrmDescrPoolTblAddr), 0,  (uint32_t)(size * 64));
 
     /* Sets the Reassembly Frame Descriptors Pool and liodn offset*/
     tmpReg64 = (uint64_t)(XX_VirtToPhys(UINT_TO_PTR(p_Manip->ipReassmParams.reassFrmDescrPoolTblAddr)));
@@ -1482,8 +1482,8 @@ static t_Error CreateIpReassTable(t_FmPcdManip *p_Manip, bool ipv4)
 {
     t_FmPcd                 *p_FmPcd = p_Manip->h_FmPcd;
     uint32_t                tmpReg32, autoLearnHashTblSize;
-    uint32_t                numOfWays, setSize, setSizeCode, tmpSetSize, keySize;
-    uint32_t                waySize, numOfSets, tmpNumOfSets, numOfEntries;
+    uint32_t                numOfWays, setSize, setSizeCode, keySize;
+    uint32_t                waySize, numOfSets, numOfEntries;
     uint64_t                tmpReg64;
     uint16_t                minFragSize;
     uintptr_t               *p_AutoLearnHashTblAddr, *p_AutoLearnSetLockTblAddr;
@@ -1527,17 +1527,8 @@ static t_Error CreateIpReassTable(t_FmPcdManip *p_Manip, bool ipv4)
     tmpReg32 = (uint32_t)(XX_VirtToPhys(p_Manip->ipReassmParams.p_IpReassCommonTbl) - p_FmPcd->physicalMuramBase);
     WRITE_UINT32((*p_IpReassTbl)->ipReassCommonPrmTblPtr, tmpReg32);
 
-    /*It is recommended that the total number of entries in this table
-    (number of sets * number of ways) will be twice the number of frames that
-     are expected to be reassembled simultaneously.*/
-    numOfEntries = (uint32_t)(p_Manip->ipReassmParams.maxNumFramesInProcess * 2);
-
-    /* sets number calculation - number of entries = number of sets * number of ways */
-    numOfSets = numOfEntries / numOfWays;
-
     /* Calculate set size (set size is rounded-up to next power of 2) */
-    LOG2(numOfWays * waySize, tmpSetSize);
-    setSize =  (uint32_t)(1 << (tmpSetSize + (POWER_OF_2(numOfWays * waySize) ? 0 : 1)));
+    NEXT_POWER_OF_2(numOfWays * waySize, setSize);
 
     /* Get set size code */
     LOG2(setSize, setSizeCode);
@@ -1545,15 +1536,23 @@ static t_Error CreateIpReassTable(t_FmPcdManip *p_Manip, bool ipv4)
     /* Sets ways number and set size code */
     WRITE_UINT16((*p_IpReassTbl)->waysNumAndSetSize, (uint16_t)((numOfWays << 8) | setSizeCode));
 
+    /* It is recommended that the total number of entries in this table
+    (number of sets * number of ways) will be twice the number of frames that
+     are expected to be reassembled simultaneously.*/
+    numOfEntries = (uint32_t)(p_Manip->ipReassmParams.maxNumFramesInProcess * 2);
+
+    /* sets number calculation - number of entries = number of sets * number of ways */
+    numOfSets = numOfEntries / numOfWays;
+
     /* Sets AutoLearnHashKeyMask*/
-    LOG2(numOfSets, tmpNumOfSets);
-    numOfSets = (uint32_t)(1 << (tmpNumOfSets + (POWER_OF_2(numOfSets) ? 0 : 1)));
+    NEXT_POWER_OF_2(numOfSets, numOfSets);
+
     WRITE_UINT16((*p_IpReassTbl)->autoLearnHashKeyMask, (uint16_t)(numOfSets - 1));
 
     /* Allocation of IP Reassembly Automatic Learning Hash Table - This table resides in external memory.
     The size of this table is determined by the number of sets and the set size.
     Table size = set size * number of sets
-    This table’s base address should be aligned to SetSize.*/
+    This table base address should be aligned to SetSize.*/
     autoLearnHashTblSize = numOfSets * setSize;
 
     *p_AutoLearnHashTblAddr = PTR_TO_UINT(XX_MallocSmart(autoLearnHashTblSize, p_Manip->ipReassmParams.dataMemId, setSize));
@@ -1760,7 +1759,9 @@ static t_Error FmPcdFragHcScratchPoolFill(t_Handle h_FmPcd, uint8_t scratchBpid)
 
     if (fmPcdCcFragScratchPoolCmdParams.numOfBuffers != 0)
         RETURN_ERROR(MAJOR, E_INVALID_STATE, ("Fill scratch pool failed,"
-                                              "Failed to release %d buffers to the BM (missing FBPRs)", fmPcdCcFragScratchPoolCmdParams.numOfBuffers));
+                                              "Failed to release %d buffers to the BM (missing FBPRs)",
+                                              fmPcdCcFragScratchPoolCmdParams.numOfBuffers));
+
     return E_OK;
 }
 
@@ -2915,20 +2916,17 @@ static t_Error IndxStats(t_FmPcdStatsParams *p_StatsParams,t_FmPcdManip *p_Manip
     return E_OK;
 }
 
-static t_Error InsrtHdrByTempl(t_FmPcdManipHdrInsrtParams   *p_ManipParams,
-                               t_FmPcdManip                 *p_Manip,
-                               t_FmPcd                      *p_FmPcd)
+static t_Error InsrtHdrByTempl(t_FmPcdManipHdrInsrtParams  *p_ManipParams, t_FmPcdManip *p_Manip, t_FmPcd *p_FmPcd)
 {
-    t_FmPcdManipHdrInsrtByTemplateParams    *p_InsrtByTemplate = &p_ManipParams->u.byTemplate;
-    uint8_t                                 tmpReg8 = 0xff;
-    t_AdOfTypeContLookup                    *p_Ad;
-    bool                                    ipModify = FALSE;
-    uint32_t                                tmpReg32 = 0, tmpRegNia = 0;
-    uint16_t                                tmpReg16 = 0;
-    t_Error                                 err = E_OK;
-    uint8_t                                 extraAddedBytes = 0, blockSize = 0;
-    uint8_t                                 extraAddedBytesAlignedToBlockSize = 0;
-    uint8_t                                 *p_Template = NULL;
+    t_FmPcdManipHdrInsrtByTemplateParams   *p_InsrtByTemplate = &p_ManipParams->u.byTemplate;
+    uint8_t                             tmpReg8 = 0xff;
+    t_AdOfTypeContLookup                *p_Ad;
+    bool                                ipModify = FALSE;
+    uint32_t                            tmpReg32 = 0, tmpRegNia = 0;
+    uint16_t                            tmpReg16 = 0;
+    t_Error                             err = E_OK;
+    uint8_t                             extraAddedBytes = 0, blockSize = 0, extraAddedBytesAlignedToBlockSize = 0, log2Num = 0;
+    uint8_t                             *p_Template = NULL;
 
     SANITY_CHECK_RETURN_ERROR(p_ManipParams,E_NULL_POINTER);
     SANITY_CHECK_RETURN_ERROR(p_Manip,E_NULL_POINTER);
@@ -2950,12 +2948,11 @@ static t_Error InsrtHdrByTempl(t_FmPcdManipHdrInsrtParams   *p_ManipParams,
 
          if (p_InsrtByTemplate->size)
          {
-             p_Manip->p_Template =
-                (uint8_t *)FM_MURAM_AllocMem(p_FmPcd->h_FmMuram,
+             p_Manip->p_Template = (uint8_t *)FM_MURAM_AllocMem(p_FmPcd->h_FmMuram,
                                              p_InsrtByTemplate->size,
                                              FM_PCD_CC_AD_TABLE_ALIGN);
-             if (!p_Manip->p_Template)
-                 RETURN_ERROR(MAJOR, E_NO_MEMORY, ("MURAM alloc for manipulation header template"));
+             if(!p_Manip->p_Template)
+                 RETURN_ERROR(MAJOR, E_NO_MEMORY, ("Memory allocation in MURAM FAILED"));
 
              tmpReg32 = (uint32_t)(XX_VirtToPhys(p_Manip->p_Template) - (p_FmPcd->physicalMuramBase));
              tmpReg32 |= (uint32_t)p_InsrtByTemplate->size << 24;
@@ -2967,7 +2964,7 @@ static t_Error InsrtHdrByTempl(t_FmPcdManipHdrInsrtParams   *p_ManipParams,
         p_Template = (uint8_t *)XX_Malloc(p_InsrtByTemplate->size * sizeof(uint8_t));
 
         if (!p_Template)
-            RETURN_ERROR(MAJOR, E_NO_MEMORY, ("Allocation of manipulation header template"));
+            RETURN_ERROR(MAJOR, E_NO_MEMORY, ("XX_Malloc allocation FAILED"));
 
         memcpy(p_Template, p_InsrtByTemplate->hdrTemplate, p_InsrtByTemplate->size * sizeof(uint8_t));
 
@@ -2978,27 +2975,21 @@ static t_Error InsrtHdrByTempl(t_FmPcdManipHdrInsrtParams   *p_ManipParams,
 
              tmpReg8 = (uint8_t)p_Template[p_InsrtByTemplate->modifyOuterIpParams.ipOuterOffset];
 
-             if ((tmpReg8 & 0xf0) == 0x40)
+             if((tmpReg8 & 0xf0) == 0x40)
                  tmpReg8 = 4;
-             else if ((tmpReg8 & 0xf0) == 0x60)
+             else if((tmpReg8 & 0xf0) == 0x60)
                  tmpReg8 = 6;
              else
                  tmpReg8 = 0xff;
 
-             if (tmpReg8 == 4)
+             if (tmpReg8 != 0xff)
              {
-                 if ((IP_HDRCHECKSUM_FIELD_OFFSET_FROM_IP + p_InsrtByTemplate->modifyOuterIpParams.ipOuterOffset) > p_InsrtByTemplate->size)
-                     RETURN_ERROR(MAJOR, E_INVALID_STATE, ("Inconsistent parameters : IP present in header template, user asked for IP modifications but ipOffset + ipTotalLengthFieldOffset in header template bigger than template size"));
-
-                 if (p_InsrtByTemplate->modifyOuterIpParams.dscpEcn & 0xff00)
+                if(p_InsrtByTemplate->modifyOuterIpParams.dscpEcn & 0xff00)
                      RETURN_ERROR(MAJOR, E_INVALID_STATE, ("Inconsistent parameters : IPV4 present in header template, dscpEcn has to be only 1 byte"));
-
-                 p_Template[p_InsrtByTemplate->modifyOuterIpParams.ipOuterOffset + IP_DSCECN_FIELD_OFFSET_FROM_IP] = (uint8_t)p_InsrtByTemplate->modifyOuterIpParams.dscpEcn;
-
-                 if (p_InsrtByTemplate->modifyOuterIpParams.recalculateLength)
+                if(p_InsrtByTemplate->modifyOuterIpParams.recalculateLength)
                  {
 
-                     if ((p_InsrtByTemplate->modifyOuterIpParams.recalculateLengthParams.extraBytesAddedAlignedToBlockSize + p_InsrtByTemplate->modifyOuterIpParams.recalculateLengthParams.extraBytesAddedNotAlignedToBlockSize) > 255)
+                     if((p_InsrtByTemplate->modifyOuterIpParams.recalculateLengthParams.extraBytesAddedAlignedToBlockSize + p_InsrtByTemplate->modifyOuterIpParams.recalculateLengthParams.extraBytesAddedNotAlignedToBlockSize) > 255)
                             RETURN_ERROR(MAJOR, E_INVALID_STATE, ("extra Byte added can not be more than 256 bytes"));
                      extraAddedBytes = (uint8_t) (p_InsrtByTemplate->modifyOuterIpParams.recalculateLengthParams.extraBytesAddedAlignedToBlockSize + p_InsrtByTemplate->modifyOuterIpParams.recalculateLengthParams.extraBytesAddedNotAlignedToBlockSize);
                      blockSize = p_InsrtByTemplate->modifyOuterIpParams.recalculateLengthParams.blockSize;
@@ -3012,32 +3003,44 @@ static t_Error InsrtHdrByTempl(t_FmPcdManipHdrInsrtParams   *p_ManipParams,
                  {
                      if (!POWER_OF_2(blockSize))
                          RETURN_ERROR(MAJOR, E_INVALID_VALUE, ("inputFrmPaddingUpToBlockSize has to be power of 2"));
-                     blockSize -= 1;
                  }
+
+             }
+             if (tmpReg8 == 4)
+             {
+                 if ((IPv4_HDRCHECKSUM_FIELD_OFFSET_FROM_IP + p_InsrtByTemplate->modifyOuterIpParams.ipOuterOffset) > p_InsrtByTemplate->size)
+                     RETURN_ERROR(MAJOR, E_INVALID_STATE, ("Inconsistent parameters : IP present in header template, user asked for IP modifications but ipOffset + ipTotalLengthFieldOffset in header template bigger than template size"));
+
+
+                 p_Template[p_InsrtByTemplate->modifyOuterIpParams.ipOuterOffset + IPv4_DSCECN_FIELD_OFFSET_FROM_IP] = (uint8_t)p_InsrtByTemplate->modifyOuterIpParams.dscpEcn;
+
+                 if (blockSize)
+                     blockSize -= 1;
 
                  if ((p_InsrtByTemplate->size - p_InsrtByTemplate->modifyOuterIpParams.ipOuterOffset + extraAddedBytes) > 255)
                      RETURN_ERROR(MAJOR, E_INVALID_STATE, ("p_InsrtByTemplate->size - p_InsrtByTemplate->modifyOuterIpParams.ipOuterOffset + extraAddedBytes has to be less than 255"));
 
-                p_Template[p_InsrtByTemplate->modifyOuterIpParams.ipOuterOffset + IP_TOTALLENGTH_FIELD_OFFSET_FROM_IP + 1] = blockSize;
-                p_Template[p_InsrtByTemplate->modifyOuterIpParams.ipOuterOffset + IP_TOTALLENGTH_FIELD_OFFSET_FROM_IP] = (uint8_t)(p_InsrtByTemplate->size - p_InsrtByTemplate->modifyOuterIpParams.ipOuterOffset + extraAddedBytes);
+                p_Template[p_InsrtByTemplate->modifyOuterIpParams.ipOuterOffset + IPv4_TOTALLENGTH_FIELD_OFFSET_FROM_IP + 1] = blockSize;// IPV6 - in AD instead of SEQ IND
+                p_Template[p_InsrtByTemplate->modifyOuterIpParams.ipOuterOffset + IPv4_TOTALLENGTH_FIELD_OFFSET_FROM_IP] = (uint8_t)(p_InsrtByTemplate->size - p_InsrtByTemplate->modifyOuterIpParams.ipOuterOffset + extraAddedBytes);// for IPV6 decrement additional 40 bytes of IPV6 heade size
 
-                p_Template[p_InsrtByTemplate->modifyOuterIpParams.ipOuterOffset + IP_ID_FIELD_OFFSET_FROM_IP] = 0x00;
-                p_Template[p_InsrtByTemplate->modifyOuterIpParams.ipOuterOffset + IP_ID_FIELD_OFFSET_FROM_IP + 1] = extraAddedBytesAlignedToBlockSize;
+                p_Template[p_InsrtByTemplate->modifyOuterIpParams.ipOuterOffset + IPv4_ID_FIELD_OFFSET_FROM_IP] = 0x00;
+                p_Template[p_InsrtByTemplate->modifyOuterIpParams.ipOuterOffset + IPv4_ID_FIELD_OFFSET_FROM_IP + 1] = extraAddedBytesAlignedToBlockSize;
+
 
 
                  /*IP header template - relevant only for ipv4 CheckSum = 0*/
-                 p_Template[p_InsrtByTemplate->modifyOuterIpParams.ipOuterOffset + IP_HDRCHECKSUM_FIELD_OFFSET_FROM_IP] = 0x00;
-                 p_Template[p_InsrtByTemplate->modifyOuterIpParams.ipOuterOffset + IP_HDRCHECKSUM_FIELD_OFFSET_FROM_IP + 1] = 0x00;
+                 p_Template[p_InsrtByTemplate->modifyOuterIpParams.ipOuterOffset + IPv4_HDRCHECKSUM_FIELD_OFFSET_FROM_IP] = 0x00;
+                 p_Template[p_InsrtByTemplate->modifyOuterIpParams.ipOuterOffset + IPv4_HDRCHECKSUM_FIELD_OFFSET_FROM_IP + 1] = 0x00;
 
 
                  /*UDP checksum has to be 0*/
                  if (p_InsrtByTemplate->modifyOuterIpParams.udpPresent)
                  {
-                     if ((p_InsrtByTemplate->modifyOuterIpParams.udpOffset + UDP_UDPHECKSUM_FIELD_OFFSET_FROM_UDP + UDP_UDPCHECKSUM_FIELD_SIZE) > p_InsrtByTemplate->size)
+                     if ((p_InsrtByTemplate->modifyOuterIpParams.udpOffset + UDP_CHECKSUM_FIELD_OFFSET_FROM_UDP + UDP_CHECKSUM_FIELD_SIZE) > p_InsrtByTemplate->size)
                          RETURN_ERROR(MAJOR, E_INVALID_STATE, ("Inconsistent parameters : UDP present according to user but (UDP offset + UDP header size) < size of header template"));
 
-                    p_Template[p_InsrtByTemplate->modifyOuterIpParams.udpOffset + UDP_UDPHECKSUM_FIELD_OFFSET_FROM_UDP ] = 0x00;
-                    p_Template[p_InsrtByTemplate->modifyOuterIpParams.udpOffset + UDP_UDPHECKSUM_FIELD_OFFSET_FROM_UDP + 1] = 0x00;
+                    p_Template[p_InsrtByTemplate->modifyOuterIpParams.udpOffset + UDP_CHECKSUM_FIELD_OFFSET_FROM_UDP ] = 0x00;
+                    p_Template[p_InsrtByTemplate->modifyOuterIpParams.udpOffset + UDP_CHECKSUM_FIELD_OFFSET_FROM_UDP + 1] = 0x00;
 
                  }
 
@@ -3046,12 +3049,34 @@ static t_Error InsrtHdrByTempl(t_FmPcdManipHdrInsrtParams   *p_ManipParams,
 
                  tmpRegNia |= (uint32_t)p_InsrtByTemplate->modifyOuterIpParams.ipIdentGenId<<24;
              }
+             else if (tmpReg8 == 6)
+             {
+                /*TODO - add check for maximum value of blockSize;*/
+                 if (blockSize)
+                    LOG2(blockSize, log2Num);
+                 tmpRegNia |= (uint32_t)log2Num << 24;
+
+                // for IPV6 decrement additional 40 bytes of IPV6 heade size - because IPV6 header size is not included in payloadLength
+                p_Template[p_InsrtByTemplate->modifyOuterIpParams.ipOuterOffset + IPv6_PAYLOAD_LENGTH_OFFSET_FROM_IP] = (uint8_t)(p_InsrtByTemplate->size - p_InsrtByTemplate->modifyOuterIpParams.ipOuterOffset + extraAddedBytes - 40);
+                p_Template[p_InsrtByTemplate->modifyOuterIpParams.ipOuterOffset + IPv6_PAYLOAD_LENGTH_OFFSET_FROM_IP + 1] = extraAddedBytesAlignedToBlockSize;
+               if (p_InsrtByTemplate->modifyOuterIpParams.udpPresent)
+               {
+                 if ((p_InsrtByTemplate->modifyOuterIpParams.udpOffset + UDP_CHECKSUM_FIELD_OFFSET_FROM_UDP + UDP_CHECKSUM_FIELD_SIZE) > p_InsrtByTemplate->size)
+                      RETURN_ERROR(MAJOR, E_INVALID_STATE, ("Inconsistent parameters : UDP present according to user but (UDP offset + UDP header size) < size of header template"));
+                if (p_Template[p_InsrtByTemplate->modifyOuterIpParams.ipOuterOffset + IPv6_NEXT_HEADER_OFFSET_FROM_IP] != 0x88)
+                      RETURN_ERROR(MAJOR, E_INVALID_STATE, ("OUr suppport is only IPv6/UDPLite"));
+                p_Template[p_InsrtByTemplate->modifyOuterIpParams.udpOffset + UDP_LENGTH_FIELD_OFFSET_FROM_UDP] = 0x00;
+                p_Template[p_InsrtByTemplate->modifyOuterIpParams.udpOffset + UDP_LENGTH_FIELD_OFFSET_FROM_UDP + 1] = 0x08;
+                p_Template[p_InsrtByTemplate->modifyOuterIpParams.udpOffset + UDP_CHECKSUM_FIELD_OFFSET_FROM_UDP] = 0x00;
+                p_Template[p_InsrtByTemplate->modifyOuterIpParams.udpOffset + UDP_CHECKSUM_FIELD_OFFSET_FROM_UDP + 1] = 0x00;
+               }
+             }
              else
                  RETURN_ERROR(MAJOR, E_INVALID_STATE, ("IP version supported only IPV4"));
          }
 
          tmpReg32 = tmpReg16 = tmpReg8 = 0;
-
+         /*TODO - check it*/
          if (p_InsrtByTemplate->modifyOuterVlan)
          {
              if (p_InsrtByTemplate->modifyOuterVlanParams.vpri & ~0x07)
@@ -3077,7 +3102,7 @@ static t_Error InsrtHdrByTempl(t_FmPcdManipHdrInsrtParams   *p_ManipParams,
     if (p_Manip->h_Frag)
     {
         tmpRegNia |= (uint32_t)(XX_VirtToPhys(p_Manip->h_Frag) - (p_FmPcd->physicalMuramBase));
-        tmpReg32 |= (uint32_t)p_Manip->sizeForFragmentation << 16;
+        tmpReg32  |= (uint32_t)p_Manip->sizeForFragmentation << 16;
     }
     else
           tmpReg32 = 0xffff0000;
@@ -3355,6 +3380,64 @@ static t_Handle ManipOrStatsSetNode(t_Handle h_FmPcd, t_Handle *p_Params, bool s
     return p_Manip;
 }
 
+static void UpdateAdPtrOfNodesWhichPointsOnCrntMdfManip(t_FmPcdManip     *p_CrntMdfManip,
+                                                       t_List            *h_NodesLst)
+{
+    t_CcNodeInformation     *p_CcNodeInformation;
+    t_FmPcdCcNode           *p_NodePtrOnCurrentMdfManip = NULL;
+    t_List                  *p_Pos;
+    int                     i = 0;
+    t_Handle                p_AdTablePtOnCrntCurrentMdfNode/*, p_AdTableNewModified*/;
+    t_CcNodeInformation     ccNodeInfo;
+
+    LIST_FOR_EACH(p_Pos, &p_CrntMdfManip->nodesLst)
+    {
+        p_CcNodeInformation = CC_NODE_F_OBJECT(p_Pos);
+        p_NodePtrOnCurrentMdfManip = (t_FmPcdCcNode *)p_CcNodeInformation->h_CcNode;
+
+        ASSERT_COND(p_NodePtrOnCurrentMdfManip);
+
+        /* Search in the previous node which exact index points on this current modified node for getting AD */
+        for (i = 0; i < p_NodePtrOnCurrentMdfManip->numOfKeys + 1; i++)
+        {
+            if (p_NodePtrOnCurrentMdfManip->keyAndNextEngineParams[i].nextEngineParams.nextEngine == e_FM_PCD_CC)
+            {
+                if (p_NodePtrOnCurrentMdfManip->keyAndNextEngineParams[i].nextEngineParams.h_Manip == (t_Handle)p_CrntMdfManip)
+                {
+                    if (p_NodePtrOnCurrentMdfManip->keyAndNextEngineParams[i].p_StatsObj)
+                        p_AdTablePtOnCrntCurrentMdfNode =
+                                p_NodePtrOnCurrentMdfManip->keyAndNextEngineParams[i].p_StatsObj->h_StatsAd;
+                    else
+                        p_AdTablePtOnCrntCurrentMdfNode =
+                                PTR_MOVE(p_NodePtrOnCurrentMdfManip->h_AdTable, i*FM_PCD_CC_AD_ENTRY_SIZE);
+
+                    memset(&ccNodeInfo, 0, sizeof(t_CcNodeInformation));
+                    ccNodeInfo.h_CcNode = p_AdTablePtOnCrntCurrentMdfNode;
+                    EnqueueNodeInfoToRelevantLst(h_NodesLst, &ccNodeInfo, NULL);
+                }
+            }
+        }
+
+        ASSERT_COND(i != p_NodePtrOnCurrentMdfManip->numOfKeys);
+    }
+}
+
+static void BuildHmtd(uint8_t *p_Dest, uint8_t *p_Src, uint8_t *p_Hmcd, t_FmPcd *p_FmPcd)
+{
+    t_Error err;
+
+   /* Copy the HMTD */
+    IO2IOCpy32(p_Dest, (uint8_t*)p_Src, 16);
+    /* Replace the HMCT table pointer  */
+    WRITE_UINT32(((t_Hmtd *)p_Dest)->hmcdBasePtr,
+              (uint32_t)(XX_VirtToPhys(p_Hmcd) - ((t_FmPcd*)p_FmPcd)->physicalMuramBase));
+    /* Call Host Command to replace HMTD by a new HMTD */
+    err = FmHcPcdCcDoDynamicChange(p_FmPcd->h_Hc,
+                                (uint32_t)(XX_VirtToPhys(p_Src) - p_FmPcd->physicalMuramBase),
+                                (uint32_t)(XX_VirtToPhys(p_Dest) - p_FmPcd->physicalMuramBase));
+    if (err)
+        REPORT_ERROR(MINOR, err, ("Failed in dynamic manip change, continued to the rest of the owners."));
+}
 
 /*****************************************************************************/
 /*              Inter-module API routines                                    */
@@ -3424,7 +3507,7 @@ t_List *FmPcdManipGetSpinlock(t_Handle h_Manip)
    return ((t_FmPcdManip *)h_Manip)->h_Spinlock;
 }
 
-t_Error FmPcdManipCheckParamsForCcNextEgine(t_FmPcdCcNextEngineParams *p_FmPcdCcNextEngineParams, uint32_t *requiredAction)
+t_Error FmPcdManipCheckParamsForCcNextEngine(t_FmPcdCcNextEngineParams *p_FmPcdCcNextEngineParams, uint32_t *requiredAction)
 {
     t_FmPcdManip             *p_Manip;
     t_Error                   err;
@@ -3904,67 +3987,6 @@ t_Handle FM_PCD_ManipNodeSet(t_Handle h_FmPcd, t_FmPcdManipParams *p_ManipParams
     }
 
     return p_Manip;
-}
-
-
-static void UpdateAdPtrOfNodesWhichPointsOnCrntMdfManip(t_FmPcdManip     *p_CrntMdfManip,
-                                                       t_List            *h_NodesLst)
-{
-    t_CcNodeInformation     *p_CcNodeInformation;
-    t_FmPcdCcNode           *p_NodePtrOnCurrentMdfManip = NULL;
-    t_List                  *p_Pos;
-    int                     i = 0;
-    t_Handle                p_AdTablePtOnCrntCurrentMdfNode/*, p_AdTableNewModified*/;
-    t_CcNodeInformation     ccNodeInfo;
-
-    LIST_FOR_EACH(p_Pos, &p_CrntMdfManip->nodesLst)
-    {
-        p_CcNodeInformation = CC_NODE_F_OBJECT(p_Pos);
-        p_NodePtrOnCurrentMdfManip = (t_FmPcdCcNode *)p_CcNodeInformation->h_CcNode;
-
-        ASSERT_COND(p_NodePtrOnCurrentMdfManip);
-
-        /* Search in the previous node which exact index points on this current modified node for getting AD */
-        for (i = 0; i < p_NodePtrOnCurrentMdfManip->numOfKeys + 1; i++)
-        {
-            if (p_NodePtrOnCurrentMdfManip->keyAndNextEngineParams[i].nextEngineParams.nextEngine == e_FM_PCD_CC)
-            {
-                if (p_NodePtrOnCurrentMdfManip->keyAndNextEngineParams[i].nextEngineParams.h_Manip == (t_Handle)p_CrntMdfManip)
-                {
-                    if (p_NodePtrOnCurrentMdfManip->keyAndNextEngineParams[i].p_StatsObj)
-                        p_AdTablePtOnCrntCurrentMdfNode =
-                                p_NodePtrOnCurrentMdfManip->keyAndNextEngineParams[i].p_StatsObj->h_StatsAd;
-                    else
-                        p_AdTablePtOnCrntCurrentMdfNode =
-                                PTR_MOVE(p_NodePtrOnCurrentMdfManip->h_AdTable, i*FM_PCD_CC_AD_ENTRY_SIZE);
-
-                    memset(&ccNodeInfo, 0, sizeof(t_CcNodeInformation));
-                    ccNodeInfo.h_CcNode = p_AdTablePtOnCrntCurrentMdfNode;
-                    EnqueueNodeInfoToRelevantLst(h_NodesLst, &ccNodeInfo, NULL);
-                }
-            }
-        }
-
-        ASSERT_COND(i != p_NodePtrOnCurrentMdfManip->numOfKeys);
-    }
-}
-
-
-static void BuildHmtd(uint8_t *p_Dest, uint8_t *p_Src, uint8_t *p_Hmcd, t_FmPcd *p_FmPcd)
-{
-    t_Error err;
-
-   /* Copy the HMTD */
-    IO2IOCpy32(p_Dest, (uint8_t*)p_Src, 16);
-    /* Replace the HMCT table pointer  */
-    WRITE_UINT32(((t_Hmtd *)p_Dest)->hmcdBasePtr,
-              (uint32_t)(XX_VirtToPhys(p_Hmcd) - ((t_FmPcd*)p_FmPcd)->physicalMuramBase));
-    /* Call Host Command to replace HMTD by a new HMTD */
-    err = FmHcPcdCcDoDynamicChange(p_FmPcd->h_Hc,
-                                (uint32_t)(XX_VirtToPhys(p_Src) - p_FmPcd->physicalMuramBase),
-                                (uint32_t)(XX_VirtToPhys(p_Dest) - p_FmPcd->physicalMuramBase));
-    if (err)
-        REPORT_ERROR(MINOR, err, ("Failed in dynamic manip change, continued to the rest of the owners."));
 }
 
 t_Error FM_PCD_ManipNodeReplace(t_Handle h_Manip, t_FmPcdManipParams *p_ManipParams)

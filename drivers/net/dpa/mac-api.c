@@ -426,24 +426,21 @@ static int __cold change_addr(struct mac_device *mac_dev, uint8_t *addr)
 
 static void adjust_link(struct net_device *net_dev)
 {
+#if (DPAA_VERSION < 11)
 	struct dpa_priv_s *priv = netdev_priv(net_dev);
 	struct mac_device *mac_dev = priv->mac_dev;
 	struct phy_device *phy_dev = mac_dev->phy_dev;
-#if (DPAA_VERSION < 11)
 	struct mac_priv_s *mac_priv;
-#endif
 	int	 _errno;
 	t_Error	 err;
 
 	if (!phy_dev->link) {
-#if (DPAA_VERSION < 11)
 		fsl_pq_mdio_lock(NULL);
 
 		mac_priv = (struct mac_priv_s *)macdev_priv(mac_dev);
 		DtsecRestartTbiAN(mac_priv->mac);
 
 		fsl_pq_mdio_unlock(NULL);
-#endif
 		return;
 	}
 
@@ -454,6 +451,7 @@ static void adjust_link(struct net_device *net_dev)
 	if (unlikely(_errno < 0))
 		dpaa_eth_err(mac_dev->dev, "FM_MAC_AdjustLink() = 0x%08x\n",
 				err);
+#endif
 
 	return;
 }

@@ -185,14 +185,17 @@ typedef enum
 #define FM_MAX_NUM_OF_SUB_PORTALS               12
 #define FM_PORT_MAX_NUM_OF_OBSERVED_EXT_POOLS   0
 
-/* RAMs defines */
-#define FM_MURAM_SIZE                   (160 * KILOBYTE)
-#define FM_IRAM_SIZE                    ( 64 * KILOBYTE)
+/* Rams defines */
+#define FM_MURAM_SIZE                   (160*KILOBYTE)
+#define FM_IRAM_SIZE                    ( 64*KILOBYTE)
+#define FM_NUM_OF_CTRL                  2
 
 /* PCD defines */
-#define FM_PCD_PLCR_NUM_ENTRIES         256                 /**< Total number of policer profiles */
-#define FM_PCD_KG_NUM_OF_SCHEMES        32                  /**< Total number of KG schemes */
-#define FM_PCD_MAX_NUM_OF_CLS_PLANS     256                 /**< Number of classification plan entries. */
+#define FM_PCD_PLCR_NUM_ENTRIES         256             /**< Total number of policer profiles */
+#define FM_PCD_KG_NUM_OF_SCHEMES        32              /**< Total number of KG schemes */
+#define FM_PCD_MAX_NUM_OF_CLS_PLANS     256             /**< Number of classification plan entries. */
+#define FM_PCD_PRS_SW_PATCHES_SIZE      0x00000200      /**< Number of bytes saved for patches */
+#define FM_PCD_SW_PRS_SIZE              0x00000800      /**< Total size of SW parser area */
 
 /* RTC defines */
 #define FM_RTC_NUM_OF_ALARMS            2                   /**< RTC number of alarms */
@@ -242,7 +245,7 @@ typedef enum
 #define FM_TX_SHORT_FRAME_BAD_TS_ERRATA_10GMAC_A006     /* No implementation, Out of LLD scope */
 #define FM_TX_FIFO_CORRUPTION_ERRATA_10GMAC_A007
 #define FM_ECC_HALT_NO_SYNC_ERRATA_10GMAC_A008
-#define FM_TX_INVALID_ECC_ERRATA_10GMAC_A009
+#define FM_TX_INVALID_ECC_ERRATA_10GMAC_A009            /* Out of LLD scope, user may disable ECC exceptions using FM_DisableRamsEcc */
 #define FM_BAD_VLAN_DETECT_ERRATA_10GMAC_A010
 
 #define FM_RX_PREAM_4_ERRATA_DTSEC_A001
@@ -251,6 +254,7 @@ typedef enum
 #define FM_GTS_ERRATA_DTSEC_A004
 #define FM_GTS_AFTER_MAC_ABORTED_FRAME_ERRATA_DTSEC_A0012
 #define FM_GTS_UNDERRUN_ERRATA_DTSEC_A0014
+#define FM_GTS_AFTER_DROPPED_FRAME_ERRATA_DTSEC_A004839
 
 #define FM_MAGIC_PACKET_UNRECOGNIZED_ERRATA_DTSEC2          /* No implementation, Out of LLD scope */
 #define FM_TX_LOCKUP_ERRATA_DTSEC6

@@ -210,8 +210,8 @@ typedef enum e_ModuleId
     e_MODULE_ID_CPC_1,              /**< CoreNet-Platform-Cache 1 */
     e_MODULE_ID_CPC_2,              /**< CoreNet-Platform-Cache 2 */
 
-    e_MODULE_ID_SRIO_PORTS,     	/**< RapidIO controller */
-    e_MODULE_ID_SRIO_MU,        	/**< RapidIO messaging unit module */
+    e_MODULE_ID_SRIO_PORTS,         /**< RapidIO controller */
+    e_MODULE_ID_SRIO_MU,            /**< RapidIO messaging unit module */
 
     e_MODULE_ID_DUMMY_LAST
 } e_ModuleId;

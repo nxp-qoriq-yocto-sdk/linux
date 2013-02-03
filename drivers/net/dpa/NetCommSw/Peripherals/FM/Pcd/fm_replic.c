@@ -507,18 +507,8 @@ static t_Error RemoveMember(t_FmPcdFrmReplicGroup   *p_ReplicGroup,
             RETURN_ERROR(MAJOR, E_INVALID_SELECTION, ("member position in remove member"));
     }
 
-    switch (GET_ERROR_TYPE(err))
-    {
-        case E_OK:
-            return E_OK;
-
-        case E_BUSY:
-            DBG(TRACE, ("E_BUSY error"));
-            return ERROR_CODE(E_BUSY);
-
-        default:
-            RETURN_ERROR(MAJOR, err, NO_MSG);
-    }
+    if (err)
+        RETURN_ERROR(MAJOR, err, NO_MSG);
 
     if (p_CurrentMember->h_Manip)
     {
@@ -627,7 +617,8 @@ void FrmReplicGroupUpdateAd(t_Handle  h_ReplicGroup,
     t_FmPcd             *p_FmPcd;
 
     ASSERT_COND(p_ReplicGroup);
-    p_FmPcd    = p_ReplicGroup->h_FmPcd;
+    p_FmPcd = p_ReplicGroup->h_FmPcd;
+
     /* build a bypass ad */
     WRITE_UINT32(p_AdResult->fqid, FM_PCD_AD_BYPASS_TYPE |
         (uint32_t)((XX_VirtToPhys(p_ReplicGroup->p_SourceTd)) - p_FmPcd->physicalMuramBase));
@@ -937,7 +928,7 @@ t_Error FM_PCD_FrmReplicAddMember(t_Handle                  h_ReplicGroup,
 
             /* add the new member to the internal sw member list */
             AddMemberToList(p_ReplicGroup, p_NewMember, &p_PreviousMember->node);
-            break;
+           break;
 
         default:
             /* unlock */

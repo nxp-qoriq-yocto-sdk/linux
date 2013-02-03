@@ -215,11 +215,14 @@ typedef enum
 /* RAMs defines */
 #define FM_MURAM_SIZE                   (384 * KILOBYTE)
 #define FM_IRAM_SIZE                    ( 64 * KILOBYTE)
+#define FM_NUM_OF_CTRL                  4
 
 /* PCD defines */
 #define FM_PCD_PLCR_NUM_ENTRIES         256                 /**< Total number of policer profiles */
 #define FM_PCD_KG_NUM_OF_SCHEMES        32                  /**< Total number of KG schemes */
 #define FM_PCD_MAX_NUM_OF_CLS_PLANS     256                 /**< Number of classification plan entries. */
+#define FM_PCD_PRS_SW_PATCHES_SIZE      0x00000240          /**< Number of bytes saved for patches */
+#define FM_PCD_SW_PRS_SIZE              0x00000800          /**< Total size of SW parser area */
 
 /* RTC defines */
 #define FM_RTC_NUM_OF_ALARMS            2                   /**< RTC number of alarms */
@@ -252,18 +255,23 @@ typedef enum
 #define FM_FRAME_END_PARAMS_FOR_OP
 #define FM_DEQ_PIPELINE_PARAMS_FOR_OP
 #define FM_QMI_NO_SINGLE_ECC_EXCEPTION
+#define FM_EXP_FEATURES
 
-/* FM erratas */
-//#define FM_TX_ECC_FRMS_ERRATA_10GMAC_A004
+/* FM errata */
+#define FM_HEAVY_TRAFFIC_HANG_ERRATA_FMAN_A005669
+#define FM_WRONG_RESET_VALUES_ERRATA_FMAN_A005127
+
 #define FM_BAD_VLAN_DETECT_ERRATA_10GMAC_A010
-
-#define FM_RX_PREAM_4_ERRATA_DTSEC_A001
-#define FM_MAGIC_PACKET_UNRECOGNIZED_ERRATA_DTSEC2              /* No implementation, Out of LLD scope */
-
-
 
 #define FM_BCB_ERRATA_BMI_SW001
 #define FM_LEN_CHECK_ERRATA_FMAN_SW002
+#define FM_AID_MODE_NO_TNUM_SW005 /* refer to pdm TKT068794 - only support of port_id on aid */
+
+/*****************************************************************************
+ RMan INTEGRATION-SPECIFIC DEFINITIONS
+******************************************************************************/
+#define RM_MAX_NUM_OF_IB        4           /**< Number of inbound blocks */
+#define RM_NUM_OF_IBCU          8           /**< NUmber of classification units in an inbound block */
 
 
 #endif /* __DPAA_INTEGRATION_EXT_H */

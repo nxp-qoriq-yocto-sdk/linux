@@ -220,7 +220,7 @@
 *//***************************************************************************/
 #define DUMP_ARR(st, phrase) \
     do { \
-        physAddress_t physAddr = XX_VirtToPhys((void *)&((st)->phrase[dumpArrIdx])); \
+        physAddress_t physAddr; \
         _CREATE_DUMP_SUBSTR(phrase); \
         dumpArrSize = ARRAY_SIZE((st)->phrase); \
         dumpVarSize = sizeof((st)->phrase[0]); \
@@ -228,21 +228,25 @@
         { \
             case 1: \
                 for (dumpArrIdx=0; dumpArrIdx < dumpArrSize; dumpArrIdx++) { \
+                    physAddr = XX_VirtToPhys((void *)&((st)->phrase[dumpArrIdx])); \
                     DUMP_Print("0x%010llX: 0x%02x%14s\t%s[%d]\r\n", \
                                physAddr, GET_UINT8((st)->phrase[dumpArrIdx]), "", dumpSubStr, dumpArrIdx); \
                 } break; \
             case 2: \
                 for (dumpArrIdx=0; dumpArrIdx < dumpArrSize; dumpArrIdx++) { \
+                    physAddr = XX_VirtToPhys((void *)&((st)->phrase[dumpArrIdx])); \
                     DUMP_Print("0x%010llX: 0x%04x%12s\t%s[%d]\r\n", \
                                physAddr, GET_UINT16((st)->phrase[dumpArrIdx]), "", dumpSubStr, dumpArrIdx); \
                 } break; \
             case 4: \
                 for (dumpArrIdx=0; dumpArrIdx < dumpArrSize; dumpArrIdx++) { \
+                    physAddr = XX_VirtToPhys((void *)&((st)->phrase[dumpArrIdx])); \
                     DUMP_Print("0x%010llX: 0x%08x%8s\t%s[%d]\r\n", \
                                physAddr, GET_UINT32((st)->phrase[dumpArrIdx]), "", dumpSubStr, dumpArrIdx); \
                 } break; \
             case 8: \
                 for (dumpArrIdx=0; dumpArrIdx < dumpArrSize; dumpArrIdx++) { \
+                    physAddr = XX_VirtToPhys((void *)&((st)->phrase[dumpArrIdx])); \
                     DUMP_Print("0x%010llX: 0x%016llx\t%s[%d]\r\n", \
                                physAddr, GET_UINT64((st)->phrase[dumpArrIdx]), dumpSubStr, dumpArrIdx); \
                 } break; \

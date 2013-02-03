@@ -819,6 +819,8 @@ typedef struct ioc_fm_port_mac_statistics_t {
     /* MIB II */
         uint64_t  if_in_octets;              /**< Total number of byte received. */
         uint64_t  if_in_pkts;                /**< Total number of packets received.*/
+        uint64_t  if_in_ucast_pkts;          /**< Total number of unicast frame received;
+                                             NOTE: this counter is not supported on dTSEC MAC */
         uint64_t  if_in_mcast_pkts;          /**< Total number of multicast frame received*/
         uint64_t  if_in_bcast_pkts;          /**< Total number of broadcast frame received */
         uint64_t  if_in_discards;            /**< Frames received, but discarded due to problems within the MAC RX. */
@@ -830,6 +832,8 @@ typedef struct ioc_fm_port_mac_statistics_t {
                                                    - The dedicated Error Code (0xfe, not a code error) was received */
         uint64_t  if_out_octets;             /**< Total number of byte sent. */
         uint64_t  if_out_pkts;               /**< Total number of packets sent .*/
+        uint64_t  if_out_ucast_pkts;         /**< Total number of unicast frame sent;
+                                             NOTE: this counter is not supported on dTSEC MAC */
         uint64_t  if_out_mcast_pkts;         /**< Total number of multicast frame sent */
         uint64_t  if_out_bcast_pkts;         /**< Total number of multicast frame sent */
         uint64_t  if_out_discards;           /**< Frames received, but discarded due to problems within the MAC TX N/A!.*/

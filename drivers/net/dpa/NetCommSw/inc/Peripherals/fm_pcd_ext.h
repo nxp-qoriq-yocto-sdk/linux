@@ -43,6 +43,7 @@
 #include "net_ext.h"
 #include "list_ext.h"
 #include "fm_ext.h"
+#include "fsl_fman_kg.h"
 
 
 /**************************************************************************//**
@@ -85,7 +86,7 @@
                                                                              for private headers. */
 #define FM_PCD_MAX_NUM_OF_INTERCHANGEABLE_HDRS      4                   /**< Maximum number of interchangeable headers
                                                                              in a distinction unit */
-#define FM_PCD_KG_NUM_OF_GENERIC_REGS               8                   /**< Total number of generic KeyGen registers */
+#define FM_PCD_KG_NUM_OF_GENERIC_REGS               FM_KG_NUM_OF_GENERIC_REGS /**< Total number of generic KeyGen registers */
 #define FM_PCD_KG_MAX_NUM_OF_EXTRACTS_PER_KEY       35                  /**< Max number allowed on any configuration;
                                                                              For HW implementation reasons, in most
                                                                              cases less than this will be allowed; The
@@ -215,7 +216,10 @@ typedef t_Error (t_FmPcdQmEnqueueCallback) (t_Handle h_QmArg, void *p_Fd);
  *//***************************************************************************/
 typedef struct t_FmPcdHcParams {
     uintptr_t                   portBaseAddr;       /**< Virtual Address of Host-Command Port memory mapped registers.*/
-    uint8_t                     portId;             /**< Port Id (0-6 relative to Host-Command/Offline-Parsing ports) */
+    uint8_t                     portId;             /**< Port Id (0-6 relative to Host-Command/Offline-Parsing ports);
+                                                         NOTE: When configuring Host Command port for
+                                                         FMANv3 devices (DPAA_VERSION 11 and higher),
+                                                         portId=0 MUST be used. */
     uint16_t                    liodnBase;          /**< LIODN base for this port, to be used together with LIODN offset
                                                          (irrelevant for P4080 revision 1.0) */
     uint32_t                    errFqid;            /**< Host-Command Port error queue Id. */
@@ -846,11 +850,14 @@ typedef protocolOpt_t   ipv6ProtocolOpt_t;      /**< IPv6 protocol options. */
 
 #define IPV6_FRAG_1                 0x00000004  /**< IPV6 reassembly option.
                                                      IPV6 Reassembly manipulation requires network
-                                                     environment with IPV6 header and IPV6_FRAG_1 option  */
+                                                     environment with IPV6 header and IPV6_FRAG_1 option;
+                                                     in case where fragment found, the fragment-extension offset
+                                                     may be found at 'shim2' (in parser-result). */
 /* @} */
 
 #define FM_PCD_MANIP_MAX_HDR_SIZE               256
 #define FM_PCD_MANIP_DSCP_TO_VLAN_TRANS         64
+
 /**************************************************************************//**
  @Collection    A set of definitions to support Header Manipulation selection.
 *//***************************************************************************/
@@ -929,10 +936,10 @@ typedef enum e_FmPcdExtractByHdrType {
 typedef enum e_FmPcdExtractFrom {
     e_FM_PCD_EXTRACT_FROM_FRAME_START,          /**< KG & CC: Extract from beginning of frame */
     e_FM_PCD_EXTRACT_FROM_DFLT_VALUE,           /**< KG only: Extract from a default value */
-    e_FM_PCD_EXTRACT_FROM_CURR_END_OF_PARSE,    /**< KG only: Extract from the point where parsing had finished */
+    e_FM_PCD_EXTRACT_FROM_CURR_END_OF_PARSE,    /**< KG & CC: Extract from the point where parsing had finished */
     e_FM_PCD_EXTRACT_FROM_KEY,                  /**< CC only: Field where saved KEY */
     e_FM_PCD_EXTRACT_FROM_HASH,                 /**< CC only: Field where saved HASH */
-    e_FM_PCD_EXTRACT_FROM_PARSE_RESULT,         /**< KG & CC: Extract from the parser result */
+    e_FM_PCD_EXTRACT_FROM_PARSE_RESULT,         /**< KG only: Extract from the parser result */
     e_FM_PCD_EXTRACT_FROM_ENQ_FQID,             /**< KG & CC: Extract from enqueue FQID */
     e_FM_PCD_EXTRACT_FROM_FLOW_ID               /**< CC only: Field where saved Dequeue FQID */
 } e_FmPcdExtractFrom;
@@ -1239,7 +1246,7 @@ typedef enum e_FmPcdManipDontFragAction {
                                                         /**< Obsolete, cannot enqueue to error queue;
                                                              In practice, selects to discard packets;
                                                              Will be removed in the future */
-    e_FM_PCD_MANIP_FRAGMENT_PACKET,                     /**< Fragment packet and continue normal processing */
+    e_FM_PCD_MANIP_FRAGMENT_PACKECT,                    /**< Fragment packet and continue normal processing */
     e_FM_PCD_MANIP_CONTINUE_WITHOUT_FRAG                /**< Continue normal processing without fragmenting the packet */
 } e_FmPcdManipDontFragAction;
 
@@ -1306,7 +1313,7 @@ typedef union u_FmPcdHdrProtocolOpt {
                                  e_FM_PCD_HDR_INDEX_NONE/e_FM_PCD_HDR_INDEX_1,
                                  e_FM_PCD_HDR_INDEX_2/e_FM_PCD_HDR_INDEX_LAST)
 
-                                (Note that starting DPAA 11, NET_HEADER_FIELD_IPv6_NEXT_HDR applies to
+                                (Note that starting from DPAA 1-1, NET_HEADER_FIELD_IPv6_NEXT_HDR applies to
                                  the last next header indication, meaning the next L4, which may be
                                  present at the Ipv6 last extension. On earlier revisions this field
                                  applies to the Next-Header field of the main IPv6 header)
@@ -1334,6 +1341,11 @@ typedef union u_FmPcdHdrProtocolOpt {
                     HEADER_TYPE_UDP:
                         NET_HEADER_FIELD_UDP_PORT_SRC
                         NET_HEADER_FIELD_UDP_PORT_DST
+
+
+                    HEADER_TYPE_UDP_LITE: - relevant only if FM_CAPWAP_SUPPORT define
+                        NET_HEADER_FIELD_UDP_LITE_PORT_SRC
+                        NET_HEADER_FIELD_UDP_LITE_PORT_DST
 
                     HEADER_TYPE_IPSEC_AH:
                         NET_HEADER_FIELD_IPSEC_AH_SPI
@@ -1388,6 +1400,7 @@ typedef union t_FmPcdFields {
     headerFieldIpv4_t           ipv4;           /**< IPv4                   */
     headerFieldIpv6_t           ipv6;           /**< IPv6                   */
     headerFieldUdp_t            udp;            /**< UDP                    */
+    headerFieldUdpLite_t        udpLite;        /**< UDP Lite               */
     headerFieldTcp_t            tcp;            /**< TCP                    */
     headerFieldSctp_t           sctp;           /**< SCTP                   */
     headerFieldDccp_t           dccp;           /**< DCCP                   */
@@ -1594,12 +1607,15 @@ typedef struct t_FmPcdKgPlcrProfile {
                                                          should indicate the policer profile offset within the
                                                          port's policer profiles or shared window. */
         struct {
-            uint8_t     fqidOffsetShift;            /**< Shift of KeyGen results without the FQID base */
+            uint8_t     fqidOffsetShift;            /**< Shift on the KeyGen create FQID offset (i.e. not the
+                                                         final FQID - without the FQID base). */
             uint8_t     fqidOffsetRelativeProfileIdBase;
-                                                    /**< OR of KeyGen results without the FQID base
-                                                         This parameter should indicate the policer profile
-                                                         offset within the port's policer profiles window or
-                                                         SHARED window depends on sharedProfile */
+                                                    /**< The base of the FMan Port's relative Storage-Profile ID;
+                                                         this value will be "OR'ed" with the KeyGen create FQID
+                                                         offset (i.e. not the final FQID - without the FQID base);
+                                                         the final result should indicate the Storage-Profile offset
+                                                         within the FMan Port's relative Storage-Profiles window/
+                                                         (or the SHARED window depends on 'sharedProfile'). */
             uint8_t     numOfProfiles;              /**< Range of profiles starting at base */
         } indirectProfile;                          /**< Indirect profile parameters */
     } profileSelect;                                /**< Direct/indirect profile selection and parameters */
@@ -1622,11 +1638,14 @@ typedef struct t_FmPcdKgStorageProfile {
                                                          should indicate the storage profile offset within the
                                                          port's storage profiles window. */
         struct {
-            uint8_t     fqidOffsetShift;            /**< Shift of KeyGen results without the FQID base */
+            uint8_t     fqidOffsetShift;            /**< Shift on the KeyGen create FQID offset (i.e. not the
+                                                         final FQID - without the FQID base). */
             uint8_t     fqidOffsetRelativeProfileIdBase;
-                                                    /**< OR of KeyGen results without the FQID base;
-                                                         should indicate the policer profile offset within the
-                                                         port's storage profiles window. */
+                                                    /**< The base of the FMan Port's relative Storage-Profile ID;
+                                                         this value will be "OR'ed" with the KeyGen create FQID
+                                                         offset (i.e. not the final FQID - without the FQID base);
+                                                         the final result should indicate the Storage-Profile offset
+                                                         within the FMan Port's relative Storage-Profiles window. */
             uint8_t     numOfProfiles;              /**< Range of profiles starting at base. */
         } indirectProfile;                          /**< Indirect profile parameters. */
     } profileSelect;                                /**< Direct/indirect profile selection and parameters. */
@@ -2060,7 +2079,6 @@ typedef struct t_FmPcdPlcrProfileParams {
     bool                                trapProfileOnFlowC;         /**< Obsolete - do not use */
 } t_FmPcdPlcrProfileParams;
 
-#ifdef FM_CAPWAP_SUPPORT
 /**************************************************************************//**
  @Description   Parameters for selecting a location for requested manipulation
 *//***************************************************************************/
@@ -2072,6 +2090,7 @@ typedef struct t_FmManipHdrInfo
     t_FmPcdFields                       fullField;      /**< Relevant only when byField = TRUE: Extract field */
 } t_FmManipHdrInfo;
 
+#ifdef FM_CAPWAP_SUPPORT
 /**************************************************************************//**
  @Description   Parameters for defining an insertion manipulation
                 of type e_FM_PCD_MANIP_INSRT_TO_START_OF_FRAME_TEMPLATE
@@ -2184,6 +2203,23 @@ typedef struct t_FmPcdManipHdrRmvByHdrParams {
 
 /**************************************************************************//**
  @Description   Parameters for configuring IP fragmentation manipulation
+
+ Restrictions:
+     - IP Fragmentation output fragments must not be forwarded to application directly.
+     - Maximum number of fragments per frame is 16.
+     - Fragmentation of IP fragments is not supported.
+     - IPv4 packets containing header Option fields are fragmented by copying all option
+       fields to each fragment, regardless of the copy bit value.
+     - Transmit confirmation is not supported.
+     - Fragmentation after SEC can't handle S/G frames.
+     - Fragmentation nodes must be set as the last PCD action (i.e. the
+       corresponding CC node key must have next engine set to e_FM_PCD_DONE).
+     - Only BMan buffers shall be used for frames to be fragmented.
+     - IPF does not support VSP. Therefore, on the same port where we have IPF
+       we cannot support VSP.
+     - NOTE: The following comment is relevant only for FMAN v3 devices: IPF
+       does not support VSP. Therefore, on the same port where we have IPF we
+       cannot support VSP.
 *//***************************************************************************/
 typedef struct t_FmPcdManipFragIpParams {
     uint16_t                    sizeForFragmentation;   /**< If length of the frame is greater than this value,
@@ -2195,7 +2231,7 @@ typedef struct t_FmPcdManipFragIpParams {
                                                              If disabled, the Scatter/Gather buffer will be allocated from the same pool as the
                                                              received frame's buffer. */
     uint8_t                     sgBpid;                 /**< Scatter/Gather buffer pool id;
-                                                             This parameter is relevant when 'sgBpidEn=TRUE';
+                                                             This parameters is relevant when 'sgBpidEn=TRUE';
                                                              Same LIODN number is used for these buffers as for the received frames buffers, so buffers
                                                              of this pool need to be allocated in the same memory area as the received buffers.
                                                              If the received buffers arrive from different sources, the Scatter/Gather BP id should be
@@ -2211,6 +2247,12 @@ typedef struct t_FmPcdManipFragIpParams {
                 This is a common structure for both IPv4 and IPv6 reassembly
                 manipulation. For reassembly of both IPv4 and IPv6, make sure to
                 set the 'hdr' field in t_FmPcdManipReassemParams to HEADER_TYPE_IPv6.
+
+ Restrictions:
+    - Application must define at least one scheme to catch the reassembled frames.
+    - Maximum number of fragments per frame is 16.
+    - Reassembly of IPv4 fragments containing Option fields is supported.
+
 *//***************************************************************************/
 typedef struct t_FmPcdManipReassemIpParams {
     uint8_t                         relativeSchemeId[2];    /**< Partition relative scheme id:
@@ -2232,7 +2274,7 @@ typedef struct t_FmPcdManipReassemIpParams {
     uint8_t                         dataMemId;              /**< Memory partition ID for the IPR's external tables structure */
     uint16_t                        dataLiodnOffset;        /**< LIODN offset for access the IPR's external tables structure. */
     uint16_t                        minFragSize[2];         /**< Minimum fragment size:
-                                                                 minFragSize[0] - for IPv4, minFragSize[1] - for IPv6 */
+                                                                 minFragSize[0] - for ipv4, minFragSize[1] - for ipv6 */
     e_FmPcdManipReassemWaysNumber   numOfFramesPerHashEntry[2];
                                                             /**< Number of frames per hash entry needed for reassembly process:
                                                                  numOfFramesPerHashEntry[0] - for ipv4 (max value is e_FM_PCD_MANIP_EIGHT_WAYS_HASH);
@@ -3150,6 +3192,8 @@ t_Error FM_PCD_MatchTableGetKeyStatistics(t_Handle                  h_CcNode,
                                           t_FmPcdCcKeyStatistics    *p_KeyStatistics);
 
 /**************************************************************************//**
+ @Function      FM_PCD_MatchTableFindNGetKeyStatistics
+
  @Description   This routine may be used to get statistics counters of specific key
                 in a CC Node.
 
@@ -3367,6 +3411,8 @@ t_Error FM_PCD_HashTableGetMissNextEngine(t_Handle                     h_HashTbl
                                           t_FmPcdCcNextEngineParams    *p_FmPcdCcNextEngineParams);
 
 /**************************************************************************//**
+ @Function      FM_PCD_HashTableFindNGetKeyStatistics
+
  @Description   This routine may be used to get statistics counters of specific key
                 in a hash table.
 

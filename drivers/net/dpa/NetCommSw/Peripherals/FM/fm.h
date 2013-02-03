@@ -171,9 +171,11 @@ switch (exception){                                         \
                                             FM_EX_QMI_SINGLE_ECC)
 
 
-#define DEFAULT_totalFifoSize(major)       (((major == 2) || (major == 5))  ?   \
-                                            (100*KILOBYTE):((major == 6) ?      \
-                                            (288*KILOBYTE):((major == 4) ? (46*KILOBYTE):(122*KILOBYTE))))
+#define DEFAULT_totalFifoSize(major)                    \
+    (((major == 2) || (major == 5)) ?                   \
+     (100*KILOBYTE) : ((major == 6) ?                   \
+                       (288*KILOBYTE) : ((major == 4) ? \
+                                         (46*KILOBYTE) : (122*KILOBYTE))))
 
 #define DEFAULT_eccEnable                   FALSE
 #define DEFAULT_dispLimit                   0
@@ -312,7 +314,8 @@ typedef _Packed struct
     volatile uint32_t   fmfp_extc;      /**< FPM External Requests Control */
     volatile uint32_t   fmfp_ext1;      /**< FPM External Requests Config1 */
     volatile uint32_t   fmfp_ext2;      /**< FPM External Requests Config2 */
-    volatile uint32_t   fmfp_drd[16];   /**< FPM Data_Ram Data 0-15 */
+    volatile uint32_t   fmfp_drd[4];    /**< FPM Data_Ram Data 0-3 */
+    volatile uint8_t    res3[48];       /**< reserved */
     volatile uint32_t   fmfp_dra;       /**< FPM Data Ram Access */
     volatile uint32_t   fm_ip_rev_1;    /**< FM IP Block Revision 1 */
     volatile uint32_t   fm_ip_rev_2;    /**< FM IP Block Revision 2 */
@@ -324,7 +327,7 @@ typedef _Packed struct
     volatile uint32_t   fmfp_cev[4];    /**< FPM CPU Event 1-4 */
     volatile uint8_t    res4[16];       /**< reserved */
     volatile uint32_t   fmfp_ps[0x40];  /**< FPM Port Status */
-    volatile uint8_t    reserved1[0x260];
+    volatile uint8_t    reserved1[0x200];
     volatile uint32_t   fmfp_ts[128];     /**< 0x400: FPM Task Status */
 } _PackedType t_FmFpmRegs;
 
@@ -476,7 +479,7 @@ typedef _Packed struct t_FmTrbRegs
  @Description       General defines
 *//***************************************************************************/
 #define FM_DEBUG_STATUS_REGISTER_OFFSET     0x000d1084UL
-#define FM_UCODE_DEBUG_INSTRUCTION          0x6ffff805UL
+#define FM_FW_DEBUG_INSTRUCTION             0x6ffff805UL
 
 /**************************************************************************//**
  @Description       DMA definitions
@@ -494,7 +497,6 @@ typedef _Packed struct t_FmTrbRegs
 #define DMA_MODE_CACHE_OR_MASK              0xC0000000
 #define DMA_MODE_CEN_MASK                   0x0000E000
 #define DMA_MODE_DBG_MASK                   0x00000380
-
 
 #define DMA_TRANSFER_PORTID_MASK            0xFF000000
 #define DMA_TRANSFER_TNUM_MASK              0x00FF0000
@@ -515,15 +517,13 @@ typedef _Packed struct t_FmTrbRegs
 #define DMA_STATUS_FM_SPDAT_ECC             0x00080000
 
 #define DMA_STATUS_FM_ECC                   (DMA_STATUS_READ_ECC |          \
-                                            DMA_STATUS_SYSTEM_WRITE_ECC |   \
-                                            DMA_STATUS_FM_WRITE_ECC |       \
-                                            DMA_STATUS_SYSTEM_DPEXT_ECC |   \
-                                            DMA_STATUS_FM_DPEXT_ECC |       \
-                                            DMA_STATUS_SYSTEM_DPDAT_ECC |   \
-                                            DMA_STATUS_FM_DPDAT_ECC |       \
-                                            DMA_STATUS_FM_SPDAT_ECC)
-
-
+                                             DMA_STATUS_SYSTEM_WRITE_ECC |  \
+                                             DMA_STATUS_FM_WRITE_ECC |      \
+                                             DMA_STATUS_SYSTEM_DPEXT_ECC |  \
+                                             DMA_STATUS_FM_DPEXT_ECC |      \
+                                             DMA_STATUS_SYSTEM_DPDAT_ECC |  \
+                                             DMA_STATUS_FM_DPDAT_ECC |      \
+                                             DMA_STATUS_FM_SPDAT_ECC)
 
 #define FM_LIODN_BASE_MASK                  0x00000FFF
 
@@ -732,7 +732,7 @@ typedef _Packed struct t_FmTrbRegs
 #define TRB_TCRH_ENABLE_COUNTERS    0x84008000
 #define TRB_TCRH_DISABLE_COUNTERS   0x8400C000
 #define TRB_TCRL_RESET              0x20000000
-#define TRB_TCRL_UTIL               0x00000400
+#define TRB_TCRL_UTIL               0x00000460
 
 typedef struct {
     void        (*f_Isr) (t_Handle h_Arg, uint32_t event);

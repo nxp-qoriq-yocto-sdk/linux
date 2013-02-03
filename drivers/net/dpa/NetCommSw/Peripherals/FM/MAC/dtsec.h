@@ -48,6 +48,21 @@
 #include "fm_mac.h"
 
 
+#define DEFAULT_exceptions            \
+    ((uint32_t)(DTSEC_IMASK_BREN    | \
+                DTSEC_IMASK_RXCEN   | \
+                DTSEC_IMASK_BTEN    | \
+                DTSEC_IMASK_TXCEN   | \
+                DTSEC_IMASK_TXEEN   | \
+                DTSEC_IMASK_ABRTEN  | \
+                DTSEC_IMASK_LCEN    | \
+                DTSEC_IMASK_CRLEN   | \
+                DTSEC_IMASK_XFUNEN  | \
+                DTSEC_IMASK_IFERREN | \
+                DTSEC_IMASK_MAGEN   | \
+                DTSEC_IMASK_TDPEEN  | \
+                DTSEC_IMASK_RDPEEN))
+
 #define GET_EXCEPTION_FLAG(bitMask, exception)  switch (exception){ \
     case e_FM_MAC_EX_1G_BAB_RX:                                     \
         bitMask = DTSEC_IMASK_BREN; break;                          \
@@ -112,21 +127,6 @@ typedef  uint32_t t_ErrorDisable;
 #define EXTENDED_HASH_TABLE_SIZE        512 /* Extended Hash table size (32 bits * 16 regs) */
 
 #define DTSEC_TO_MII_OFFSET             0x1000  /* number of pattern match registers (entries) */
-
-#define DEFAULT_exceptions              ((uint32_t)(DTSEC_IMASK_BREN    | \
-                                                    DTSEC_IMASK_RXCEN   | \
-                                                    DTSEC_IMASK_BTEN    | \
-                                                    DTSEC_IMASK_TXCEN   | \
-                                                    DTSEC_IMASK_TXEEN   | \
-                                                    DTSEC_IMASK_ABRTEN  | \
-                                                    DTSEC_IMASK_LCEN    | \
-                                                    DTSEC_IMASK_CRLEN   | \
-                                                    DTSEC_IMASK_XFUNEN  | \
-                                                    DTSEC_IMASK_IFERREN | \
-                                                    DTSEC_IMASK_MAGEN   | \
-                                                    DTSEC_IMASK_TDPEEN  | \
-                                                    DTSEC_IMASK_RDPEEN))
-
 
 #define MAX_PHYS                    32 /* maximum number of phys */
 
@@ -240,5 +240,6 @@ typedef struct {
     e_FmMacStatisticsLevel      statisticsLevel;
     struct dtsec_cfg            *p_DtsecDriverParam;
 } t_Dtsec;
+
 
 #endif /* __DTSEC_H */

@@ -48,6 +48,23 @@
 #include "fm_mac.h"
 
 
+#define DEFAULT_exceptions                        \
+    ((uint32_t)(TGEC_IMASK_MDIO_SCAN_EVENT     |  \
+                TGEC_IMASK_REM_FAULT           |  \
+                TGEC_IMASK_LOC_FAULT           |  \
+                TGEC_IMASK_TX_ECC_ER           |  \
+                TGEC_IMASK_TX_FIFO_UNFL        |  \
+                TGEC_IMASK_TX_FIFO_OVFL        |  \
+                TGEC_IMASK_TX_ER               |  \
+                TGEC_IMASK_RX_FIFO_OVFL        |  \
+                TGEC_IMASK_RX_ECC_ER           |  \
+                TGEC_IMASK_RX_JAB_FRM          |  \
+                TGEC_IMASK_RX_OVRSZ_FRM        |  \
+                TGEC_IMASK_RX_RUNT_FRM         |  \
+                TGEC_IMASK_RX_FRAG_FRM         |  \
+                TGEC_IMASK_RX_CRC_ER           |  \
+                TGEC_IMASK_RX_ALIGN_ER))
+
 #define GET_EXCEPTION_FLAG(bitMask, exception)      switch (exception){ \
     case e_FM_MAC_EX_10G_MDIO_SCAN_EVENTMDIO:                           \
         bitMask = TGEC_IMASK_MDIO_SCAN_EVENT    ; break;                \
@@ -84,22 +101,6 @@
     case e_FM_MAC_EX_10G_RX_ALIGN_ER:                                   \
         bitMask = TGEC_IMASK_RX_ALIGN_ER        ; break;                \
     default: bitMask = 0;break;}
-
-#define DEFAULT_exceptions  ((uint32_t)(TGEC_IMASK_MDIO_SCAN_EVENT     |  \
-                                        TGEC_IMASK_REM_FAULT           |  \
-                                        TGEC_IMASK_LOC_FAULT           |  \
-                                        TGEC_IMASK_TX_ECC_ER           |  \
-                                        TGEC_IMASK_TX_FIFO_UNFL        |  \
-                                        TGEC_IMASK_TX_FIFO_OVFL        |  \
-                                        TGEC_IMASK_TX_ER               |  \
-                                        TGEC_IMASK_RX_FIFO_OVFL        |  \
-                                        TGEC_IMASK_RX_ECC_ER           |  \
-                                        TGEC_IMASK_RX_JAB_FRM          |  \
-                                        TGEC_IMASK_RX_OVRSZ_FRM        |  \
-                                        TGEC_IMASK_RX_RUNT_FRM         |  \
-                                        TGEC_IMASK_RX_FRAG_FRM         |  \
-                                        TGEC_IMASK_RX_CRC_ER           |  \
-                                        TGEC_IMASK_RX_ALIGN_ER))
 
 #define MAX_PACKET_ALIGNMENT        31
 #define MAX_INTER_PACKET_GAP        0x7f

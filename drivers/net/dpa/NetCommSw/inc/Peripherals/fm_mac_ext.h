@@ -169,6 +169,8 @@ typedef struct t_FmMacStatistics {
 /* MIB II */
     uint64_t  ifInOctets;              /**< Total number of byte received. */
     uint64_t  ifInPkts;                /**< Total number of packets received.*/
+    uint64_t  ifInUcastPkts;           /**< Total number of unicast frame received;
+                                            NOTE: this counter is not supported on dTSEC MAC */
     uint64_t  ifInMcastPkts;           /**< Total number of multicast frame received*/
     uint64_t  ifInBcastPkts;           /**< Total number of broadcast frame received */
     uint64_t  ifInDiscards;            /**< Frames received, but discarded due to problems within the MAC RX. */
@@ -180,6 +182,8 @@ typedef struct t_FmMacStatistics {
                                                - The dedicated Error Code (0xfe, not a code error) was received */
     uint64_t  ifOutOctets;             /**< Total number of byte sent. */
     uint64_t  ifOutPkts;               /**< Total number of packets sent .*/
+    uint64_t  ifOutUcastPkts;          /**< Total number of unicast frame sent;
+                                            NOTE: this counter is not supported on dTSEC MAC */
     uint64_t  ifOutMcastPkts;          /**< Total number of multicast frame sent */
     uint64_t  ifOutBcastPkts;          /**< Total number of multicast frame sent */
     uint64_t  ifOutDiscards;           /**< Frames received, but discarded due to problems within the MAC TX N/A!.*/
@@ -205,7 +209,14 @@ typedef struct t_FmMacParams {
     uintptr_t                   baseAddr;           /**< Base of memory mapped FM MAC registers */
     t_EnetAddr                  addr;               /**< MAC address of device; First octet is sent first */
     uint8_t                     macId;              /**< MAC ID <dTSEC 0-3> <10G-MAC 0>      */
-    e_EnetMode                  enetMode;           /**< Ethernet operation mode (MAC-PHY interface and speed) */
+    e_EnetMode                  enetMode;           /**< Ethernet operation mode (MAC-PHY interface and speed);
+                                                         Note that the speed should indicate the maximum rate that
+                                                         this MAC should support rather than the actuall speed;
+                                                         i.e. user should use the FM_MAC_AdjustLink() routine to
+                                                         provide accurate speed;
+                                                         In addition, in mEMAC, in case where user is using the higher MACs
+                                                         (i.e. the MACs that should support 10G), user should pass here
+                                                         speed=10000 even if the interface is not allowing that (e.g. SGMII). */
     t_Handle                    h_Fm;               /**< A handle to the FM object this port related to */
     int                         mdioIrq;            /**< MDIO exceptions interrupt source - not valid for all
                                                          MACs; MUST be set to 'NO_IRQ' for MACs that don't have

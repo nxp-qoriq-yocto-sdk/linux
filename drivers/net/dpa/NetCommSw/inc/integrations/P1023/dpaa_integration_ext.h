@@ -102,6 +102,7 @@ typedef enum {
 #define SEC_NUM_OF_DECOS    2
 #define SEC_ALL_DECOS_MASK  0x00000003
 #define SEC_RNGB
+#define SEC_NO_ESP_TRAILER_REMOVAL
 
 /*****************************************************************************
  FM INTEGRATION-SPECIFIC DEFINITIONS
@@ -122,7 +123,7 @@ typedef enum {
 #define FM_MAX_NUM_OF_MACSECS       1
 
 #define FM_MACSEC_SUPPORT
-#define FM_DISABLE_SEC_ERRORS
+#define FM_CAPWAP_SUPPORT
 
 #define FM_LOW_END_RESTRICTION      /* prevents the use of TX port 1 with OP port 0 */
 
@@ -132,13 +133,16 @@ typedef enum {
 #define FM_MAX_NUM_OF_SUB_PORTALS               7
 
 /* Rams defines */
-#define FM_MURAM_SIZE               (64*KILOBYTE)
-#define FM_IRAM_SIZE                (32*KILOBYTE)
+#define FM_MURAM_SIZE                   (64*KILOBYTE)
+#define FM_IRAM_SIZE                    (32*KILOBYTE)
+#define FM_NUM_OF_CTRL                  2
 
 /* PCD defines */
 #define FM_PCD_PLCR_NUM_ENTRIES         32                  /**< Total number of policer profiles */
 #define FM_PCD_KG_NUM_OF_SCHEMES        16                  /**< Total number of KG schemes */
 #define FM_PCD_MAX_NUM_OF_CLS_PLANS     128                 /**< Number of classification plan entries. */
+#define FM_PCD_PRS_SW_PATCHES_SIZE      0x00000240          /**< Number of bytes saved for patches */
+#define FM_PCD_SW_PRS_SIZE              0x00000800          /**< Total size of SW parser area */
 
 /* RTC defines */
 #define FM_RTC_NUM_OF_ALARMS            2
@@ -217,6 +221,8 @@ typedef enum e_FmMacsecInterModuleEvent {
 
 #define FM_DEBUG_TRACE_FMAN_A004                        /* No implementation, Out of LLD scope */
 #define FM_INT_BUF_LEAK_FMAN_A005                       /* No implementation, Out of LLD scope. App must avoid S/G */
+
+#define FM_GTS_AFTER_DROPPED_FRAME_ERRATA_DTSEC_A004839
 
 /* #define FM_UCODE_NOT_RESET_ERRATA_BUGZILLA6173 */
 

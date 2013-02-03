@@ -41,7 +41,6 @@
 
 #include "std_ext.h"
 
-
 /***********************************************************************/
 /*          Keygen defines                                             */
 /***********************************************************************/
@@ -55,30 +54,6 @@
 #define KG_SCH_VSP_MASK_SHIFT                   12
 #define KG_SCH_VSP_SHIFT                        24
 #endif /* (DPAA_VERSION >= 11) */
-
-#define KG_SCH_PP_SHIFT_HIGH                    0x80000000
-#define KG_SCH_PP_NO_GEN                        0x10000000
-#define KG_SCH_PP_SHIFT_LOW                     0x0000F000
-#define KG_SCH_MODE_NIA_PLCR                    0x40000000
-#define KG_SCH_GEN_EXTRACT_TYPE                 0x00008000
-#define KG_SCH_BITMASK_MASK                     0x000000FF
-#define KG_SCH_GEN_VALID                        0x80000000
-#define KG_SCH_GEN_MASK                         0x00FF0000
-#define FM_PCD_KG_KGAR_ERR                      0x20000000
-#define FM_PCD_KG_KGAR_SEL_CLS_PLAN_ENTRY       0x01000000
-#define FM_PCD_KG_KGAR_SEL_PORT_ENTRY           0x02000000
-#define FM_PCD_KG_KGAR_SEL_PORT_WSEL_SP         0x00008000
-#define FM_PCD_KG_KGAR_SEL_PORT_WSEL_CPP        0x00004000
-#define FM_PCD_KG_KGAR_WSEL_MASK                0x0000FF00
-#define KG_SCH_HASH_CONFIG_NO_FQID              0x80000000
-#define KG_SCH_HASH_CONFIG_SYM                  0x40000000
-
-#define FM_PCD_KG_KGAR_GO                       0x80000000
-#define FM_PCD_KG_KGAR_READ                     0x40000000
-#define FM_PCD_KG_KGAR_WRITE                    0x00000000
-#define FM_PCD_KG_KGAR_SEL_SCHEME_ENTRY         0x00000000
-#define FM_PCD_KG_KGAR_SCHEME_WSEL_UPDATE_CNT   0x00008000
-
 
 typedef uint32_t t_KnownFieldsMasks;
 #define KG_SCH_KN_PORT_ID                   0x80000000
@@ -220,22 +195,7 @@ switch (i) {                                        \
 /***********************************************************************/
 /*          Keygen defines                                             */
 /***********************************************************************/
-/* Masks */
-#define FM_PCD_KG_KGGCR_EN                      0x80000000
-#define KG_SCH_GEN_VALID                        0x80000000
-#define KG_SCH_GEN_EXTRACT_TYPE                 0x00008000
-#define KG_ERR_CAP                              0x80000000
-#define KG_ERR_TYPE_DOUBLE                      0x40000000
-#define KG_ERR_ADDR_MASK                        0x00000FFF
-#define FM_PCD_KG_DOUBLE_ECC                    0x80000000
-#define FM_PCD_KG_KEYSIZE_OVERFLOW              0x40000000
-#define KG_SCH_MODE_EN                          0x80000000
 
-/* shifts */
-#define FM_PCD_KG_PE_CPP_MASK_SHIFT             16
-#define FM_PCD_KG_KGAR_WSEL_SHIFT               8
-
-/* others */
 #define KG_DOUBLE_MEANING_REGS_OFFSET           0x100
 #define NO_VALIDATION                           0x70
 #define KG_ACTION_REG_TO                        1024

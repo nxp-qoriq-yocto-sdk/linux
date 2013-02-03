@@ -48,30 +48,15 @@
 #include "fsl_fman_memac.h"
 
 
+#define MEMAC_default_exceptions    ((uint32_t)(MEMAC_IMASK_TECC_ER | MEMAC_IMASK_RECC_ER))
+
 #define GET_EXCEPTION_FLAG(bitMask, exception)       switch (exception){    \
-    case e_FM_MAC_EX_10G_RX_FIFO_OVFL:                                      \
-        bitMask = IMASK_RX_FIFO_OVFL; break;                                \
-    case e_FM_MAC_EX_10G_TX_FIFO_UNFL:                                      \
-        bitMask = IMASK_TX_FIFO_UNFL; break;                                \
-    case e_FM_MAC_EX_10G_TX_FIFO_OVFL:                                      \
-        bitMask = IMASK_TX_FIFO_OVFL; break;                                \
     case e_FM_MAC_EX_10G_1TX_ECC_ER:                                        \
-        bitMask = IMASK_TX_ECC_ER; break;                                   \
+        bitMask = MEMAC_IMASK_TECC_ER; break;                               \
     case e_FM_MAC_EX_10G_RX_ECC_ER:                                         \
-        bitMask = IMASK_RX_ECC_ER; break;                                   \
-    case e_FM_MAC_EX_10G_REM_FAULT:                                         \
-        bitMask = IMASK_REM_FAULT; break;                                   \
-    case e_FM_MAC_EX_10G_LOC_FAULT:                                         \
-        bitMask = IMASK_LOC_FAULT; break;                                           \
+        bitMask = MEMAC_IMASK_RECC_ER; break;                                     \
     default: bitMask = 0;break;}
 
-#define DEFAULT_exceptions          ((uint32_t)(IMASK_RX_FIFO_OVFL  |  \
-                                                IMASK_TX_FIFO_UNFL  |  \
-                                                IMASK_TX_FIFO_OVFL  |  \
-                                                IMASK_TX_ECC_ER     |  \
-                                                IMASK_RX_ECC_ER     |  \
-                                                IMASK_REM_FAULT     |  \
-                                                IMASK_LOC_FAULT))
 
 typedef struct
 {
@@ -94,13 +79,26 @@ typedef struct
     uint32_t                    exceptions;
     struct memac_cfg            *p_MemacDriverParam;
 } t_Memac;
-/* Internal PHY access */
 
+
+/* Internal PHY access */
 #define PHY_MDIO_ADDR               0
+
+/* Internal PHY Registers - SGMII */
+#define PHY_SGMII_CR_PHY_RESET          0x8000
+#define PHY_SGMII_CR_RESET_AN           0x0200
+#define PHY_SGMII_CR_DEF_VAL            0x1140
+#define PHY_SGMII_DEV_ABILITY_SGMII     0x4001
+#define PHY_SGMII_DEV_ABILITY_1000X     0x01A0
+#define PHY_SGMII_IF_MODE_AN            0x0002
+#define PHY_SGMII_IF_MODE_SGMII         0x0001
+#define PHY_SGMII_IF_MODE_1000X         0x0000
+
 
 #define MEMAC_TO_MII_OFFSET         0x030       /* Offset from the MEM map to the MDIO mem map */
 
 t_Error MEMAC_MII_WritePhyReg(t_Handle h_Memac, uint8_t phyAddr, uint8_t reg, uint16_t data);
 t_Error MEMAC_MII_ReadPhyReg(t_Handle h_Memac,  uint8_t phyAddr, uint8_t reg, uint16_t *p_Data);
+
 
 #endif /* __MEMAC_H */

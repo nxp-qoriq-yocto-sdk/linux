@@ -69,9 +69,9 @@
 #define HC_HCOR_KG_SCHEME_REGS_MASK         0xFFFFFE00
 #endif /* (DPAA_VERSION == 10) */
 
-#define SIZE_OF_HC_FRAME_PORT_REGS          (sizeof(t_HcFrame)-sizeof(t_FmPcdKgSchemeRegs)+sizeof(t_FmPcdKgPortRegs))
+#define SIZE_OF_HC_FRAME_PORT_REGS          (sizeof(t_HcFrame)-sizeof(struct fman_kg_scheme_regs)+sizeof(t_FmPcdKgPortRegs))
 #define SIZE_OF_HC_FRAME_SCHEME_REGS        sizeof(t_HcFrame)
-#define SIZE_OF_HC_FRAME_PROFILES_REGS      (sizeof(t_HcFrame)-sizeof(t_FmPcdKgSchemeRegs)+sizeof(t_FmPcdPlcrProfileRegs))
+#define SIZE_OF_HC_FRAME_PROFILES_REGS      (sizeof(t_HcFrame)-sizeof(struct fman_kg_scheme_regs)+sizeof(t_FmPcdPlcrProfileRegs))
 #define SIZE_OF_HC_FRAME_PROFILE_CNT        (sizeof(t_HcFrame)-sizeof(t_FmPcdPlcrProfileRegs)+sizeof(uint32_t))
 #define SIZE_OF_HC_FRAME_READ_OR_CC_DYNAMIC 16
 
@@ -101,8 +101,8 @@ typedef _Packed struct t_HcFrame {
     volatile uint32_t                           extraReg;
     volatile uint32_t                           commandSequence;
     union {
-        t_FmPcdKgSchemeRegs                     schemeRegs;
-        t_FmPcdKgSchemeRegs                     schemeRegsWithoutCounter;
+        struct fman_kg_scheme_regs              schemeRegs;
+        struct fman_kg_scheme_regs              schemeRegsWithoutCounter;
         t_FmPcdPlcrProfileRegs                  profileRegs;
         volatile uint32_t                       singleRegForWrite;    /* for writing SP, CPP, profile counter */
         t_FmPcdKgPortRegs                       portRegsForRead;
@@ -246,6 +246,14 @@ t_Handle FmHcConfigAndInit(t_FmHcParams *p_FmHcParams)
     p_FmHc->h_QmArg             = p_FmHcParams->params.h_QmArg;
     p_FmHc->dataMemId           = DEFAULT_dataMemId;
 
+    err = FillBufPool(p_FmHc);
+    if (err != E_OK)
+    {
+        REPORT_ERROR(MAJOR, err, NO_MSG);
+        FmHcFree(p_FmHc);
+        return NULL;
+    }
+
     if (!FmIsMaster(p_FmHcParams->h_Fm))
         return (t_Handle)p_FmHc;
 
@@ -281,14 +289,6 @@ t_Handle FmHcConfigAndInit(t_FmHcParams *p_FmHcParams)
     if (err != E_OK)
     {
         REPORT_ERROR(MAJOR, err, ("FM HC port enable!"));
-        FmHcFree(p_FmHc);
-        return NULL;
-    }
-
-    err = FillBufPool(p_FmHc);
-    if (err != E_OK)
-    {
-        REPORT_ERROR(MAJOR, err, NO_MSG);
         FmHcFree(p_FmHc);
         return NULL;
     }
@@ -375,16 +375,16 @@ void FmHcTxConf(t_Handle h_FmHc, t_DpaaFD *p_Fd)
     FmPcdUnlock(p_FmHc->h_FmPcd, intFlags);
 }
 
-t_Error FmHcPcdKgSetScheme(t_Handle             h_FmHc,
-                           t_Handle             h_Scheme,
-                           t_FmPcdKgSchemeRegs  *p_SchemeRegs,
-                           bool                 updateCounter)
+t_Error FmHcPcdKgSetScheme(t_Handle                    h_FmHc,
+                           t_Handle                    h_Scheme,
+                           struct fman_kg_scheme_regs  *p_SchemeRegs,
+                           bool                        updateCounter)
 {
     t_FmHc                              *p_FmHc = (t_FmHc*)h_FmHc;
     t_Error                             err = E_OK;
     t_HcFrame                           *p_HcFrame;
     t_DpaaFD                            fmFd;
-    uint8_t                             physicalSchemeId, relativeSchemeId;
+    uint8_t                             physicalSchemeId;
     uint32_t                            seqNum;
 
     p_HcFrame = GetBuf(p_FmHc, &seqNum);
@@ -392,13 +392,12 @@ t_Error FmHcPcdKgSetScheme(t_Handle             h_FmHc,
         RETURN_ERROR(MINOR, E_NO_MEMORY, ("HC Frame object"));
 
     physicalSchemeId = FmPcdKgGetSchemeId(h_Scheme);
-    relativeSchemeId = FmPcdKgGetRelativeSchemeId(p_FmHc->h_FmPcd, physicalSchemeId);
 
     memset(p_HcFrame, 0, sizeof(t_HcFrame));
     p_HcFrame->opcode = (uint32_t)(HC_HCOR_GBL | HC_HCOR_OPCODE_KG_SCM);
     p_HcFrame->actionReg  = FmPcdKgBuildWriteSchemeActionReg(physicalSchemeId, updateCounter);
     p_HcFrame->extraReg = HC_HCOR_KG_SCHEME_REGS_MASK;
-    memcpy(&p_HcFrame->hcSpecificData.schemeRegs, p_SchemeRegs, sizeof(t_FmPcdKgSchemeRegs));
+    memcpy(&p_HcFrame->hcSpecificData.schemeRegs, p_SchemeRegs, sizeof(struct fman_kg_scheme_regs));
     if (!updateCounter)
     {
         p_HcFrame->hcSpecificData.schemeRegs.kgse_dv0   = p_SchemeRegs->kgse_dv0;
@@ -437,7 +436,7 @@ t_Error FmHcPcdKgDeleteScheme(t_Handle h_FmHc, t_Handle h_Scheme)
     p_HcFrame->opcode = (uint32_t)(HC_HCOR_GBL | HC_HCOR_OPCODE_KG_SCM);
     p_HcFrame->actionReg  = FmPcdKgBuildWriteSchemeActionReg(physicalSchemeId, TRUE);
     p_HcFrame->extraReg = HC_HCOR_KG_SCHEME_REGS_MASK;
-    memset(&p_HcFrame->hcSpecificData.schemeRegs, 0, sizeof(t_FmPcdKgSchemeRegs));
+    memset(&p_HcFrame->hcSpecificData.schemeRegs, 0, sizeof(struct fman_kg_scheme_regs));
     p_HcFrame->commandSequence = seqNum;
 
     BUILD_FD(sizeof(t_HcFrame));

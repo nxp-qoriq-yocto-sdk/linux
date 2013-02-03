@@ -51,6 +51,35 @@
 /*****************************************************************************/
 /*                      Internal routines                                    */
 /*****************************************************************************/
+
+/* ......................................................................... */
+
+static uint32_t GetMacAddrHashCode(uint64_t ethAddr)
+{
+    uint64_t    mask1, mask2;
+    uint32_t    xor = 0;
+    uint8_t     i, j;
+
+    for (i=0; i < 6; i++)
+    {
+        mask1 = ethAddr & (uint64_t)0x01;
+        ethAddr >>= 1;
+
+        for (j=0; j < 7; j++)
+        {
+            mask2 = ethAddr & (uint64_t)0x01;
+            mask1 ^= mask2;
+            ethAddr >>= 1;
+        }
+        xor |= (mask1 << (5-i));
+    }
+
+    return xor;
+}
+
+
+/* ......................................................................... */
+
 static void SetupSgmiiInternalPhy(t_Memac *p_Memac, uint8_t phyAddr)
 {
     uint16_t    tmpReg16;
@@ -64,14 +93,58 @@ static void SetupSgmiiInternalPhy(t_Memac *p_Memac, uint8_t phyAddr)
     MEMAC_MII_WritePhyReg(p_Memac, phyAddr, 0x4, tmpReg16);
 
     /* Adjust link timer for SGMII  -
-       1.6 ms in units of 8 ns = 2 * 10^5 = 0x30d40 */
-    MEMAC_MII_WritePhyReg(p_Memac, phyAddr, 0x13, 0x0003);
-    MEMAC_MII_WritePhyReg(p_Memac, phyAddr, 0x12, 0x0d40);
+       According to Cisco SGMII specification the timer should be 1.6 ms.
+       The link_timer register is configured in units of the clock.
+       - When running as 1G SGMII, Serdes clock is 125 MHz, so
+         unit = 1 / (125*10^6 Hz) = 8 ns.
+         1.6 ms in units of 8 ns = 1.6ms / 8ns = 2 * 10^5 = 0x30d40
+       - When running as 2.5G SGMII, Serdes clock is 312.5 MHz, so
+         unit = 1 / (312.5*10^6 Hz) = 3.2 ns.
+         1.6 ms in units of 3.2 ns = 1.6ms / 3.2ns = 5 * 10^5 = 0x7a120.
+       Since link_timer value of 1G SGMII will be too short for 2.5 SGMII,
+       we always set up here a value of 2.5 SGMII. */
+    MEMAC_MII_WritePhyReg(p_Memac, phyAddr, 0x13, 0x0007);
+    MEMAC_MII_WritePhyReg(p_Memac, phyAddr, 0x12, 0xa120);
 
     /* Restart AN */
     tmpReg16 = PHY_SGMII_CR_DEF_VAL | PHY_SGMII_CR_RESET_AN;
     MEMAC_MII_WritePhyReg(p_Memac, phyAddr, 0x0, tmpReg16);
 }
+
+/* ......................................................................... */
+
+static void SetupSgmiiInternalPhyBaseX(t_Memac *p_Memac, uint8_t phyAddr)
+{
+    uint16_t    tmpReg16;
+
+    /* 1000BaseX mode */
+    tmpReg16 = PHY_SGMII_IF_MODE_1000X;
+    MEMAC_MII_WritePhyReg(p_Memac, phyAddr, 0x14, tmpReg16);
+
+    /* AN Device capability  */
+    tmpReg16 = PHY_SGMII_DEV_ABILITY_1000X;
+    MEMAC_MII_WritePhyReg(p_Memac, phyAddr, 0x4, tmpReg16);
+
+    /* Adjust link timer for SGMII  -
+       For Serdes 1000BaseX auto-negotiation the timer should be 10 ms.
+       The link_timer register is configured in units of the clock.
+       - When running as 1G SGMII, Serdes clock is 125 MHz, so
+         unit = 1 / (125*10^6 Hz) = 8 ns.
+         10 ms in units of 8 ns = 10ms / 8ns = 1250000 = 0x1312d0
+       - When running as 2.5G SGMII, Serdes clock is 312.5 MHz, so
+         unit = 1 / (312.5*10^6 Hz) = 3.2 ns.
+         10 ms in units of 3.2 ns = 10ms / 3.2ns = 3125000 = 0x2faf08.
+       Since link_timer value of 1G SGMII will be too short for 2.5 SGMII,
+       we always set up here a value of 2.5 SGMII. */
+    MEMAC_MII_WritePhyReg(p_Memac, phyAddr, 0x13, 0x002f);
+    MEMAC_MII_WritePhyReg(p_Memac, phyAddr, 0x12, 0xaf08);
+
+    /* Restart AN */
+    tmpReg16 = PHY_SGMII_CR_DEF_VAL | PHY_SGMII_CR_RESET_AN;
+    MEMAC_MII_WritePhyReg(p_Memac, phyAddr, 0x0, tmpReg16);
+}
+
+/* ......................................................................... */
 
 static t_Error CheckInitParameters(t_Memac *p_Memac)
 {
@@ -100,38 +173,54 @@ static t_Error CheckInitParameters(t_Memac *p_Memac)
     return E_OK;
 }
 
-
 /* ........................................................................... */
 
 static void MemacErrException(t_Handle h_Memac)
 {
     t_Memac     *p_Memac = (t_Memac *)h_Memac;
-    uint32_t    event;
+    struct memac_regs   *regs = p_Memac->p_MemMap;
+    uint32_t    event, imsk;
 
-    event = GET_UINT32(p_Memac->p_MemMap->ievent);
-    /* do not handle MDIO events */
-    //event &= ~(IMASK_MDIO_SCAN_EVENTMDIO | IMASK_MDIO_CMD_CMPL);
+    event = memac_get_event(regs, 0xffffffff);
 
-    event &= GET_UINT32(p_Memac->p_MemMap->imask);
+    /*
+     * Apparently the imask bits are shifted by 16 bits offset from
+     * their corresponding bits in the ievent - hence the >> 16
+     */
+    imsk = memac_get_interrupt_mask(regs) >> 16;;
 
-    WRITE_UINT32(p_Memac->p_MemMap->ievent, event);
+    /*
+     * Extract all event bits plus the pending interrupts according to
+     * their imask
+     */
+    event = (event & ~(MEMAC_ALL_IMASKS >> 16)) | (event & imsk);
 
-    if (event & IMASK_RX_FIFO_OVFL)
+    /* Ignoring the status bits */
+    event = event & ~(MEMAC_IEVNT_RX_EMPTY |
+                      MEMAC_IEVNT_TX_EMPTY |
+                      MEMAC_IEVNT_RX_LOWP |
+                      MEMAC_IEVNT_PHY_LOS);
+
+    memac_ack_event(regs, event);
+
+    if (event & MEMAC_IEVNT_RX_FIFO_OVFL)
         p_Memac->f_Exception(p_Memac->h_App, e_FM_MAC_EX_10G_RX_FIFO_OVFL);
-    if (event & IMASK_TX_FIFO_UNFL)
+    if (event & MEMAC_IEVNT_TX_FIFO_UNFL)
         p_Memac->f_Exception(p_Memac->h_App, e_FM_MAC_EX_10G_TX_FIFO_UNFL);
-    if (event & IMASK_TX_FIFO_OVFL)
+    if (event & MEMAC_IEVNT_TX_FIFO_OVFL)
         p_Memac->f_Exception(p_Memac->h_App, e_FM_MAC_EX_10G_TX_FIFO_OVFL);
-    if (event & IMASK_TX_ECC_ER)
+    if (event & MEMAC_IEVNT_TX_ECC_ER)
         p_Memac->f_Exception(p_Memac->h_App, e_FM_MAC_EX_10G_1TX_ECC_ER);
-    if (event & IMASK_RX_ECC_ER)
+    if (event & MEMAC_IEVNT_RX_ECC_ER)
         p_Memac->f_Exception(p_Memac->h_App, e_FM_MAC_EX_10G_RX_ECC_ER);
-    if (event & IMASK_REM_FAULT)
+    if (event & MEMAC_IEVNT_REM_FAULT)
         p_Memac->f_Exception(p_Memac->h_App, e_FM_MAC_EX_10G_REM_FAULT);
-    if (event & IMASK_LOC_FAULT)
+    if (event & MEMAC_IEVNT_LOC_FAULT)
         p_Memac->f_Exception(p_Memac->h_App, e_FM_MAC_EX_10G_LOC_FAULT);
 }
 
+
+/* ......................................................................... */
 
 static void FreeInitResources(t_Memac *p_Memac)
 {
@@ -159,7 +248,7 @@ static void FreeInitResources(t_Memac *p_Memac)
 /*                     mEMAC API routines                                    */
 /*****************************************************************************/
 
-/* .............................................................................. */
+/* ......................................................................... */
 
 static t_Error MemacEnable(t_Handle h_Memac,  e_CommMode mode)
 {
@@ -173,7 +262,7 @@ static t_Error MemacEnable(t_Handle h_Memac,  e_CommMode mode)
     return E_OK;
 }
 
-/* .............................................................................. */
+/* ......................................................................... */
 
 static t_Error MemacDisable (t_Handle h_Memac, e_CommMode mode)
 {
@@ -187,7 +276,7 @@ static t_Error MemacDisable (t_Handle h_Memac, e_CommMode mode)
     return E_OK;
 }
 
-/* .............................................................................. */
+/* ......................................................................... */
 
 static t_Error MemacSetPromiscuous(t_Handle h_Memac, bool newVal)
 {
@@ -201,12 +290,26 @@ static t_Error MemacSetPromiscuous(t_Handle h_Memac, bool newVal)
     return E_OK;
 }
 
+/* .............................................................................. */
+
+static t_Error MemacAdjustLink(t_Handle h_Memac, e_EnetSpeed speed, bool fullDuplex)
+{
+    t_Memac     *p_Memac = (t_Memac *)h_Memac;
+
+    SANITY_CHECK_RETURN_ERROR(p_Memac, E_INVALID_HANDLE);
+    SANITY_CHECK_RETURN_ERROR(!p_Memac->p_MemacDriverParam, E_INVALID_STATE);
+UNUSED(p_Memac);
+DBG(WARNING, ("mEMAC works in automatic-mode; therefore, adjust-link is not needed!"));
+
+    return E_OK;
+}
+
 
 /*****************************************************************************/
 /*                      Memac Configs modification functions                 */
 /*****************************************************************************/
 
-/* .............................................................................. */
+/* ......................................................................... */
 
 static t_Error MemacConfigLoopback(t_Handle h_Memac, bool newVal)
 {
@@ -220,7 +323,7 @@ static t_Error MemacConfigLoopback(t_Handle h_Memac, bool newVal)
     return E_OK;
 }
 
-/* .............................................................................. */
+/* ......................................................................... */
 
 static t_Error MemacConfigWan(t_Handle h_Memac, bool newVal)
 {
@@ -234,7 +337,7 @@ static t_Error MemacConfigWan(t_Handle h_Memac, bool newVal)
     return E_OK;
 }
 
-/* .............................................................................. */
+/* ......................................................................... */
 
 static t_Error MemacConfigMaxFrameLength(t_Handle h_Memac, uint16_t newVal)
 {
@@ -248,7 +351,7 @@ static t_Error MemacConfigMaxFrameLength(t_Handle h_Memac, uint16_t newVal)
     return E_OK;
 }
 
-/* .............................................................................. */
+/* ......................................................................... */
 
 static t_Error MemacConfigPad(t_Handle h_Memac, bool newVal)
 {
@@ -262,7 +365,7 @@ static t_Error MemacConfigPad(t_Handle h_Memac, bool newVal)
     return E_OK;
 }
 
-/* .............................................................................. */
+/* ......................................................................... */
 
 static t_Error MemacConfigLengthCheck(t_Handle h_Memac, bool newVal)
 {
@@ -276,7 +379,7 @@ static t_Error MemacConfigLengthCheck(t_Handle h_Memac, bool newVal)
     return E_OK;
 }
 
-/* .............................................................................. */
+/* ......................................................................... */
 
 static t_Error MemacConfigException(t_Handle h_Memac, e_FmMacExceptions exception, bool enable)
 {
@@ -300,8 +403,7 @@ static t_Error MemacConfigException(t_Handle h_Memac, e_FmMacExceptions exceptio
     return E_OK;
 }
 
-
-/* .............................................................................. */
+/* ......................................................................... */
 
 static t_Error MemacConfigResetOnInit(t_Handle h_Memac, bool enable)
 {
@@ -320,6 +422,8 @@ static t_Error MemacConfigResetOnInit(t_Handle h_Memac, bool enable)
 /*                      Memac Run Time API functions                         */
 /*****************************************************************************/
 
+/* ......................................................................... */
+
 static t_Error MemacSetTxPauseFrames(t_Handle h_Memac,
                                      uint8_t  priority,
                                      uint16_t pauseTime,
@@ -335,7 +439,7 @@ static t_Error MemacSetTxPauseFrames(t_Handle h_Memac,
     return E_OK;
 }
 
-/* .............................................................................. */
+/* ......................................................................... */
 
 static t_Error MemacSetTxAutoPauseFrames(t_Handle h_Memac,
                                          uint16_t pauseTime)
@@ -343,7 +447,7 @@ static t_Error MemacSetTxAutoPauseFrames(t_Handle h_Memac,
     return MemacSetTxPauseFrames(h_Memac, FM_MAC_NO_PFC, pauseTime, 0);
 }
 
-/* .............................................................................. */
+/* ......................................................................... */
 
 static t_Error MemacSetRxIgnorePauseFrames(t_Handle h_Memac, bool en)
 {
@@ -357,8 +461,22 @@ static t_Error MemacSetRxIgnorePauseFrames(t_Handle h_Memac, bool en)
     return E_OK;
 }
 
-/* Counters handling */
 /* .............................................................................. */
+
+static t_Error MemacEnable1588TimeStamp(t_Handle h_Memac)
+{
+    t_Memac     *p_Memac = (t_Memac *)h_Memac;
+
+    SANITY_CHECK_RETURN_ERROR(p_Memac, E_INVALID_HANDLE);
+    SANITY_CHECK_RETURN_ERROR(!p_Memac->p_MemacDriverParam, E_INVALID_STATE);
+UNUSED(p_Memac);
+DBG(WARNING, ("mEMAC has 1588 always enabled!"));
+
+    return E_OK;
+}
+
+/* Counters handling */
+/* ......................................................................... */
 
 static t_Error MemacGetStatistics(t_Handle h_Memac, t_FmMacStatistics *p_Statistics)
 {
@@ -390,28 +508,30 @@ static t_Error MemacGetStatistics(t_Handle h_Memac, t_FmMacStatistics *p_Statist
 
 /* MIB II */
     p_Statistics->ifInOctets            = memac_get_counter(p_Memac->p_MemMap, E_MEMAC_COUNTER_ROCT);
+    p_Statistics->ifInUcastPkts         = memac_get_counter(p_Memac->p_MemMap, E_MEMAC_COUNTER_RUCA);
     p_Statistics->ifInMcastPkts         = memac_get_counter(p_Memac->p_MemMap, E_MEMAC_COUNTER_RMCA);
     p_Statistics->ifInBcastPkts         = memac_get_counter(p_Memac->p_MemMap, E_MEMAC_COUNTER_RBCA);
-    p_Statistics->ifInPkts              = memac_get_counter(p_Memac->p_MemMap, E_MEMAC_COUNTER_RUCA)
+    p_Statistics->ifInPkts              = p_Statistics->ifInUcastPkts
                                         + p_Statistics->ifInMcastPkts
                                         + p_Statistics->ifInBcastPkts;
     p_Statistics->ifInDiscards          = 0;
     p_Statistics->ifInErrors            = memac_get_counter(p_Memac->p_MemMap, E_MEMAC_COUNTER_RERR);
 
     p_Statistics->ifOutOctets           = memac_get_counter(p_Memac->p_MemMap, E_MEMAC_COUNTER_TOCT);
+    p_Statistics->ifOutUcastPkts        = memac_get_counter(p_Memac->p_MemMap, E_MEMAC_COUNTER_TUCA);
     p_Statistics->ifOutMcastPkts        = memac_get_counter(p_Memac->p_MemMap, E_MEMAC_COUNTER_TMCA);
     p_Statistics->ifOutBcastPkts        = memac_get_counter(p_Memac->p_MemMap, E_MEMAC_COUNTER_TBCA);
-    p_Statistics->ifOutPkts             = memac_get_counter(p_Memac->p_MemMap, E_MEMAC_COUNTER_TUCA)
-                                            + p_Statistics->ifOutMcastPkts
-                                            + p_Statistics->ifOutBcastPkts;
+    p_Statistics->ifOutPkts             = p_Statistics->ifOutUcastPkts
+                                        + p_Statistics->ifOutMcastPkts
+                                        + p_Statistics->ifOutBcastPkts;
     p_Statistics->ifOutDiscards         = 0;
     p_Statistics->ifOutErrors           = memac_get_counter(p_Memac->p_MemMap,  E_MEMAC_COUNTER_TERR);
 
     return E_OK;
 }
 
+/* ......................................................................... */
 
-/* .............................................................................. */
 static t_Error MemacModifyMacAddress (t_Handle h_Memac, t_EnetAddr *p_EnetAddr)
 {
     t_Memac     *p_Memac = (t_Memac *)h_Memac;
@@ -424,7 +544,7 @@ static t_Error MemacModifyMacAddress (t_Handle h_Memac, t_EnetAddr *p_EnetAddr)
     return E_OK;
 }
 
-/* .............................................................................. */
+/* ......................................................................... */
 
 static t_Error MemacResetCounters (t_Handle h_Memac)
 {
@@ -438,7 +558,7 @@ static t_Error MemacResetCounters (t_Handle h_Memac)
     return E_OK;
 }
 
-/* .............................................................................. */
+/* ......................................................................... */
 
 static t_Error MemacAddExactMatchMacAddress(t_Handle h_Memac, t_EnetAddr *p_EthAddr)
 {
@@ -481,7 +601,7 @@ static t_Error MemacAddExactMatchMacAddress(t_Handle h_Memac, t_EnetAddr *p_EthA
     RETURN_ERROR(MAJOR, E_FULL, NO_MSG);
 }
 
-/* .............................................................................. */
+/* ......................................................................... */
 
 static t_Error MemacDelExactMatchMacAddress(t_Handle h_Memac, t_EnetAddr *p_EthAddr)
 {
@@ -513,13 +633,12 @@ static t_Error MemacDelExactMatchMacAddress(t_Handle h_Memac, t_EnetAddr *p_EthA
     RETURN_ERROR(MAJOR, E_NOT_FOUND, NO_MSG);
 }
 
-/* .............................................................................. */
+/* ......................................................................... */
 
 static t_Error MemacAddHashMacAddress(t_Handle h_Memac, t_EnetAddr *p_EthAddr)
 {
     t_Memac             *p_Memac = (t_Memac *)h_Memac;
     t_EthHashEntry      *p_HashEntry;
-    uint32_t            crc;
     uint32_t            hash;
     uint64_t            ethAddr;
 
@@ -532,10 +651,7 @@ static t_Error MemacAddHashMacAddress(t_Handle h_Memac, t_EnetAddr *p_EthAddr)
         /* Unicast addresses not supported in hash */
         RETURN_ERROR(MAJOR, E_NOT_SUPPORTED, ("Unicast Address"));
 
-    /* CRC calculation */
-    crc = get_mac_addr_crc(ethAddr);
-
-    hash = (crc >> HASH_CTRL_MCAST_SHIFT) & HASH_CTRL_ADDR_MASK;        /* Take 6 MSB bits */
+    hash = GetMacAddrHashCode(ethAddr) & HASH_CTRL_ADDR_MASK;
 
     /* Create element to be added to the driver hash table */
     p_HashEntry = (t_EthHashEntry *)XX_Malloc(sizeof(t_EthHashEntry));
@@ -548,14 +664,13 @@ static t_Error MemacAddHashMacAddress(t_Handle h_Memac, t_EnetAddr *p_EthAddr)
     return E_OK;
 }
 
-/* .............................................................................. */
+/* ......................................................................... */
 
 static t_Error MemacDelHashMacAddress(t_Handle h_Memac, t_EnetAddr *p_EthAddr)
 {
     t_Memac             *p_Memac = (t_Memac *)h_Memac;
     t_EthHashEntry      *p_HashEntry = NULL;
     t_List              *p_Pos;
-    uint32_t            crc;
     uint32_t            hash;
     uint64_t            ethAddr;
 
@@ -564,10 +679,7 @@ static t_Error MemacDelHashMacAddress(t_Handle h_Memac, t_EnetAddr *p_EthAddr)
 
     ethAddr = ENET_ADDR_TO_UINT64(*p_EthAddr);
 
-    /* CRC calculation */
-    crc = get_mac_addr_crc(ethAddr);
-
-    hash = (crc >> HASH_CTRL_MCAST_SHIFT) & HASH_CTRL_ADDR_MASK;        /* Take 6 MSB bits */
+    hash = GetMacAddrHashCode(ethAddr) & HASH_CTRL_ADDR_MASK;
 
     LIST_FOR_EACH(p_Pos, &(p_Memac->p_MulticastAddrHash->p_Lsts[hash]))
     {
@@ -585,9 +697,8 @@ static t_Error MemacDelHashMacAddress(t_Handle h_Memac, t_EnetAddr *p_EthAddr)
     return E_OK;
 }
 
-/* .............................................................................. */
 
-/* .............................................................................. */
+/* ......................................................................... */
 
 static t_Error MemacSetException(t_Handle h_Memac, e_FmMacExceptions exception, bool enable)
 {
@@ -613,8 +724,7 @@ static t_Error MemacSetException(t_Handle h_Memac, e_FmMacExceptions exception, 
     return E_OK;
 }
 
-
-/* .............................................................................. */
+/* ......................................................................... */
 
 static uint16_t MemacGetMaxFrameLength(t_Handle h_Memac)
 {
@@ -626,7 +736,7 @@ static uint16_t MemacGetMaxFrameLength(t_Handle h_Memac)
     return memac_get_max_frame_length(p_Memac->p_MemMap);
 }
 
-/* .............................................................................. */
+/* ......................................................................... */
 
 #if (defined(DEBUG_ERRORS) && (DEBUG_ERRORS > 0))
 static t_Error MemacDumpRegs(t_Handle h_Memac)
@@ -688,7 +798,7 @@ static t_Error MemacDumpRegs(t_Handle h_Memac)
 /*                      mEMAC Init & Free API                                   */
 /*****************************************************************************/
 
-/* .............................................................................. */
+/* ......................................................................... */
 
 static t_Error MemacInit(t_Handle h_Memac)
 {
@@ -735,7 +845,10 @@ static t_Error MemacInit(t_Handle h_Memac)
     if (ENET_INTERFACE_FROM_MODE(p_Memac->enetMode) == e_ENET_IF_SGMII)
     {
         /* Configure internal SGMII PHY */
-        SetupSgmiiInternalPhy(p_Memac, PHY_MDIO_ADDR);
+        if (p_Memac->enetMode & ENET_IF_SGMII_BASEX)
+            SetupSgmiiInternalPhyBaseX(p_Memac, PHY_MDIO_ADDR);
+        else
+            SetupSgmiiInternalPhy(p_Memac, PHY_MDIO_ADDR);
     }
     else if (ENET_INTERFACE_FROM_MODE(p_Memac->enetMode) == e_ENET_IF_QSGMII)
     {
@@ -747,7 +860,10 @@ static t_Error MemacInit(t_Handle h_Memac)
                register address space and access each one of 4
                ports inside QSGMII. */
             phyAddr = (uint8_t)((PHY_MDIO_ADDR << 2) | i);
-            SetupSgmiiInternalPhy(p_Memac, phyAddr);
+            if (p_Memac->enetMode & ENET_IF_SGMII_BASEX)
+                SetupSgmiiInternalPhyBaseX(p_Memac, phyAddr);
+            else
+                SetupSgmiiInternalPhy(p_Memac, phyAddr);
         }
     }
 
@@ -756,6 +872,8 @@ static t_Error MemacInit(t_Handle h_Memac)
                            portType,
                            p_Memac->fmMacControllerDriver.macId,
                            p_MemacDriverParam->max_frame_length);
+    if (err)
+        RETURN_ERROR(MAJOR, err, ("settings Mac max frame length is FAILED"));
 
     p_Memac->p_MulticastAddrHash = AllocHashTable(HASH_TABLE_SIZE);
     if (!p_Memac->p_MulticastAddrHash)
@@ -771,20 +889,13 @@ static t_Error MemacInit(t_Handle h_Memac)
         RETURN_ERROR(MAJOR, E_NO_MEMORY, ("allocation hash table is FAILED"));
     }
 
-    if (portType == e_FM_MAC_10G)
-        FmRegisterIntr(p_Memac->fmMacControllerDriver.h_Fm,
-                       e_FM_MOD_10G_MAC,
-                       p_Memac->macId,
-                       e_FM_INTR_TYPE_ERR,
-                       MemacErrException,
-                       p_Memac);
-    else
-        FmRegisterIntr(p_Memac->fmMacControllerDriver.h_Fm,
-                       e_FM_MOD_1G_MAC,
-                       p_Memac->macId,
-                       e_FM_INTR_TYPE_ERR,
-                       MemacErrException,
-                       p_Memac);
+    FmRegisterIntr(p_Memac->fmMacControllerDriver.h_Fm,
+                   (portType == e_FM_MAC_10G) ? e_FM_MOD_10G_MAC : e_FM_MOD_1G_MAC,
+                   p_Memac->macId,
+                   e_FM_INTR_TYPE_ERR,
+                   MemacErrException,
+                   p_Memac);
+
 
     XX_Free(p_MemacDriverParam);
     p_Memac->p_MemacDriverParam = NULL;
@@ -792,7 +903,7 @@ static t_Error MemacInit(t_Handle h_Memac)
     return E_OK;
 }
 
-/* .............................................................................. */
+/* ......................................................................... */
 
 static t_Error MemacFree(t_Handle h_Memac)
 {
@@ -812,7 +923,7 @@ static t_Error MemacFree(t_Handle h_Memac)
     return E_OK;
 }
 
-/* .............................................................................. */
+/* ......................................................................... */
 
 static void InitFmMacControllerDriver(t_FmMacControllerDriver *p_FmMacControllerDriver)
 {
@@ -834,11 +945,11 @@ static void InitFmMacControllerDriver(t_FmMacControllerDriver *p_FmMacController
 
     p_FmMacControllerDriver->f_FM_MAC_SetException              = MemacSetException;
 
-    p_FmMacControllerDriver->f_FM_MAC_Enable1588TimeStamp       = NULL; /*MemacEnable1588TimeStamp;*/
-    p_FmMacControllerDriver->f_FM_MAC_Disable1588TimeStamp      = NULL; /*MemacDisable1588TimeStamp;*/
+    p_FmMacControllerDriver->f_FM_MAC_Enable1588TimeStamp       = MemacEnable1588TimeStamp; /* always enabled */
+    p_FmMacControllerDriver->f_FM_MAC_Disable1588TimeStamp      = NULL;
 
     p_FmMacControllerDriver->f_FM_MAC_SetPromiscuous            = MemacSetPromiscuous;
-    p_FmMacControllerDriver->f_FM_MAC_AdjustLink                = NULL;
+    p_FmMacControllerDriver->f_FM_MAC_AdjustLink                = MemacAdjustLink;
     p_FmMacControllerDriver->f_FM_MAC_RestartAutoneg            = NULL;
 
     p_FmMacControllerDriver->f_FM_MAC_Enable                    = MemacEnable;
@@ -873,7 +984,7 @@ static void InitFmMacControllerDriver(t_FmMacControllerDriver *p_FmMacController
 /*                      mEMAC Config Main Entry                             */
 /*****************************************************************************/
 
-/* .............................................................................. */
+/* ......................................................................... */
 
 t_Handle MEMAC_Config(t_FmMacParams *p_FmMacParam)
 {
@@ -916,7 +1027,7 @@ t_Handle MEMAC_Config(t_FmMacParams *p_FmMacParam)
 
     p_Memac->enetMode       = p_FmMacParam->enetMode;
     p_Memac->macId          = p_FmMacParam->macId;
-    p_Memac->exceptions     = DEFAULT_exceptions;
+    p_Memac->exceptions     = MEMAC_default_exceptions;
     p_Memac->f_Exception    = p_FmMacParam->f_Exception;
     p_Memac->f_Event        = p_FmMacParam->f_Event;
     p_Memac->h_App          = p_FmMacParam->h_App;

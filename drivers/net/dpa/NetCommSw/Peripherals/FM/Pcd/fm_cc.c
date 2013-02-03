@@ -1490,11 +1490,11 @@ t_Error ValidateNextEngineParams(t_Handle                   h_FmPcd,
 
     switch (p_FmPcdCcNextEngineParams->nextEngine)
     {
-         case (e_FM_PCD_INVALID):
+        case (e_FM_PCD_INVALID):
             err = E_NOT_SUPPORTED;
             break;
 
-         case (e_FM_PCD_DONE):
+        case (e_FM_PCD_DONE):
             if ((p_FmPcdCcNextEngineParams->params.enqueueParams.action == e_FM_PCD_ENQ_FRAME) &&
                 p_FmPcdCcNextEngineParams->params.enqueueParams.overrideFqid)
             {
@@ -1540,13 +1540,13 @@ t_Error ValidateNextEngineParams(t_Handle                   h_FmPcd,
         case (e_FM_PCD_CC):
             if (!p_FmPcdCcNextEngineParams->params.ccParams.h_CcNode)
                 RETURN_ERROR(MAJOR, E_NULL_POINTER, ("handler to next Node is NULL"));
-        break;
+            break;
 
 #if (DPAA_VERSION >= 11)
          case (e_FM_PCD_FR):
-             if (!p_FmPcdCcNextEngineParams->params.frParams.h_FrmReplic)
+            if (!p_FmPcdCcNextEngineParams->params.frParams.h_FrmReplic)
                 err = E_NOT_SUPPORTED;
-             break;
+            break;
 #endif /* (DPAA_VERSION >= 11) */
 
         default:
@@ -1692,6 +1692,7 @@ static uint8_t GetFullFieldParseCode(e_NetHeaderType    hdr,
                 case (NET_HEADER_FIELD_IPv4_PROTO):
                     if ((index == e_FM_PCD_HDR_INDEX_NONE) || (index == e_FM_PCD_HDR_INDEX_1))
                         return CC_PC_FF_IPV4PTYPE1;
+                    if(index == e_FM_PCD_HDR_INDEX_2)
                         return CC_PC_FF_IPV4PTYPE2;
                     REPORT_ERROR(MAJOR, E_NOT_SUPPORTED, ("Illegal IPv4 index"));
                     return CC_PC_ILLEGAL;
@@ -2085,7 +2086,7 @@ static void FillAdOfTypeResult(t_Handle                    h_Ad,
                        tmp = FM_PCD_AD_RESULT_CONTRL_FLOW_TYPE;
                        tmp |= p_CcNextEngineParams->params.enqueueParams.newFqid;
 #if (DPAA_VERSION >= 11)
-                       tmp |= (p_CcNextEngineParams->params.enqueueParams.newRelativeStorageProfileId & FM_PCD_AD_RESULT_VSP_MASK)<< FM_PCD_AD_RESULT_VSP_SHIFT;
+                       tmp |= (p_CcNextEngineParams->params.enqueueParams.newRelativeStorageProfileId & FM_PCD_AD_RESULT_VSP_MASK) << FM_PCD_AD_RESULT_VSP_SHIFT;
 #endif /* (DPAA_VERSION >= 11) */
                     }
                     else
@@ -2117,6 +2118,7 @@ static void FillAdOfTypeResult(t_Handle                    h_Ad,
                 }
                 tmpNia = NIA_KG_DIRECT;
                 tmpNia |= NIA_ENG_KG;
+                tmpNia |= NIA_KG_CC_EN;
                 tmpNia |= FmPcdKgGetSchemeId(p_CcNextEngineParams->params.kgParams.h_DirectScheme);
                 break;
 
@@ -2167,7 +2169,7 @@ static void FillAdOfTypeResult(t_Handle                    h_Ad,
         }
 
 #if (DPAA_VERSION >= 11)
-       tmpNia |= FM_PCD_AD_RESULT_NO_OM_VSPE;
+        tmpNia |= FM_PCD_AD_RESULT_NO_OM_VSPE;
 #endif /* (DPAA_VERSION >= 11) */
         WRITE_UINT32(p_AdResult->nia, tmpNia);
     }
@@ -2438,7 +2440,7 @@ static t_Error BuildNewNodeAddOrMdfyKeyAndNextEngine(t_Handle                   
     /* Check that manip is legal and what requiredAction is necessary for this manip */
     if (p_KeyParams->ccNextEngineParams.h_Manip)
     {
-        err = FmPcdManipCheckParamsForCcNextEgine(&p_KeyParams->ccNextEngineParams,&requiredAction);
+        err = FmPcdManipCheckParamsForCcNextEngine(&p_KeyParams->ccNextEngineParams,&requiredAction);
         if (err)
             RETURN_ERROR(MAJOR, err, (NO_MSG));
     }
@@ -2618,8 +2620,7 @@ static t_Error BuildNewNodeAddOrMdfyKeyAndNextEngine(t_Handle                   
 
 #if (DPAA_VERSION >= 11)
         if ((p_KeyParams->ccNextEngineParams.nextEngine == e_FM_PCD_FR) &&
-            (p_KeyParams->ccNextEngineParams.params.frParams.h_FrmReplic) &&
-            (!(p_KeyParams->ccNextEngineParams.h_Manip)))
+            (p_KeyParams->ccNextEngineParams.params.frParams.h_FrmReplic))
             p_AdditionalInfo->h_FrmReplicForAdd = p_KeyParams->ccNextEngineParams.params.frParams.h_FrmReplic;
 #endif /* (DPAA_VERSION >= 11) */
 
@@ -2639,8 +2640,7 @@ static t_Error BuildNewNodeAddOrMdfyKeyAndNextEngine(t_Handle                   
 
 #if (DPAA_VERSION >= 11)
         if ((p_CcNode->keyAndNextEngineParams[keyIndex].nextEngineParams.nextEngine == e_FM_PCD_FR) &&
-            (p_CcNode->keyAndNextEngineParams[keyIndex].nextEngineParams.params.frParams.h_FrmReplic) &&
-            (!(p_CcNode->keyAndNextEngineParams[keyIndex].nextEngineParams.h_Manip)))
+            (p_CcNode->keyAndNextEngineParams[keyIndex].nextEngineParams.params.frParams.h_FrmReplic))
             p_AdditionalInfo->h_FrmReplicForRmv = p_CcNode->keyAndNextEngineParams[keyIndex].nextEngineParams.params.frParams.h_FrmReplic;
 #endif /* (DPAA_VERSION >= 11) */
     }
@@ -2705,9 +2705,8 @@ static t_Error BuildNewNodeRemoveKey(t_FmPcdCcNode                      *p_CcNod
 
 #if (DPAA_VERSION >= 11)
         if ((p_CcNode->keyAndNextEngineParams[keyIndex].nextEngineParams.nextEngine == e_FM_PCD_FR) &&
-            (p_CcNode->keyAndNextEngineParams[keyIndex].nextEngineParams.params.frParams.h_FrmReplic) &&
-            (!(p_CcNode->keyAndNextEngineParams[keyIndex].nextEngineParams.h_Manip)))
-            p_AdditionalInfo->h_FrmReplicForRmv =
+            (p_CcNode->keyAndNextEngineParams[keyIndex].nextEngineParams.params.frParams.h_FrmReplic))
+             p_AdditionalInfo->h_FrmReplicForRmv =
                 p_CcNode->keyAndNextEngineParams[keyIndex].nextEngineParams.params.frParams.h_FrmReplic;
 #endif /* (DPAA_VERSION >= 11) */
 
@@ -2768,7 +2767,7 @@ static t_Error BuildNewNodeModifyKey(t_FmPcdCcNode                      *p_CcNod
 
         if (j == keyIndex)
         {
-            ASSERT_COND(keyIndex < FM_PCD_MAX_NUM_OF_CC_GROUPS);
+            ASSERT_COND(keyIndex < CC_MAX_NUM_OF_KEYS);
             if (p_CcNode->keyAndNextEngineParams[keyIndex].p_StatsObj)
             {
                 /* As statistics were enabled, we need to update the existing
@@ -2902,7 +2901,7 @@ static t_Error BuildNewNodeModifyNextEngine(t_Handle                            
     /* Check that manip is legal and what requiredAction is necessary for this manip */
     if (p_CcNextEngineParams->h_Manip)
     {
-        err = FmPcdManipCheckParamsForCcNextEgine(p_CcNextEngineParams, &requiredAction);
+        err = FmPcdManipCheckParamsForCcNextEngine(p_CcNextEngineParams, &requiredAction);
         if (err)
             RETURN_ERROR(MAJOR, err, (NO_MSG));
     }
@@ -2921,8 +2920,7 @@ static t_Error BuildNewNodeModifyNextEngine(t_Handle                            
 
 #if (DPAA_VERSION >= 11)
         if ((p_FmPcdCcNode1->keyAndNextEngineParams[keyIndex].nextEngineParams.nextEngine == e_FM_PCD_FR) &&
-            (p_FmPcdCcNode1->keyAndNextEngineParams[keyIndex].nextEngineParams.params.frParams.h_FrmReplic) &&
-            (!(p_FmPcdCcNode1->keyAndNextEngineParams[keyIndex].nextEngineParams.h_Manip)))
+            (p_FmPcdCcNode1->keyAndNextEngineParams[keyIndex].nextEngineParams.params.frParams.h_FrmReplic))
             p_AdditionalInfo->h_FrmReplicForRmv = p_FmPcdCcNode1->keyAndNextEngineParams[keyIndex].nextEngineParams.params.frParams.h_FrmReplic;
 #endif /* (DPAA_VERSION >= 11) */
     }
@@ -2939,8 +2937,7 @@ static t_Error BuildNewNodeModifyNextEngine(t_Handle                            
 
 #if (DPAA_VERSION >= 11)
         if ((p_FmPcdCcTree->keyAndNextEngineParams[keyIndex].nextEngineParams.nextEngine == e_FM_PCD_FR) &&
-            (p_FmPcdCcTree->keyAndNextEngineParams[keyIndex].nextEngineParams.params.frParams.h_FrmReplic) &&
-            (!(p_FmPcdCcTree->keyAndNextEngineParams[keyIndex].nextEngineParams.h_Manip)))
+            (p_FmPcdCcTree->keyAndNextEngineParams[keyIndex].nextEngineParams.params.frParams.h_FrmReplic))
             p_AdditionalInfo->h_FrmReplicForRmv = p_FmPcdCcTree->keyAndNextEngineParams[keyIndex].nextEngineParams.params.frParams.h_FrmReplic;
 #endif /* (DPAA_VERSION >= 11) */
     }
@@ -3093,8 +3090,7 @@ static t_Error BuildNewNodeModifyNextEngine(t_Handle                            
     }
 #if (DPAA_VERSION >= 11)
         if ((p_CcNextEngineParams->nextEngine == e_FM_PCD_FR) &&
-            (p_CcNextEngineParams->params.frParams.h_FrmReplic) &&
-            (!(p_CcNextEngineParams->h_Manip)))
+            (p_CcNextEngineParams->params.frParams.h_FrmReplic))
             p_AdditionalInfo->h_FrmReplicForAdd = p_CcNextEngineParams->params.frParams.h_FrmReplic;
 #endif /* (DPAA_VERSION >= 11) */
 
@@ -3482,7 +3478,7 @@ static t_Error CheckParams(t_Handle             h_FmPcd,
 
     if (p_CcNodeParam->keysParams.ccNextEngineParamsForMiss.h_Manip)
     {
-        err = FmPcdManipCheckParamsForCcNextEgine(&p_CcNodeParam->keysParams.ccNextEngineParamsForMiss, &requiredAction);
+        err = FmPcdManipCheckParamsForCcNextEngine(&p_CcNodeParam->keysParams.ccNextEngineParamsForMiss, &requiredAction);
         if (err)
             RETURN_ERROR(MAJOR, err, (NO_MSG));
     }
@@ -3522,7 +3518,7 @@ static t_Error CheckParams(t_Handle             h_FmPcd,
 
         if (p_KeyParams->ccNextEngineParams.h_Manip)
         {
-            err = FmPcdManipCheckParamsForCcNextEgine(&p_KeyParams->ccNextEngineParams, &requiredAction);
+            err = FmPcdManipCheckParamsForCcNextEngine(&p_KeyParams->ccNextEngineParams, &requiredAction);
             if (err)
                 RETURN_ERROR(MAJOR, err, (NO_MSG));
         }
@@ -3599,7 +3595,7 @@ static t_Error Ipv4TtlOrIpv6HopLimitCheckParams(t_Handle            h_FmPcd,
 
     if (p_CcNodeParam->keysParams.ccNextEngineParamsForMiss.h_Manip)
     {
-        err = FmPcdManipCheckParamsForCcNextEgine(&p_CcNodeParam->keysParams.ccNextEngineParamsForMiss, &requiredAction);
+        err = FmPcdManipCheckParamsForCcNextEngine(&p_CcNodeParam->keysParams.ccNextEngineParamsForMiss, &requiredAction);
         if (err)
             RETURN_ERROR(MAJOR, err, (NO_MSG));
     }
@@ -3636,7 +3632,7 @@ static t_Error Ipv4TtlOrIpv6HopLimitCheckParams(t_Handle            h_FmPcd,
 
         if (p_KeyParams->ccNextEngineParams.h_Manip)
         {
-            err = FmPcdManipCheckParamsForCcNextEgine(&p_KeyParams->ccNextEngineParams, &requiredAction);
+            err = FmPcdManipCheckParamsForCcNextEngine(&p_KeyParams->ccNextEngineParams, &requiredAction);
             if (err)
                 RETURN_ERROR(MAJOR, err, (NO_MSG));
         }
@@ -3727,7 +3723,7 @@ static t_Error IcHashIndexedCheckParams(t_Handle            h_FmPcd,
 
             if (p_KeyParams->ccNextEngineParams.h_Manip)
             {
-                err = FmPcdManipCheckParamsForCcNextEgine(&p_KeyParams->ccNextEngineParams, &requiredAction);
+                err = FmPcdManipCheckParamsForCcNextEngine(&p_KeyParams->ccNextEngineParams, &requiredAction);
                 if (err)
                     RETURN_ERROR(MAJOR, err, (NO_MSG));
                 p_CcNode->keyAndNextEngineParams[tmp].requiredAction = requiredAction;
@@ -3790,7 +3786,10 @@ static t_Error ModifyNextEngineParamNode(t_Handle                    h_FmPcd,
     if (p_CcNode->maxNumOfKeys)
     {
         if (!TRY_LOCK(p_FmPcd->h_ShadowSpinlock, &p_FmPcd->shadowLock))
+        {
+            XX_Free(p_ModifyKeyParams);
             return ERROR_CODE(E_BUSY);
+        }
     }
 
     err = BuildNewNodeModifyNextEngine(h_FmPcd,
@@ -4336,7 +4335,10 @@ t_Error FmPcdCcModifyNextEngineParamTree(t_Handle                   h_FmPcd,
 
     if (p_FmPcd->p_CcShadow)
         if (!TRY_LOCK(p_FmPcd->h_ShadowSpinlock, &p_FmPcd->shadowLock))
+        {
+            XX_Free(p_ModifyKeyParams);
             return ERROR_CODE(E_BUSY);
+        }
 
     err = BuildNewNodeModifyNextEngine(p_FmPcd,
                                        p_FmPcdCcTree,
@@ -4393,7 +4395,10 @@ t_Error FmPcdCcRemoveKey(t_Handle   h_FmPcd,
     if (p_CcNode->maxNumOfKeys)
     {
         if (!TRY_LOCK(p_FmPcd->h_ShadowSpinlock, &p_FmPcd->shadowLock))
+        {
+            XX_Free(p_ModifyKeyParams);
             return ERROR_CODE(E_BUSY);
+        }
 
         useShadowStructs = TRUE;
     }
@@ -4477,7 +4482,10 @@ t_Error FmPcdCcModifyKey(t_Handle   h_FmPcd,
     if (p_CcNode->maxNumOfKeys)
     {
         if (!TRY_LOCK(p_FmPcd->h_ShadowSpinlock, &p_FmPcd->shadowLock))
+        {
+            XX_Free(p_ModifyKeyParams);
             return ERROR_CODE(E_BUSY);
+        }
 
         useShadowStructs = TRUE;
     }
@@ -4547,7 +4555,10 @@ t_Error FmPcdCcModifyMissNextEngineParamNode(t_Handle                   h_FmPcd,
     if (p_CcNode->maxNumOfKeys)
     {
         if (!TRY_LOCK(p_FmPcd->h_ShadowSpinlock, &p_FmPcd->shadowLock))
+        {
+            XX_Free(p_ModifyKeyParams);
             return ERROR_CODE(E_BUSY);
+        }
     }
 
     err = BuildNewNodeModifyNextEngine(h_FmPcd,
@@ -4590,7 +4601,6 @@ t_Error FmPcdCcAddKey(t_Handle              h_FmPcd,
     if (keyIndex > p_CcNode->numOfKeys)
         RETURN_ERROR(MAJOR, E_NOT_IN_RANGE, ("keyIndex > previously cleared last index + 1"));
 
-
     if (keySize != p_CcNode->userSizeOfExtraction)
         RETURN_ERROR(MAJOR, E_INVALID_VALUE, ("keySize has to be defined as it was defined in initialization step"));
 
@@ -4631,7 +4641,10 @@ t_Error FmPcdCcAddKey(t_Handle              h_FmPcd,
     if (p_CcNode->maxNumOfKeys)
     {
         if (!TRY_LOCK(p_FmPcd->h_ShadowSpinlock, &p_FmPcd->shadowLock))
+        {
+            XX_Free(p_ModifyKeyParams);
             return ERROR_CODE(E_BUSY);
+        }
 
         useShadowStructs = TRUE;
     }
@@ -4719,7 +4732,10 @@ t_Error FmPcdCcModifyKeyAndNextEngine(t_Handle              h_FmPcd,
     if (p_CcNode->maxNumOfKeys)
     {
         if (!TRY_LOCK(p_FmPcd->h_ShadowSpinlock, &p_FmPcd->shadowLock))
+        {
+            XX_Free(p_ModifyKeyParams);
             return ERROR_CODE(E_BUSY);
+        }
 
         useShadowStructs = TRUE;
     }
@@ -5131,7 +5147,7 @@ t_Handle FM_PCD_CcRootBuild(t_Handle h_FmPcd, t_FmPcdCcTreeParams *p_PcdGroupsPa
 
             if (p_FmPcdCcGroupParams->nextEnginePerEntriesInGrp[j].h_Manip)
             {
-                err = FmPcdManipCheckParamsForCcNextEgine(&p_FmPcdCcGroupParams->nextEnginePerEntriesInGrp[j], &requiredAction);
+                err = FmPcdManipCheckParamsForCcNextEngine(&p_FmPcdCcGroupParams->nextEnginePerEntriesInGrp[j], &requiredAction);
                 if (err)
                 {
                     DeleteTree(p_FmPcdCcTree,p_FmPcd);
@@ -5862,6 +5878,7 @@ t_Handle FM_PCD_MatchTableSet(t_Handle h_FmPcd, t_FmPcdCcNodeParams *p_CcNodePar
             }
             else
                 p_CcInformation->index++;
+
             if (p_CcNode->keyAndNextEngineParams[tmp].nextEngineParams.h_Manip)
             {
                 h_Manip = p_CcNode->keyAndNextEngineParams[tmp].nextEngineParams.h_Manip;

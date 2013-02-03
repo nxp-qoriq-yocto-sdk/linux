@@ -68,14 +68,18 @@
 #define HMAN_RMV_HDR                               0x80000000
 #define HMAN_INSRT_INT_FRM_HDR                     0x40000000
 
-#define UDP_UDPHECKSUM_FIELD_OFFSET_FROM_UDP        6
-#define UDP_UDPCHECKSUM_FIELD_SIZE                  2
+#define UDP_CHECKSUM_FIELD_OFFSET_FROM_UDP          6
+#define UDP_CHECKSUM_FIELD_SIZE                     2
+#define UDP_LENGTH_FIELD_OFFSET_FROM_UDP            4
 
-#define IP_DSCECN_FIELD_OFFSET_FROM_IP              1
-#define IP_TOTALLENGTH_FIELD_OFFSET_FROM_IP         2
-#define IP_HDRCHECKSUM_FIELD_OFFSET_FROM_IP         10
+#define IPv4_DSCECN_FIELD_OFFSET_FROM_IP            1
+#define IPv4_TOTALLENGTH_FIELD_OFFSET_FROM_IP       2
+#define IPv4_HDRCHECKSUM_FIELD_OFFSET_FROM_IP       10
 #define VLAN_TAG_FIELD_OFFSET_FROM_ETH              12
-#define IP_ID_FIELD_OFFSET_FROM_IP                  4
+#define IPv4_ID_FIELD_OFFSET_FROM_IP                4
+
+#define IPv6_PAYLOAD_LENGTH_OFFSET_FROM_IP          4
+#define IPv6_NEXT_HEADER_OFFSET_FROM_IP             6
 
 #define FM_PCD_MANIP_CAPWAP_REASM_TABLE_SIZE               0x80
 #define FM_PCD_MANIP_CAPWAP_REASM_TABLE_ALIGN              8
@@ -146,6 +150,7 @@
 #define HMCD_OPCODE_TCP_UDP_CHECKSUM            0x14
 #define HMCD_OPCODE_REPLACE_IP                  0x12
 
+#define HMCD_DSCP_VALUES                        64
 
 #define HMCD_BASIC_SIZE                         4
 #define HMCD_PTR_SIZE                           4
@@ -207,7 +212,7 @@
 
 #define HMCD_IP_REPLACE_L3HDRSIZE_SHIFT         24
 
-#define DSCP_TO_VLAN_TABLE_SIZE                 32
+#define DSCP_TO_VLAN_TABLE_SIZE                    32
 
 #define MANIP_GET_HMCT_SIZE(h_Manip)                    (((t_FmPcdManip *)h_Manip)->tableSize)
 #define MANIP_GET_DATA_SIZE(h_Manip)                    (((t_FmPcdManip *)h_Manip)->dataSize)

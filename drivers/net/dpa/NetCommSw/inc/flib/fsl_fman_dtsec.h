@@ -30,18 +30,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-/**
- * DOC: dTSEC
- *
- * This section contains description of dTSEC API available in flib.
- */
-
-#ifndef FSL_FMAN_DTSEC_H
-#define FSL_FMAN_DTSEC_H
+#ifndef __FSL_FMAN_DTSEC_H
+#define __FSL_FMAN_DTSEC_H
 
 #include "common/general.h"
 #include "fsl_enet.h"
-
 
 /**
  * DOC: dTSEC Init sequence
@@ -173,33 +166,85 @@
  * likely to compromise the validity of recently transferred frames.
  */
 /* Interrupt Mask Register (IMASK) */
-#define DTSEC_IMASK_BREN              0x80000000
-#define DTSEC_IMASK_RXCEN             0x40000000
-#define DTSEC_IMASK_MSROEN            0x04000000
-#define DTSEC_IMASK_GTSCEN            0x02000000
-#define DTSEC_IMASK_BTEN              0x01000000
-#define DTSEC_IMASK_TXCEN             0x00800000
-#define DTSEC_IMASK_TXEEN             0x00400000
-#define DTSEC_IMASK_LCEN              0x00040000
-#define DTSEC_IMASK_CRLEN             0x00020000
-#define DTSEC_IMASK_XFUNEN            0x00010000
-#define DTSEC_IMASK_ABRTEN            0x00008000
-#define DTSEC_IMASK_IFERREN           0x00004000
-#define DTSEC_IMASK_MAGEN             0x00000800
-#define DTSEC_IMASK_MMRDEN            0x00000400
-#define DTSEC_IMASK_MMWREN            0x00000200
-#define DTSEC_IMASK_GRSCEN            0x00000100
-#define DTSEC_IMASK_TDPEEN            0x00000002
-#define DTSEC_IMASK_RDPEEN            0x00000001
+#define DTSEC_IMASK_BREN	0x80000000
+#define DTSEC_IMASK_RXCEN	0x40000000
+#define DTSEC_IMASK_MSROEN	0x04000000
+#define DTSEC_IMASK_GTSCEN	0x02000000
+#define DTSEC_IMASK_BTEN	0x01000000
+#define DTSEC_IMASK_TXCEN	0x00800000
+#define DTSEC_IMASK_TXEEN	0x00400000
+#define DTSEC_IMASK_LCEN	0x00040000
+#define DTSEC_IMASK_CRLEN	0x00020000
+#define DTSEC_IMASK_XFUNEN	0x00010000
+#define DTSEC_IMASK_ABRTEN	0x00008000
+#define DTSEC_IMASK_IFERREN	0x00004000
+#define DTSEC_IMASK_MAGEN	0x00000800
+#define DTSEC_IMASK_MMRDEN	0x00000400
+#define DTSEC_IMASK_MMWREN	0x00000200
+#define DTSEC_IMASK_GRSCEN	0x00000100
+#define DTSEC_IMASK_TDPEEN	0x00000002
+#define DTSEC_IMASK_RDPEEN	0x00000001
+
+#define EVENTS_MASK					\
+	((uint32_t)(DTSEC_IMASK_BREN    | \
+				DTSEC_IMASK_RXCEN   | \
+				DTSEC_IMASK_BTEN    | \
+				DTSEC_IMASK_TXCEN   | \
+				DTSEC_IMASK_TXEEN   | \
+				DTSEC_IMASK_ABRTEN  | \
+				DTSEC_IMASK_LCEN    | \
+				DTSEC_IMASK_CRLEN   | \
+				DTSEC_IMASK_XFUNEN  | \
+				DTSEC_IMASK_IFERREN | \
+				DTSEC_IMASK_MAGEN   | \
+				DTSEC_IMASK_TDPEEN  | \
+				DTSEC_IMASK_RDPEEN))
 
 /* dtsec timestamp event bits */
-#define TMR_PEMASK_TSREEN		0x00010000
-#define TMR_PEVENT_TSRE			0x00010000
+#define TMR_PEMASK_TSREEN	0x00010000
+#define TMR_PEVENT_TSRE		0x00010000
 
 /* Group address bit indication */
-#define MAC_GROUP_ADDRESS		0x0000010000000000ULL
+#define MAC_GROUP_ADDRESS	0x0000010000000000ULL
 /* size in bytes of L2 address */
-#define MAC_ADDRLEN                     6
+#define MAC_ADDRLEN		6
+
+#define DEFAULT_HALFDUP_ON		FALSE
+#define DEFAULT_HALFDUP_RETRANSMIT	0xf
+#define DEFAULT_HALFDUP_COLL_WINDOW	0x37
+#define DEFAULT_HALFDUP_EXCESS_DEFER	TRUE
+#define DEFAULT_HALFDUP_NO_BACKOFF	FALSE
+#define DEFAULT_HALFDUP_BP_NO_BACKOFF	FALSE
+#define DEFAULT_HALFDUP_ALT_BACKOFF_VAL	0x0A
+#define DEFAULT_HALFDUP_ALT_BACKOFF_EN	FALSE
+#define DEFAULT_RX_DROP_BCAST		FALSE
+#define DEFAULT_RX_SHORT_FRM		TRUE
+#define DEFAULT_RX_LEN_CHECK		FALSE
+#define DEFAULT_TX_PAD_CRC		TRUE
+#define DEFAULT_TX_CRC			FALSE
+#define DEFAULT_RX_CTRL_ACC		FALSE
+#define DEFAULT_TX_PAUSE_TIME		0xf000
+#define DEFAULT_TBIPA			5
+#define DEFAULT_RX_PREPEND		0
+#define DEFAULT_PTP_TSU_EN		TRUE
+#define DEFAULT_PTP_EXCEPTION_EN	TRUE
+#define DEFAULT_PREAMBLE_LEN		7
+#define DEFAULT_RX_PREAMBLE		FALSE
+#define DEFAULT_TX_PREAMBLE		FALSE
+#define DEFAULT_LOOPBACK		FALSE
+#define DEFAULT_RX_TIME_STAMP_EN	FALSE
+#define DEFAULT_TX_TIME_STAMP_EN	FALSE
+#define DEFAULT_RX_FLOW			TRUE
+#define DEFAULT_TX_FLOW			TRUE
+#define DEFAULT_RX_GROUP_HASH_EXD	FALSE
+#define DEFAULT_TX_PAUSE_TIME_EXTD	0
+#define DEFAULT_RX_PROMISC		FALSE
+#define DEFAULT_NON_BACK_TO_BACK_IPG1	0x40
+#define DEFAULT_NON_BACK_TO_BACK_IPG2	0x60
+#define DEFAULT_MIN_IFG_ENFORCEMENT	0x50
+#define DEFAULT_BACK_TO_BACK_IPG	0x60
+#define DEFAULT_MAXIMUM_FRAME		0x600
+#define DEFAULT_TBI_PHY_ADDR		5
 
 /* register related defines (bits, field offsets..) */
 #define DTSEC_ID1_ID			0xffff0000
@@ -209,70 +254,70 @@
 #define DTSEC_ID2_INT_REDUCED_OFF	0x00010000
 #define DTSEC_ID2_INT_NORMAL_OFF	0x00020000
 
-#define DTSEC_ECNTRL_CLRCNT         0x00004000
-#define DTSEC_ECNTRL_AUTOZ          0x00002000
-#define DTSEC_ECNTRL_STEN           0x00001000
-#define DTSEC_ECNTRL_CFG_RO         0x80000000
-#define DTSEC_ECNTRL_GMIIM          0x00000040
-#define DTSEC_ECNTRL_TBIM           0x00000020
-#define DTSEC_ECNTRL_SGMIIM         0x00000002
-#define DTSEC_ECNTRL_RPM            0x00000010
-#define DTSEC_ECNTRL_R100M          0x00000008
-#define DTSEC_ECNTRL_RMM            0x00000004
-#define DTSEC_ECNTRL_QSGMIIM        0x00000001
+#define DTSEC_ECNTRL_CLRCNT		0x00004000
+#define DTSEC_ECNTRL_AUTOZ		0x00002000
+#define DTSEC_ECNTRL_STEN		0x00001000
+#define DTSEC_ECNTRL_CFG_RO		0x80000000
+#define DTSEC_ECNTRL_GMIIM		0x00000040
+#define DTSEC_ECNTRL_TBIM		0x00000020
+#define DTSEC_ECNTRL_SGMIIM		0x00000002
+#define DTSEC_ECNTRL_RPM		0x00000010
+#define DTSEC_ECNTRL_R100M		0x00000008
+#define DTSEC_ECNTRL_RMM		0x00000004
+#define DTSEC_ECNTRL_QSGMIIM		0x00000001
 
-#define DTSEC_TCTRL_THDF            0x00000800
-#define DTSEC_TCTRL_TTSE            0x00000040
-#define DTSEC_TCTRL_GTS             0x00000020
-#define DTSEC_TCTRL_TFC_PAUSE       0x00000010
+#define DTSEC_TCTRL_THDF		0x00000800
+#define DTSEC_TCTRL_TTSE		0x00000040
+#define DTSEC_TCTRL_GTS			0x00000020
+#define DTSEC_TCTRL_TFC_PAUSE		0x00000010
 
 /* PTV offsets */
-#define PTV_PTE_OFST                16
+#define PTV_PTE_OFST		16
 
-#define RCTRL_CFA                   0x00008000
-#define RCTRL_GHTX                  0x00000400
-#define RCTRL_RTSE                  0x00000040
-#define RCTRL_GRS                   0x00000020
-#define RCTRL_BC_REJ                0x00000010
-#define RCTRL_MPROM                 0x00000008
-#define RCTRL_RSF                   0x00000004
-#define RCTRL_UPROM                 0x00000001
-#define RCTRL_PROM                  (RCTRL_UPROM | RCTRL_MPROM)
+#define RCTRL_CFA		0x00008000
+#define RCTRL_GHTX		0x00000400
+#define RCTRL_RTSE		0x00000040
+#define RCTRL_GRS		0x00000020
+#define RCTRL_BC_REJ		0x00000010
+#define RCTRL_MPROM		0x00000008
+#define RCTRL_RSF		0x00000004
+#define RCTRL_UPROM		0x00000001
+#define RCTRL_PROM		(RCTRL_UPROM | RCTRL_MPROM)
 
-#define TMR_CTL_ESFDP               0x00000800
-#define TMR_CTL_ESFDE               0x00000400
+#define TMR_CTL_ESFDP		0x00000800
+#define TMR_CTL_ESFDE		0x00000400
 
-#define MACCFG1_SOFT_RESET          0x80000000
-#define MACCFG1_LOOPBACK            0x00000100
-#define MACCFG1_RX_FLOW             0x00000020
-#define MACCFG1_TX_FLOW             0x00000010
-#define MACCFG1_TX_EN               0x00000001
-#define MACCFG1_RX_EN               0x00000004
-#define MACCFG1_RESET_RxMC          0x00080000
-#define MACCFG1_RESET_TxMC          0x00040000
-#define MACCFG1_RESET_RxFUN         0x00020000
-#define MACCFG1_RESET_TxFUN         0x00010000
+#define MACCFG1_SOFT_RESET	0x80000000
+#define MACCFG1_LOOPBACK	0x00000100
+#define MACCFG1_RX_FLOW		0x00000020
+#define MACCFG1_TX_FLOW		0x00000010
+#define MACCFG1_TX_EN		0x00000001
+#define MACCFG1_RX_EN		0x00000004
+#define MACCFG1_RESET_RxMC	0x00080000
+#define MACCFG1_RESET_TxMC	0x00040000
+#define MACCFG1_RESET_RxFUN	0x00020000
+#define MACCFG1_RESET_TxFUN	0x00010000
 
-#define MACCFG2_NIBBLE_MODE         0x00000100
-#define MACCFG2_BYTE_MODE           0x00000200
-#define MACCFG2_PRE_AM_Rx_EN        0x00000080
-#define MACCFG2_PRE_AM_Tx_EN        0x00000040
-#define MACCFG2_LENGTH_CHECK        0x00000010
-#define MACCFG2_MAGIC_PACKET_EN     0x00000008
-#define MACCFG2_PAD_CRC_EN          0x00000004
-#define MACCFG2_CRC_EN              0x00000002
-#define MACCFG2_FULL_DUPLEX         0x00000001
+#define MACCFG2_NIBBLE_MODE	0x00000100
+#define MACCFG2_BYTE_MODE	0x00000200
+#define MACCFG2_PRE_AM_Rx_EN	0x00000080
+#define MACCFG2_PRE_AM_Tx_EN	0x00000040
+#define MACCFG2_LENGTH_CHECK	0x00000010
+#define MACCFG2_MAGIC_PACKET_EN	0x00000008
+#define MACCFG2_PAD_CRC_EN	0x00000004
+#define MACCFG2_CRC_EN		0x00000002
+#define MACCFG2_FULL_DUPLEX	0x00000001
 
-#define PREAMBLE_LENGTH_SHIFT       12
+#define PREAMBLE_LENGTH_SHIFT	12
 
-#define IPGIFG_NON_BACK_TO_BACK_IPG_1_SHIFT    24
-#define IPGIFG_NON_BACK_TO_BACK_IPG_2_SHIFT    16
-#define IPGIFG_MIN_IFG_ENFORCEMENT_SHIFT        8
+#define IPGIFG_NON_BACK_TO_BACK_IPG_1_SHIFT	24
+#define IPGIFG_NON_BACK_TO_BACK_IPG_2_SHIFT	16
+#define IPGIFG_MIN_IFG_ENFORCEMENT_SHIFT	8
 
-#define IPGIFG_NON_BACK_TO_BACK_IPG_1    0x7F000000
-#define IPGIFG_NON_BACK_TO_BACK_IPG_2    0x007F0000
-#define IPGIFG_MIN_IFG_ENFORCEMENT       0x0000FF00
-#define IPGIFG_BACK_TO_BACK_IPG          0x0000007F
+#define IPGIFG_NON_BACK_TO_BACK_IPG_1	0x7F000000
+#define IPGIFG_NON_BACK_TO_BACK_IPG_2	0x007F0000
+#define IPGIFG_MIN_IFG_ENFORCEMENT	0x0000FF00
+#define IPGIFG_BACK_TO_BACK_IPG		0x0000007F
 
 #define HAFDUP_ALT_BEB			0x00080000
 #define HAFDUP_BP_NO_BACKOFF		0x00040000
@@ -284,54 +329,54 @@
 #define HAFDUP_RETRANSMISSION_MAX_SHIFT		12
 #define HAFDUP_RETRANSMISSION_MAX		0x0000f000
 
-#define NUM_OF_HASH_REGS     8 /* Number of hash table registers */
+#define NUM_OF_HASH_REGS	8 /* Number of hash table registers */
 
 /* CAR1/2 bits */
-#define DTSEC_CAR1_TR64   0x80000000
-#define DTSEC_CAR1_TR127  0x40000000
-#define DTSEC_CAR1_TR255  0x20000000
-#define DTSEC_CAR1_TR511  0x10000000
-#define DTSEC_CAR1_TRK1   0x08000000
-#define DTSEC_CAR1_TRMAX  0x04000000
-#define DTSEC_CAR1_TRMGV  0x02000000
+#define DTSEC_CAR1_TR64		0x80000000
+#define DTSEC_CAR1_TR127	0x40000000
+#define DTSEC_CAR1_TR255	0x20000000
+#define DTSEC_CAR1_TR511	0x10000000
+#define DTSEC_CAR1_TRK1		0x08000000
+#define DTSEC_CAR1_TRMAX	0x04000000
+#define DTSEC_CAR1_TRMGV	0x02000000
 
-#define DTSEC_CAR1_RBYT   0x00010000
-#define DTSEC_CAR1_RPKT   0x00008000
-#define DTSEC_CAR1_RFCS   0x00004000
-#define DTSEC_CAR1_RMCA   0x00002000
-#define DTSEC_CAR1_RBCA   0x00001000
-#define DTSEC_CAR1_RXCF   0x00000800
-#define DTSEC_CAR1_RXPF   0x00000400
-#define DTSEC_CAR1_RXUO   0x00000200
-#define DTSEC_CAR1_RALN   0x00000100
-#define DTSEC_CAR1_RFLR   0x00000080
-#define DTSEC_CAR1_RCDE   0x00000040
-#define DTSEC_CAR1_RCSE   0x00000020
-#define DTSEC_CAR1_RUND   0x00000010
-#define DTSEC_CAR1_ROVR   0x00000008
-#define DTSEC_CAR1_RFRG   0x00000004
-#define DTSEC_CAR1_RJBR   0x00000002
-#define DTSEC_CAR1_RDRP   0x00000001
+#define DTSEC_CAR1_RBYT		0x00010000
+#define DTSEC_CAR1_RPKT		0x00008000
+#define DTSEC_CAR1_RFCS		0x00004000
+#define DTSEC_CAR1_RMCA		0x00002000
+#define DTSEC_CAR1_RBCA		0x00001000
+#define DTSEC_CAR1_RXCF		0x00000800
+#define DTSEC_CAR1_RXPF		0x00000400
+#define DTSEC_CAR1_RXUO		0x00000200
+#define DTSEC_CAR1_RALN		0x00000100
+#define DTSEC_CAR1_RFLR		0x00000080
+#define DTSEC_CAR1_RCDE		0x00000040
+#define DTSEC_CAR1_RCSE		0x00000020
+#define DTSEC_CAR1_RUND		0x00000010
+#define DTSEC_CAR1_ROVR		0x00000008
+#define DTSEC_CAR1_RFRG		0x00000004
+#define DTSEC_CAR1_RJBR		0x00000002
+#define DTSEC_CAR1_RDRP		0x00000001
 
-#define DTSEC_CAR2_TJBR   0x00080000
-#define DTSEC_CAR2_TFCS   0x00040000
-#define DTSEC_CAR2_TXCF   0x00020000
-#define DTSEC_CAR2_TOVR   0x00010000
-#define DTSEC_CAR2_TUND   0x00008000
-#define DTSEC_CAR2_TFRG   0x00004000
-#define DTSEC_CAR2_TBYT   0x00002000
-#define DTSEC_CAR2_TPKT   0x00001000
-#define DTSEC_CAR2_TMCA   0x00000800
-#define DTSEC_CAR2_TBCA   0x00000400
-#define DTSEC_CAR2_TXPF   0x00000200
-#define DTSEC_CAR2_TDFR   0x00000100
-#define DTSEC_CAR2_TEDF   0x00000080
-#define DTSEC_CAR2_TSCL   0x00000040
-#define DTSEC_CAR2_TMCL   0x00000020
-#define DTSEC_CAR2_TLCL   0x00000010
-#define DTSEC_CAR2_TXCL   0x00000008
-#define DTSEC_CAR2_TNCL   0x00000004
-#define DTSEC_CAR2_TDRP   0x00000001
+#define DTSEC_CAR2_TJBR		0x00080000
+#define DTSEC_CAR2_TFCS		0x00040000
+#define DTSEC_CAR2_TXCF		0x00020000
+#define DTSEC_CAR2_TOVR		0x00010000
+#define DTSEC_CAR2_TUND		0x00008000
+#define DTSEC_CAR2_TFRG		0x00004000
+#define DTSEC_CAR2_TBYT		0x00002000
+#define DTSEC_CAR2_TPKT		0x00001000
+#define DTSEC_CAR2_TMCA		0x00000800
+#define DTSEC_CAR2_TBCA		0x00000400
+#define DTSEC_CAR2_TXPF		0x00000200
+#define DTSEC_CAR2_TDFR		0x00000100
+#define DTSEC_CAR2_TEDF		0x00000080
+#define DTSEC_CAR2_TSCL		0x00000040
+#define DTSEC_CAR2_TMCL		0x00000020
+#define DTSEC_CAR2_TLCL		0x00000010
+#define DTSEC_CAR2_TXCL		0x00000008
+#define DTSEC_CAR2_TNCL		0x00000004
+#define DTSEC_CAR2_TDRP		0x00000001
 
 #define CAM1_ERRORS_ONLY \
 	(DTSEC_CAR1_RXPF | DTSEC_CAR1_RALN | DTSEC_CAR1_RFLR \
@@ -374,7 +419,7 @@ struct dtsec_regs {
 	uint32_t reserved0044[3];
 	uint32_t rctrl;		/* 0x050 Receive control register */
 	uint32_t reserved0054[11];
-	uint32_t igaddr[8]; /* 0x080-0x09C Individual/group address registers */
+	uint32_t igaddr[8]; 	/* 0x080-0x09C Individual/group address */
 	uint32_t gaddr[8];	/* 0x0A0-0x0BC Group address registers 0-7 */
 	uint32_t reserved00c0[16];
 	uint32_t maccfg1;		/* 0x100 MAC configuration #1 */
@@ -389,9 +434,8 @@ struct dtsec_regs {
 	struct {
 	    uint32_t exact_match1; /* octets 1-4 */
 	    uint32_t exact_match2; /* octets 5-6 */
-	} macaddr[15]; /* 0x148-0x1BC mac exact match addresses 1-15, parts 1-2 */
-    uint32_t reserved01c0[16];
-    //	uint32_t reserved0148[61];
+	} macaddr[15];	/* 0x148-0x1BC mac exact match addresses 1-15 */
+	uint32_t reserved01c0[16];
 	uint32_t tr64;	/* 0x200 transmit and receive 64 byte frame counter */
 	uint32_t tr127;	/* 0x204 transmit and receive 65 to 127 byte frame
 			 * counter */
@@ -518,28 +562,25 @@ struct dtsec_regs {
  * and SFD but including FCS bytes.
  */
 struct dtsec_mib_grp_1_counters {
-	uint64_t  rdrp;
-	uint64_t  tdrp;
-
-	uint64_t  rbyt;
-	uint64_t  rpkt;
-	uint64_t  rbca;
-	uint64_t  rmca;
-	uint64_t  raln;
-	uint64_t  rund;
-	uint64_t  rovr;
-	uint64_t  rfrg;
-	uint64_t  rjbr;
-	uint64_t  tncl;
-
-	uint64_t  tr64;
-	uint64_t  tr127;
-	uint64_t  tr255;
-	uint64_t  tr511;
-	uint64_t  tr1k;
-	uint64_t  trmax;
+	uint64_t	rdrp;
+	uint64_t	tdrp;
+	uint64_t	rbyt;
+	uint64_t	rpkt;
+	uint64_t	rbca;
+	uint64_t	rmca;
+	uint64_t	raln;
+	uint64_t	rund;
+	uint64_t	rovr;
+	uint64_t	rfrg;
+	uint64_t	rjbr;
+	uint64_t	tncl;
+	uint64_t	tr64;
+	uint64_t	tr127;
+	uint64_t	tr255;
+	uint64_t	tr511;
+	uint64_t	tr1k;
+	uint64_t	trmax;
 };
-
 
 enum dtsec_stat_counters {
 	E_DTSEC_STAT_TR64,
@@ -671,7 +712,7 @@ struct dtsec_cfg {
 	bool		tx_flow;
 	bool		rx_group_hash_exd;
 	bool		rx_promisc;
-    uint8_t     tbi_phy_addr;
+	uint8_t		tbi_phy_addr;
 	uint16_t	tx_pause_time_extd;
 	uint16_t	maximum_frame;
 	uint32_t	non_back_to_back_ipg1;
@@ -928,20 +969,6 @@ void dtsec_enable_interrupt(struct dtsec_regs *regs, uint32_t ev_mask);
 void dtsec_set_ts(struct dtsec_regs *regs, bool en);
 
 /**
- * dtsec_compute_bucket() - Get bucket index for an address
- * @regs:	Pointer to dTSEC register block
- * @addr:	MAC address
- * @bucket:	pointer to hold the return value of the bucket index
- *
- * This function returns the bucket index associated with the specified address.
- * This index can be used to enable/disable specific buckets.
- *
- * Returns: 0 if successful, an error code otherwise.
- */
-int dtsec_compute_bucket(struct dtsec_regs *regs, unsigned char addr[6],
-			 int32_t *bucket);
-
-/**
  * dtsec_set_bucket() - Enables/disables a filter bucket
  * @regs:   Pointer to dTSEC register block
  * @bucket: Bucket index
@@ -1028,6 +1055,6 @@ void dtsec_start_tx(struct dtsec_regs *regs);
 void dtsec_start_rx(struct dtsec_regs *regs);
 void dtsec_stop_rx(struct dtsec_regs *regs);
 void dtsec_stop_tx(struct dtsec_regs *regs);
+uint32_t dtsec_get_rctrl(struct dtsec_regs *regs);
 
-
-#endif /* FSL_FMAN_DTSEC_H */
+#endif /* __FSL_FMAN_DTSEC_H */

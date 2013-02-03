@@ -12,7 +12,7 @@ EXTRA_CFLAGS += -I$(NCSW_FM_INC)
 
 obj-y		+= fsl-ncsw-Pcd.o
 
-fsl-ncsw-Pcd-objs	:= fm_cc.o fm_kg.o fm_pcd.o fm_plcr.o fm_prs.o fm_manip.o
+fsl-ncsw-Pcd-objs	:= fman_kg.o fman_prs.o fm_cc.o fm_kg.o fm_pcd.o fm_plcr.o fm_prs.o fm_manip.o
 
 ifeq ($(CONFIG_FMAN_T4240),y)
 fsl-ncsw-Pcd-objs	+= fm_replic.o

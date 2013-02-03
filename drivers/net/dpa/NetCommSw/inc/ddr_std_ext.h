@@ -30,47 +30,47 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef __FSL_ENET_H
-#define __FSL_ENET_H
-
-/**
- @Description  Ethernet MAC-PHY Interface
-*/
-
-enum enet_interface {
-	E_ENET_IF_MII		= 0x00010000, /**< MII interface */
-	E_ENET_IF_RMII		= 0x00020000, /**< RMII interface */
-	E_ENET_IF_SMII		= 0x00030000, /**< SMII interface */
-	E_ENET_IF_GMII		= 0x00040000, /**< GMII interface */
-	E_ENET_IF_RGMII		= 0x00050000, /**< RGMII interface */
-	E_ENET_IF_TBI		= 0x00060000, /**< TBI interface */
-	E_ENET_IF_RTBI		= 0x00070000, /**< RTBI interface */
-	E_ENET_IF_SGMII		= 0x00080000, /**< SGMII interface */
-	E_ENET_IF_XGMII		= 0x00090000, /**< XGMII interface */
-	E_ENET_IF_QSGMII	= 0x000a0000, /**< QSGMII interface */
-	E_ENET_IF_XFI		= 0x000b0000  /**< XFI interface */
-};
-
-/**
- @Description  Ethernet Speed (nominal data rate)
-*/
-enum enet_speed {
-	E_ENET_SPEED_10		= 10,	/**< 10 Mbps */
-	E_ENET_SPEED_100	= 100,	/**< 100 Mbps */
-	E_ENET_SPEED_1000	= 1000,	/**< 1000 Mbps = 1 Gbps */
-	E_ENET_SPEED_10000	= 10000	/**< 10000 Mbps = 10 Gbps */
-};
-
-enum mac_stat_level {
-	/* No statistics */
-	E_MAC_STAT_NONE = 0,
-	/* Only RMON MIB group 1 (ether stats). Optimized for performance */
-	E_MAC_STAT_MIB_GRP1,
-	/* Only error counters are available. Optimized for performance */
-	E_MAC_STAT_PARTIAL,
-	/* All counters available. Not optimized for performance */
-	E_MAC_STAT_FULL
-};
+#ifndef __DDR_SDT_EXT_H
+#define __DDR_SDT_EXT_H
 
 
-#endif /* __FSL_ENET_H */
+/**************************************************************************//**
+ @Group         ddr_Generic_Resources
+
+ @Description   ddr generic functions, definitions and enums.
+
+ @{
+*//***************************************************************************/
+
+
+/**************************************************************************//**
+ @Description   SPD maximum size
+*//***************************************************************************/
+#define SPD_MAX_SIZE 256
+
+/**************************************************************************//**
+ @Description   DDR types select
+*//***************************************************************************/
+typedef enum e_DdrType
+{
+    e_DDR_DDR1,
+    e_DDR_DDR2,
+    e_DDR_DDR3,
+    e_DDR_DDR3L
+} e_DdrType;
+
+/**************************************************************************//**
+ @Description   DDR Mode.
+*//***************************************************************************/
+typedef enum e_DdrMode
+{
+    e_DDR_BUS_WIDTH_32BIT,
+    e_DDR_BUS_WIDTH_64BIT
+} e_DdrMode;
+
+/** @} */ /* end of ddr_Generic_Resources group */
+
+
+
+#endif /* __DDR_SDT_EXT_H */
+

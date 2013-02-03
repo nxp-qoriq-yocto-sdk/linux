@@ -43,6 +43,7 @@
 #include "xx_ext.h"
 #include "endian_ext.h"
 #include "debug_ext.h"
+#include "crc_mac_addr_ext.h"
 
 #include "fm_common.h"
 #include "dtsec.h"
@@ -108,6 +109,21 @@ static t_Error CheckInitParameters(t_Dtsec *p_Dtsec)
     return E_OK;
 }
 
+/* ......................................................................... */
+
+static uint32_t GetMacAddrHashCode(uint64_t ethAddr)
+{
+    uint32_t crc;
+
+    /* CRC calculation */
+    GET_MAC_ADDR_CRC(ethAddr, crc);
+
+    crc = GetMirror32(crc);
+
+    return crc;
+}
+
+/* ......................................................................... */
 
 static void UpdateStatistics(t_Dtsec *p_Dtsec)
 {
@@ -179,7 +195,6 @@ static void UpdateStatistics(t_Dtsec *p_Dtsec)
     }
 }
 
-
 /* .............................................................................. */
 
 static uint16_t DtsecGetMaxFrameLength(t_Handle h_Dtsec)
@@ -228,7 +243,7 @@ static void DtsecIsr(t_Handle h_Dtsec)
     if (event & DTSEC_IMASK_XFUNEN)
     {
 #ifdef FM_TX_LOCKUP_ERRATA_DTSEC6
-    if (p_Dtsec->fmMacControllerDriver.fmRevInfo.majorRev == 2)
+        if (p_Dtsec->fmMacControllerDriver.fmRevInfo.majorRev == 2)
         {
             uint32_t  tpkt1, tmpReg1, tpkt2, tmpReg2, i;
             /* a. Write 0x00E0_0C00 to DTSEC_ID */
@@ -287,13 +302,6 @@ static void DtsecIsr(t_Handle h_Dtsec)
                 /* e.Write a 0 to bit n of FM_RSTC. */
                 /* cleared by FMAN */
             }
-//            else
-//            {
-                /* If either value has changed, the dTSEC controller is not locked up and the
-                   controller should be allowed to proceed normally by writing the reset value
-                   of 0x0824_0101 to DTSEC_ID. */
-                /* Register is read only */
-//            }
         }
 #endif /* FM_TX_LOCKUP_ERRATA_DTSEC6 */
 
@@ -388,12 +396,18 @@ static t_Error GracefulStop(t_Dtsec *p_Dtsec, e_CommMode mode)
 
     /* Assert the graceful transmit stop bit */
     if (mode & e_COMM_MODE_RX)
+    {
         dtsec_stop_rx(p_MemMap);
 
 #ifdef FM_GRS_ERRATA_DTSEC_A002
-    if (p_Dtsec->fmMacControllerDriver.fmRevInfo.majorRev == 2)
-        XX_UDelay(100);
+        if (p_Dtsec->fmMacControllerDriver.fmRevInfo.majorRev == 2)
+            XX_UDelay(100);
+#else  /* FM_GRS_ERRATA_DTSEC_A002 */
+#ifdef FM_GTS_AFTER_DROPPED_FRAME_ERRATA_DTSEC_A004839
+        XX_UDelay(10);
+#endif /* FM_GTS_AFTER_DROPPED_FRAME_ERRATA_DTSEC_A004839 */
 #endif /* FM_GRS_ERRATA_DTSEC_A002 */
+    }
 
     if (mode & e_COMM_MODE_TX)
 #if defined(FM_GTS_ERRATA_DTSEC_A004) || defined(FM_GTS_AFTER_MAC_ABORTED_FRAME_ERRATA_DTSEC_A0012)
@@ -401,8 +415,6 @@ static t_Error GracefulStop(t_Dtsec *p_Dtsec, e_CommMode mode)
         DBG(INFO, ("GTS not supported due to DTSEC_A004 errata."));
 #else  /* not defined(FM_GTS_ERRATA_DTSEC_A004) ||... */
 #ifdef FM_GTS_UNDERRUN_ERRATA_DTSEC_A0014
-    if ((p_Dtsec->fmMacControllerDriver.fmRevInfo.majorRev == 2) ||
-        (p_Dtsec->fmMacControllerDriver.fmRevInfo.majorRev == 5))
         DBG(INFO, ("GTS not supported due to DTSEC_A0014 errata."));
 #else  /* FM_GTS_UNDERRUN_ERRATA_DTSEC_A0014 */
         dtsec_stop_tx(p_MemMap);
@@ -649,7 +661,6 @@ static t_Error DtsecRxIgnoreMacPause(t_Handle h_Dtsec, bool en)
     return E_OK;
 }
 
-
 /* .............................................................................. */
 
 static t_Error DtsecEnable1588TimeStamp(t_Handle h_Dtsec)
@@ -664,6 +675,8 @@ static t_Error DtsecEnable1588TimeStamp(t_Handle h_Dtsec)
 
     return E_OK;
 }
+
+/* .............................................................................. */
 
 static t_Error DtsecDisable1588TimeStamp(t_Handle h_Dtsec)
 {
@@ -718,6 +731,7 @@ static t_Error DtsecGetStatistics(t_Handle h_Dtsec, t_FmMacStatistics *p_Statist
                 + p_Dtsec->internalStatistics.rbyt;
         p_Statistics->ifInPkts = dtsec_get_stat_counter(p_DtsecMemMap, E_DTSEC_STAT_RPKT)
                 + p_Dtsec->internalStatistics.rpkt;
+        p_Statistics->ifInUcastPkts = 0;
         p_Statistics->ifInMcastPkts = dtsec_get_stat_counter(p_DtsecMemMap, E_DTSEC_STAT_RMCA)
                 + p_Dtsec->internalStatistics.rmca;
         p_Statistics->ifInBcastPkts = dtsec_get_stat_counter(p_DtsecMemMap, E_DTSEC_STAT_RBCA)
@@ -726,6 +740,7 @@ static t_Error DtsecGetStatistics(t_Handle h_Dtsec, t_FmMacStatistics *p_Statist
                 + p_Dtsec->internalStatistics.tbyt;
         p_Statistics->ifOutPkts = dtsec_get_stat_counter(p_DtsecMemMap, E_DTSEC_STAT_TPKT)
                 + p_Dtsec->internalStatistics.tpkt;
+        p_Statistics->ifOutUcastPkts = 0;
         p_Statistics->ifOutMcastPkts = dtsec_get_stat_counter(p_DtsecMemMap, E_DTSEC_STAT_TMCA)
                 + p_Dtsec->internalStatistics.tmca;
         p_Statistics->ifOutBcastPkts = dtsec_get_stat_counter(p_DtsecMemMap, E_DTSEC_STAT_TBCA)
@@ -881,18 +896,40 @@ static t_Error DtsecAddHashMacAddress(t_Handle h_Dtsec, t_EnetAddr *p_EthAddr)
     t_EthHashEntry  *p_HashEntry;
     uint64_t        ethAddr;
     int32_t         bucket;
-    t_Error         err;
+    uint32_t        crc;
+    bool            mcast, ghtx;
 
     SANITY_CHECK_RETURN_ERROR(p_Dtsec, E_INVALID_HANDLE);
     SANITY_CHECK_RETURN_ERROR(!p_Dtsec->p_DtsecDriverParam, E_INVALID_STATE);
 
     ethAddr = ENET_ADDR_TO_UINT64(*p_EthAddr);
 
-    err = (t_Error)dtsec_compute_bucket(p_Dtsec->p_MemMap,
-                                        (uint8_t*)(*p_EthAddr),
-                                        &bucket);
-    if (err != E_OK)
-        RETURN_ERROR(MAJOR, err, ("Could not compute hash bucket"));
+    ghtx = (bool)((dtsec_get_rctrl(p_Dtsec->p_MemMap) & RCTRL_GHTX) ? TRUE : FALSE);
+    mcast = (bool)((ethAddr & MAC_GROUP_ADDRESS) ? TRUE : FALSE);
+
+    if (ghtx && !mcast) /* Cannot handle unicast mac addr when GHTX is on */
+        RETURN_ERROR(MAJOR, E_INVALID_STATE, ("Could not compute hash bucket"));
+
+    crc = GetMacAddrHashCode(ethAddr);
+
+    /* considering the 9 highest order bits in crc H[8:0]:
+     * if ghtx = 0 H[8:6] (highest order 3 bits) identify the hash register
+     * and H[5:1] (next 5 bits) identify the hash bit
+     * if ghts = 1 H[8:5] (highest order 4 bits) identify the hash register
+     * and H[4:0] (next 5 bits) identify the hash bit.
+     *
+     * In bucket index output the low 5 bits identify the hash register bit,
+     * while the higher 4 bits identify the hash register
+     */
+
+    if (ghtx)
+        bucket = (int32_t)((crc >> 23) & 0x1ff);
+    else {
+        bucket = (int32_t)((crc >> 24) & 0xff);
+        /* if !ghtx and mcast the bit must be set in gaddr instead of igaddr. */
+        if (mcast)
+            bucket += 0x100;
+    }
 
     dtsec_set_bucket(p_Dtsec->p_MemMap, bucket, TRUE);
 
@@ -919,18 +956,30 @@ static t_Error DtsecDelHashMacAddress(t_Handle h_Dtsec, t_EnetAddr *p_EthAddr)
     t_EthHashEntry  *p_HashEntry = NULL;
     uint64_t        ethAddr;
     int32_t         bucket;
-    t_Error         err;
+    uint32_t        crc;
+    bool            mcast, ghtx;
 
     SANITY_CHECK_RETURN_ERROR(p_Dtsec, E_INVALID_HANDLE);
     SANITY_CHECK_RETURN_ERROR(!p_Dtsec->p_DtsecDriverParam, E_INVALID_STATE);
 
     ethAddr = ENET_ADDR_TO_UINT64(*p_EthAddr);
 
-    err = (t_Error)dtsec_compute_bucket(p_Dtsec->p_MemMap,
-                                        (uint8_t*)(*p_EthAddr),
-                                        &bucket);
-    if (err != E_OK)
-        RETURN_ERROR(MAJOR, err, ("Could not compute hash bucket"));
+    ghtx = (bool)((dtsec_get_rctrl(p_Dtsec->p_MemMap) & RCTRL_GHTX) ? TRUE : FALSE);
+    mcast = (bool)((ethAddr & MAC_GROUP_ADDRESS) ? TRUE : FALSE);
+
+    if (ghtx && !mcast) /* Cannot handle unicast mac addr when GHTX is on */
+        RETURN_ERROR(MAJOR, E_INVALID_STATE, ("Could not compute hash bucket"));
+
+    crc = GetMacAddrHashCode(ethAddr);
+
+    if (ghtx)
+        bucket = (int32_t)((crc >> 23) & 0x1ff);
+    else {
+        bucket = (int32_t)((crc >> 24) & 0xff);
+        /* if !ghtx and mcast the bit must be set in gaddr instead of igaddr. */
+        if (mcast)
+            bucket += 0x100;
+    }
 
     if (ethAddr & MAC_GROUP_ADDRESS)
     {
@@ -1251,25 +1300,24 @@ static t_Error DtsecInit(t_Handle h_Dtsec)
 
     DTSEC_MII_Init(h_Dtsec);
 
-    if (p_Dtsec->enetMode == e_ENET_MODE_SGMII_1000)
+    if (ENET_INTERFACE_FROM_MODE(p_Dtsec->enetMode) == e_ENET_IF_SGMII)
     {
         uint16_t            tmpReg16;
 
         /* Configure the TBI PHY Control Register */
         tmpReg16 = PHY_TBICON_CLK_SEL | PHY_TBICON_SRESET;
-
         DTSEC_MII_WritePhyReg(p_Dtsec, (uint8_t)p_DtsecDriverParam->tbipa, 17, tmpReg16);
 
         tmpReg16 = PHY_TBICON_CLK_SEL;
-
         DTSEC_MII_WritePhyReg(p_Dtsec, (uint8_t)p_DtsecDriverParam->tbipa, 17, tmpReg16);
 
         tmpReg16 = (PHY_CR_PHY_RESET | PHY_CR_ANE | PHY_CR_FULLDUPLEX | PHY_CR_SPEED1);
-
-
         DTSEC_MII_WritePhyReg(p_Dtsec, (uint8_t)p_DtsecDriverParam->tbipa, 0, tmpReg16);
 
-        tmpReg16 = PHY_TBIANA_SGMII;
+        if (p_Dtsec->enetMode & ENET_IF_SGMII_BASEX)
+            tmpReg16 = PHY_TBIANA_1000X;
+        else
+            tmpReg16 = PHY_TBIANA_SGMII;
         DTSEC_MII_WritePhyReg(p_Dtsec, (uint8_t)p_DtsecDriverParam->tbipa, 4, tmpReg16);
 
         tmpReg16 = (PHY_CR_ANE | PHY_CR_RESET_AN | PHY_CR_FULLDUPLEX | PHY_CR_SPEED1);
@@ -1281,12 +1329,7 @@ static t_Error DtsecInit(t_Handle h_Dtsec)
     maxFrmLn = dtsec_get_max_frame_len(p_Dtsec->p_MemMap);
     err = FmSetMacMaxFrame(p_Dtsec->fmMacControllerDriver.h_Fm, e_FM_MAC_1G,
             p_Dtsec->fmMacControllerDriver.macId, maxFrmLn);
-/* we consider having no IPC a non crasher... */
-/*    if (err) {
-        FreeInitResources(p_Dtsec);
-        RETURN_ERROR(MAJOR, err, NO_MSG);
-    }
-*/
+
     p_Dtsec->p_MulticastAddrHash = AllocHashTable(EXTENDED_HASH_TABLE_SIZE);
     if (!p_Dtsec->p_MulticastAddrHash) {
         FreeInitResources(p_Dtsec);

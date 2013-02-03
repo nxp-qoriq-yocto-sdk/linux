@@ -49,13 +49,13 @@ void tgec_set_mac_address(struct tgec_regs *regs, uint8_t *adr)
 
 void tgec_reset_stat(struct tgec_regs *regs)
 {
-	uint32_t command_config;
+	uint32_t tmp;
 
-	command_config = ioread32be(&regs->command_config);
+	tmp = ioread32be(&regs->command_config);
 
-	command_config |= CMD_CFG_STAT_CLR;
+	tmp |= CMD_CFG_STAT_CLR;
 
-	iowrite32be(command_config, &regs->command_config);
+	iowrite32be(tmp, &regs->command_config);
 
 	while (ioread32be(&regs->command_config) & CMD_CFG_STAT_CLR);
 }
@@ -159,13 +159,10 @@ void tgec_enable(struct tgec_regs *regs, bool apply_rx, bool apply_tx)
 	uint32_t tmp;
 
 	tmp = ioread32be(&regs->command_config);
-
 	if (apply_rx)
-		tmp |= CMD_CFG_RX_EN ;
-
+		tmp |= CMD_CFG_RX_EN;
 	if (apply_tx)
-		tmp |= CMD_CFG_TX_EN ;
-
+		tmp |= CMD_CFG_TX_EN;
 	iowrite32be(tmp, &regs->command_config);
 }
 
@@ -174,13 +171,10 @@ void tgec_disable(struct tgec_regs *regs, bool apply_rx, bool apply_tx)
 	uint32_t tmp_reg_32;
 
 	tmp_reg_32 = ioread32be(&regs->command_config);
-
 	if (apply_rx)
 		tmp_reg_32 &= ~CMD_CFG_RX_EN;
-
 	if (apply_tx)
 		tmp_reg_32 &= ~CMD_CFG_TX_EN;
-
 	iowrite32be(tmp_reg_32, &regs->command_config);
 }
 
@@ -288,21 +282,21 @@ uint16_t tgec_get_max_frame_len(struct tgec_regs *regs)
 
 void tgec_defconfig(struct tgec_cfg *cfg)
 {
-	cfg->wan_mode_enable = FALSE;
-	cfg->promiscuous_mode_enable = FALSE;
-	cfg->pause_forward_enable = FALSE;
-	cfg->pause_ignore = FALSE;
-	cfg->tx_addr_ins_enable = FALSE;
-	cfg->loopback_enable = FALSE;
-	cfg->cmd_frame_enable = FALSE;
-	cfg->rx_error_discard = FALSE;
-	cfg->send_idle_enable = FALSE;
-	cfg->no_length_check_enable = TRUE;
-	cfg->lgth_check_nostdr = FALSE;
-	cfg->time_stamp_enable = FALSE;
-	cfg->tx_ipg_length = 12;
-	cfg->max_frame_length = 0x600;
-	cfg->pause_quant = 0xf000;
+	cfg->wan_mode_enable = DEFAULT_WAN_MODE_ENABLE;
+	cfg->promiscuous_mode_enable = DEFAULT_PROMISCUOUS_MODE_ENABLE;
+	cfg->pause_forward_enable = DEFAULT_PAUSE_FORWARD_ENABLE;
+	cfg->pause_ignore = DEFAULT_PAUSE_IGNORE;
+	cfg->tx_addr_ins_enable = DEFAULT_TX_ADDR_INS_ENABLE;
+	cfg->loopback_enable = DEFAULT_LOOPBACK_ENABLE;
+	cfg->cmd_frame_enable = DEFAULT_CMD_FRAME_ENABLE;
+	cfg->rx_error_discard = DEFAULT_RX_ERROR_DISCARD;
+	cfg->send_idle_enable = DEFAULT_SEND_IDLE_ENABLE;
+	cfg->no_length_check_enable = DEFAULT_NO_LENGTH_CHECK_ENABLE;
+	cfg->lgth_check_nostdr = DEFAULT_LGTH_CHECK_NOSTDR;
+	cfg->time_stamp_enable = DEFAULT_TIME_STAMP_ENABLE;
+	cfg->tx_ipg_length = DEFAULT_TX_IPG_LENGTH;
+	cfg->max_frame_length = DEFAULT_MAX_FRAME_LENGTH;
+	cfg->pause_quant = DEFAULT_PAUSE_QUANT;
 #ifdef FM_TX_ECC_FRMS_ERRATA_10GMAC_A004
 	cfg->skip_fman11_workaround = FALSE;
 #endif /* FM_TX_ECC_FRMS_ERRATA_10GMAC_A004 */
@@ -314,7 +308,7 @@ int tgec_init(struct tgec_regs *regs, struct tgec_cfg *cfg,
 	uint32_t tmp;
 
 	/* Config */
-	tmp = 0;
+	tmp = 0x40; /* CRC forward */
 	if (cfg->wan_mode_enable)
 		tmp |= CMD_CFG_WAN_MODE;
 	if (cfg->promiscuous_mode_enable)
@@ -337,7 +331,6 @@ int tgec_init(struct tgec_regs *regs, struct tgec_cfg *cfg,
 		tmp |= CMD_CFG_NO_LEN_CHK;
 	if (cfg->time_stamp_enable)
 		tmp |= CMD_CFG_EN_TIMESTAMP;
-	tmp |= 0x40;
 	iowrite32be(tmp, &regs->command_config);
 	/* Max Frame Length */
 	iowrite32be((uint32_t)cfg->max_frame_length, &regs->maxfrm);

@@ -112,7 +112,7 @@ typedef _Packed struct t_FmPrsResult {
     volatile uint8_t     l4r;                /**< Layer 4 result */
     volatile uint8_t     cplan;              /**< Classification plan id */
     volatile uint16_t    nxthdr;             /**< Next Header  */
-    volatile uint16_t    cksum;              /**< running-sum */
+    volatile uint16_t    cksum;              /**< Running-sum */
     volatile uint16_t    flags_frag_off;     /**< Flags & fragment-offset field of the last IP-header */
     volatile uint8_t     route_type;         /**< Routing type field of a IPv6 routing extension header */
     volatile uint8_t     rhp_ip_valid;       /**< Routing Extension Header Present; last bit is IP valid */
@@ -457,7 +457,7 @@ typedef struct t_FmBufPoolDepletion {
 } t_FmBufPoolDepletion;
 
 /**************************************************************************//**
- @Description   A structure for defining Ucode patch for loading.
+ @Description   A Structure for defining Ucode patch for loading.
 *//***************************************************************************/
 typedef struct t_FmFirmwareParams {
     uint32_t                size;                   /**< Size of uCode */
@@ -804,6 +804,17 @@ t_Error FM_ConfigDmaAxiDbgNumOfBeats(t_Handle h_Fm, uint8_t axiDbgNumOfBeats);
                 (i.e. guestId != NCSW_MASTER_ID)
 *//***************************************************************************/
 t_Error FM_ConfigDmaCamNumOfEntries(t_Handle h_Fm, uint8_t numOfEntries);
+
+/**************************************************************************//**
+ @Function      FM_ConfigEnableCounters
+
+ @Description   Obsolete, always return E_OK.
+
+ @Param[in]     h_Fm    A handle to an FM Module.
+
+ @Return        E_OK on success; Error code otherwise.
+*//***************************************************************************/
+t_Error FM_ConfigEnableCounters(t_Handle h_Fm);
 
 /**************************************************************************//**
  @Function      FM_ConfigDmaDbgCounter
@@ -1261,7 +1272,7 @@ typedef enum e_FmCounters {
 } e_FmCounters;
 
 /**************************************************************************//**
- @Description   A structure for returning FM revision information
+ @Description   A Structure for returning FM revision information
 *//***************************************************************************/
 typedef struct t_FmRevisionInfo {
     uint8_t         majorRev;               /**< Major revision */
@@ -1269,7 +1280,7 @@ typedef struct t_FmRevisionInfo {
 } t_FmRevisionInfo;
 
 /**************************************************************************//**
- @Description   A structure for returning FM ctrl code revision information
+ @Description   A Structure for returning FM ctrl code revision information
 *//***************************************************************************/
 typedef struct t_FmCtrlCodeRevisionInfo {
     uint16_t        packageRev;             /**< Package revision */
@@ -1278,7 +1289,7 @@ typedef struct t_FmCtrlCodeRevisionInfo {
 } t_FmCtrlCodeRevisionInfo;
 
 /**************************************************************************//**
- @Description   A structure for defining DMA status
+ @Description   A Structure for defining DMA status
 *//***************************************************************************/
 typedef struct t_FmDmaStatus {
     bool    cmqNotEmpty;            /**< Command queue is not empty */
@@ -1293,7 +1304,7 @@ typedef struct t_FmDmaStatus {
  @Description   A Structure for obtaining FM controller monitor values
 *//***************************************************************************/
 typedef struct t_FmCtrlMon {
-    uint8_t percentCnt[1];          /**< Percentage value */
+    uint8_t percentCnt[2];          /**< Percentage value */
 } t_FmCtrlMon;
 
 

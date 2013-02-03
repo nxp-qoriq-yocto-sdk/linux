@@ -577,7 +577,7 @@ static void FreeSharedProfiles(t_FmPcd *p_FmPcd, uint16_t numOfProfiles, uint16_
 
     ASSERT_COND(numOfProfiles);
 
-    for (i=0; i<numOfProfiles; i++)
+    for (i=0; i < numOfProfiles; i++)
     {
         ASSERT_COND(p_FmPcd->p_FmPcdPlcr->profiles[profilesIds[i]].profilesMng.allocated);
         p_FmPcd->p_FmPcdPlcr->profiles[profilesIds[i]].profilesMng.allocated = FALSE;
@@ -1793,7 +1793,7 @@ uint32_t FM_PCD_PlcrProfileGetCounter(t_Handle h_Profile, e_FmPcdPlcrProfileCoun
         REPORT_ERROR(MAJOR, E_INVALID_VALUE, ("profileId too Big "));
         return 0;
     }
-    intFlags = PlcrHwLock(p_FmPcd);
+    intFlags = PlcrHwLock(p_FmPcd->p_FmPcdPlcr);
     WritePar(p_FmPcd, FmPcdPlcrBuildReadPlcrActionReg(profileIndx));
 
     switch (counter)
@@ -1817,7 +1817,7 @@ uint32_t FM_PCD_PlcrProfileGetCounter(t_Handle h_Profile, e_FmPcdPlcrProfileCoun
             REPORT_ERROR(MAJOR, E_INVALID_SELECTION, NO_MSG);
             break;
     }
-    PlcrHwUnlock(p_FmPcd, intFlags);
+    PlcrHwUnlock(p_FmPcd->p_FmPcdPlcr, intFlags);
 
     return counterVal;
 }

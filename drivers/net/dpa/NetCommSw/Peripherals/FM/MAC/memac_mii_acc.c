@@ -40,15 +40,12 @@
 #include "fm_common.h"
 
 
-static void WritePhyReg10G(t_Memac   *p_Memac,
-                           uint8_t   phyAddr,
-                           uint8_t   reg,
-                           uint16_t  data)
+static void WritePhyReg10G(t_MemacMiiAccessMemMap   *p_MiiAccess,
+                           uint8_t                  phyAddr,
+                           uint8_t                  reg,
+                           uint16_t                 data)
 {
-    t_MemacMiiAccessMemMap  *p_MiiAccess;
     uint32_t                tmpReg;
-
-    p_MiiAccess = p_Memac->p_MiiMemMap;
 
     tmpReg = GET_UINT32(p_MiiAccess->mdio_cfg);
     /* Leave only MDIO_CLK_DIV bits set on */
@@ -67,7 +64,6 @@ static void WritePhyReg10G(t_Memac   *p_Memac,
     /* Specify phy and register to be accessed */
     WRITE_UINT32(p_MiiAccess->mdio_ctrl, phyAddr);
     WRITE_UINT32(p_MiiAccess->mdio_addr, reg);
-
     CORE_MemoryBarrier();
 
     while ((GET_UINT32(p_MiiAccess->mdio_cfg)) & MDIO_CFG_BSY)
@@ -75,7 +71,6 @@ static void WritePhyReg10G(t_Memac   *p_Memac,
 
     /* Write data */
     WRITE_UINT32(p_MiiAccess->mdio_data, data);
-
     CORE_MemoryBarrier();
 
     /* Wait for write transaction end */
@@ -83,15 +78,12 @@ static void WritePhyReg10G(t_Memac   *p_Memac,
         XX_UDelay(1);
 }
 
-static t_Error ReadPhyReg10G(t_Memac   *p_Memac,
-                             uint8_t   phyAddr,
-                             uint8_t   reg,
-                             uint16_t  *p_Data)
+static uint32_t ReadPhyReg10G(t_MemacMiiAccessMemMap *p_MiiAccess,
+                              uint8_t                phyAddr,
+                              uint8_t                reg,
+                              uint16_t               *p_Data)
 {
-    t_MemacMiiAccessMemMap  *p_MiiAccess;
     uint32_t                tmpReg;
-
-    p_MiiAccess = p_Memac->p_MiiMemMap;
 
     tmpReg = GET_UINT32(p_MiiAccess->mdio_cfg);
     /* Leave only MDIO_CLK_DIV bits set on */
@@ -110,7 +102,6 @@ static t_Error ReadPhyReg10G(t_Memac   *p_Memac,
     /* Specify phy and register to be accessed */
     WRITE_UINT32(p_MiiAccess->mdio_ctrl, phyAddr);
     WRITE_UINT32(p_MiiAccess->mdio_addr, reg);
-
     CORE_MemoryBarrier();
 
     while ((GET_UINT32(p_MiiAccess->mdio_cfg)) & MDIO_CFG_BSY)
@@ -120,7 +111,6 @@ static t_Error ReadPhyReg10G(t_Memac   *p_Memac,
     tmpReg = phyAddr;
     tmpReg |= MDIO_CTL_READ;
     WRITE_UINT32(p_MiiAccess->mdio_ctrl, tmpReg);
-
     CORE_MemoryBarrier();
 
     /* Wait for data to be available */
@@ -130,25 +120,15 @@ static t_Error ReadPhyReg10G(t_Memac   *p_Memac,
     *p_Data =  (uint16_t)GET_UINT32(p_MiiAccess->mdio_data);
 
     /* Check if there was an error */
-    tmpReg  = GET_UINT32(p_MiiAccess->mdio_cfg);
-
-    if (tmpReg & MDIO_CFG_READ_ERR)
-        RETURN_ERROR(MINOR, E_INVALID_VALUE,
-                     ("Read Error: phyAddr 0x%x, dev 0x%x, reg 0x%x, cfgReg 0x%x",
-                      ((phyAddr & 0xe0) >> 5), (phyAddr & 0x1f), reg, tmpReg));
-
-    return E_OK;
+    return GET_UINT32(p_MiiAccess->mdio_cfg);
 }
 
-static void WritePhyReg1G(t_Memac   *p_Memac,
-                          uint8_t   phyAddr,
-                          uint8_t   reg,
-                          uint16_t  data)
+static void WritePhyReg1G(t_MemacMiiAccessMemMap    *p_MiiAccess,
+                          uint8_t                   phyAddr,
+                          uint8_t                   reg,
+                          uint16_t                  data)
 {
-    t_MemacMiiAccessMemMap  *p_MiiAccess;
     uint32_t                tmpReg;
-
-    p_MiiAccess = p_Memac->p_MiiMemMap;
 
     /* Leave only MDIO_CLK_DIV and MDIO_HOLD bits set on */
     tmpReg = GET_UINT32(p_MiiAccess->mdio_cfg);
@@ -176,15 +156,12 @@ static void WritePhyReg1G(t_Memac   *p_Memac,
         XX_UDelay(1);
 }
 
-static t_Error ReadPhyReg1G(t_Memac   *p_Memac,
-                            uint8_t   phyAddr,
-                            uint8_t   reg,
-                            uint16_t  *p_Data)
+static uint32_t ReadPhyReg1G(t_MemacMiiAccessMemMap  *p_MiiAccess,
+                             uint8_t                 phyAddr,
+                             uint8_t                 reg,
+                             uint16_t                *p_Data)
 {
-    t_MemacMiiAccessMemMap  *p_MiiAccess;
     uint32_t                tmpReg;
-
-    p_MiiAccess = p_Memac->p_MiiMemMap;
 
     /* Leave only MDIO_CLK_DIV and MDIO_HOLD bits set on */
     tmpReg = GET_UINT32(p_MiiAccess->mdio_cfg);
@@ -211,14 +188,7 @@ static t_Error ReadPhyReg1G(t_Memac   *p_Memac,
     *p_Data =  (uint16_t)GET_UINT32(p_MiiAccess->mdio_data);
 
     /* Check error */
-    tmpReg  = GET_UINT32(p_MiiAccess->mdio_cfg);
-
-    if (tmpReg & MDIO_CFG_READ_ERR)
-        RETURN_ERROR(MINOR, E_INVALID_VALUE,
-                     ("Read Error: phyAddr 0x%x, dev 0x%x, reg 0x%x, cfgReg 0x%x",
-                      ((phyAddr & 0xe0) >> 5), (phyAddr & 0x1f), reg, tmpReg));
-
-    return E_OK;
+    return GET_UINT32(p_MiiAccess->mdio_cfg);
 }
 
 /*****************************************************************************/
@@ -228,19 +198,16 @@ t_Error MEMAC_MII_WritePhyReg(t_Handle  h_Memac,
                              uint16_t   data)
 {
     t_Memac                 *p_Memac = (t_Memac *)h_Memac;
-    bool                    phy10G;
 
     SANITY_CHECK_RETURN_ERROR(p_Memac, E_INVALID_HANDLE);
     SANITY_CHECK_RETURN_ERROR(p_Memac->p_MiiMemMap, E_INVALID_HANDLE);
 
     /* Figure out interface type - 10G vs 1G.
        In 10G interface both phyAddr and devAddr present. */
-    phy10G = (phyAddr > 0x1F) ? TRUE : FALSE;
-
-    if (phy10G)
-        WritePhyReg10G(p_Memac, phyAddr, reg, data);
+    if (ENET_SPEED_FROM_MODE(p_Memac->enetMode) == e_ENET_SPEED_10000)
+        WritePhyReg10G(p_Memac->p_MiiMemMap, phyAddr, reg, data);
     else
-        WritePhyReg1G(p_Memac, phyAddr, reg, data);
+        WritePhyReg1G(p_Memac->p_MiiMemMap, phyAddr, reg, data);
 
     return E_OK;
 }
@@ -252,20 +219,22 @@ t_Error MEMAC_MII_ReadPhyReg(t_Handle h_Memac,
                             uint16_t  *p_Data)
 {
     t_Memac                 *p_Memac = (t_Memac *)h_Memac;
-    bool                    phy10G;
-    t_Error                 errCode;
+    uint32_t                ans;
 
     SANITY_CHECK_RETURN_ERROR(p_Memac, E_INVALID_HANDLE);
     SANITY_CHECK_RETURN_ERROR(p_Memac->p_MiiMemMap, E_INVALID_HANDLE);
 
     /* Figure out interface type - 10G vs 1G.
        In 10G interface both phyAddr and devAddr present. */
-    phy10G = (phyAddr > 0x1F) ? TRUE : FALSE;
-
-    if (phy10G)
-        errCode = ReadPhyReg10G(p_Memac, phyAddr, reg, p_Data);
+    if (ENET_SPEED_FROM_MODE(p_Memac->enetMode) == e_ENET_SPEED_10000)
+        ans = ReadPhyReg10G(p_Memac->p_MiiMemMap, phyAddr, reg, p_Data);
     else
-        errCode = ReadPhyReg1G(p_Memac, phyAddr, reg, p_Data);
+        ans = ReadPhyReg1G(p_Memac->p_MiiMemMap, phyAddr, reg, p_Data);
 
-    return errCode;
+    if (ans & MDIO_CFG_READ_ERR)
+        RETURN_ERROR(MINOR, E_INVALID_VALUE,
+                     ("Read Error: phyAddr 0x%x, dev 0x%x, reg 0x%x, cfgReg 0x%x",
+                      ((phyAddr & 0xe0) >> 5), (phyAddr & 0x1f), reg, ans));
+
+    return E_OK;
 }

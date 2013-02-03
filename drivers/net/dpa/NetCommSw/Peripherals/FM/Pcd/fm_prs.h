@@ -46,6 +46,16 @@
 /*          SW parser IP_FRAG patch                                    */
 /***********************************************************************/
 
+
+#ifdef FM_CAPWAP_SUPPORT
+#define SW_PRS_UDP_LITE_PATCH   \
+{\
+    0x31,0x92,0x50,0x29,0x00,0x88,0x08,0x16,0x00,0x00, \
+    0x00,0x01,0x00,0x05,0x00,0x81,0x1C,0x0B,0x00,0x01, \
+    0x1B,0xFF,                                    \
+}
+#endif /* FM_CAPWAP_SUPPORT */
+
 #if (DPAA_VERSION == 10)
 /* Version: 106.1.9 */
 #define SW_PRS_IP_FRAG_PATCH                           \
@@ -93,6 +103,7 @@
     0x00,0x00,0x00,0x01,0x32,0xC1,0x32,0xF0,0x00,0x4A, \
     0x00,0x80,0x1F,0xFF,0x00,0x01,0x1B,0xFE,           \
 }
+
 #else
 /* version: 106.3.13 */
 #define SW_PRS_IP_FRAG_PATCH                           \
@@ -158,16 +169,14 @@
 /****************************/
 /* Parser defines           */
 /****************************/
+#define FM_PCD_PRS_SW_TAIL_SIZE             4                   /**< Number of bytes that must be cleared at
+                                                                             the end of the SW parser area */
+
 /* masks */
 #define PRS_ERR_CAP                         0x80000000
 #define PRS_ERR_TYPE_DOUBLE                 0x40000000
 #define PRS_ERR_SINGLE_ECC_CNT_MASK         0x00FF0000
 #define PRS_ERR_ADDR_MASK                   0x000001FF
-#define FM_PCD_PRS_RPIMAC_EN                0x00000001
-#define FM_PCD_PRS_SINGLE_ECC               0x00004000
-#define FM_PCD_PRS_PORT_IDLE_STS            0xffff0000
-#define FM_PCD_PRS_DOUBLE_ECC               0x00004000
-#define FM_PCD_PRS_PPSC_ALL_PORTS           0xffff0000
 
 /* others */
 #define PRS_MAX_CYCLE_LIMIT                 8191

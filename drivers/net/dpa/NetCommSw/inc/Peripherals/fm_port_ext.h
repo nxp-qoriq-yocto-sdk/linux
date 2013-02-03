@@ -130,10 +130,8 @@ typedef uint32_t    fmPortFrameErrSelect_t;                         /**< typedef
 #define FM_PORT_FRM_ERR_UNSUPPORTED_FORMAT      FM_FD_ERR_UNSUPPORTED_FORMAT    /**< Not for Rx-Port! Unsupported Format */
 #define FM_PORT_FRM_ERR_LENGTH                  FM_FD_ERR_LENGTH                /**< Not for Rx-Port! Length Error */
 #define FM_PORT_FRM_ERR_DMA                     FM_FD_ERR_DMA                   /**< DMA Data error */
-#ifdef FM_DISABLE_SEC_ERRORS
-#define FM_PORT_FRM_ERR_NON_FM                  FM_FD_RX_STATUS_ERR_NON_FM      /*< non Frame-Manager error; probably come from SEC that
-                                                                                    was chained to FM */
-#endif /* FM_DISABLE_SEC_ERRORS */
+#define FM_PORT_FRM_ERR_NON_FM                  FM_FD_RX_STATUS_ERR_NON_FM      /**< non Frame-Manager error; probably come from SEC that
+                                                                                     was chained to FM */
 
 #define FM_PORT_FRM_ERR_IPRE                    (FM_FD_ERR_IPR & ~FM_FD_IPR)        /**< IPR error */
 #define FM_PORT_FRM_ERR_IPR_NCSP                (FM_FD_ERR_IPR_NCSP & ~FM_FD_IPR)   /**< IPR non-consistent-sp */
@@ -276,7 +274,11 @@ typedef struct t_FmPortParams {
     uintptr_t                   baseAddr;           /**< Virtual Address of memory mapped FM Port registers.*/
     t_Handle                    h_Fm;               /**< A handle to the FM object this port related to */
     e_FmPortType                portType;           /**< Port type */
-    uint8_t                     portId;             /**< Port Id - relative to type */
+    uint8_t                     portId;             /**< Port Id - relative to type;
+                                                         NOTE: When configuring Offline Parsing port for
+                                                         FMANv3 devices (DPAA_VERSION 11 and higher),
+                                                         it is highly recommended NOT to use portId=0 due to lack
+                                                         of HW resources on portId=0. */
     bool                        independentModeEnable;
                                                     /**< This port is Independent-Mode - Used for Rx/Tx ports only! */
     uint16_t                    liodnBase;          /**< Irrelevant for P4080 rev 1. LIODN base for this port, to be
@@ -1170,9 +1172,30 @@ t_Error FM_PORT_ConfigRxFifoThreshold(t_Handle h_FmPort, uint32_t fifoThreshold)
 *//***************************************************************************/
 t_Error FM_PORT_ConfigRxFifoPriElevationLevel(t_Handle h_FmPort, uint32_t priElevationLevel);
 
-#ifdef FM_BCB_ERRATA_BMI_SW001
+#ifdef FM_HEAVY_TRAFFIC_HANG_ERRATA_FMAN_A005669
+/**************************************************************************//*
+ @Function      FM_PORT_ConfigBCBWorkaround
+
+ @Description   Configures BCB errata workaround.
+
+                When BCB errata is applicable, the workaround is always
+                performed by FM Controller. Thus, this functions doesn't
+                actually enable errata workaround but rather allows driver
+                to perform adjustments required due to errata workaround
+                execution in FM controller.
+
+                Applying BCB workaround also configures FM_PORT_FRM_ERR_PHYSICAL
+                errors to be discarded. Thus FM_PORT_FRM_ERR_PHYSICAL can't be
+                set by FM_PORT_SetErrorsRoute() function.
+
+ @Param[in]     h_FmPort            A handle to a FM Port module.
+
+ @Return        E_OK on success; Error code otherwise.
+
+ @Cautions      Allowed only following FM_PORT_Config() and before FM_PORT_Init().
+*//***************************************************************************/
 t_Error FM_PORT_ConfigBCBWorkaround(t_Handle h_FmPort);
-#endif /* FM_BCB_ERRATA_BMI_SW001 */
+#endif /* FM_HEAVY_TRAFFIC_HANG_ERRATA_FMAN_A005669 */
 
 #if (DPAA_VERSION >= 11)
 /**************************************************************************//*
@@ -1706,7 +1729,7 @@ t_Error FM_PORT_SetIMExceptions(t_Handle h_FmPort, e_FmPortExceptions exception,
 t_Error FM_PORT_SetPerformanceCounters(t_Handle h_FmPort, bool enable);
 
 /**************************************************************************//*
- @Function      FM_PORT_SetPerformanceCounters
+ @Function      FM_PORT_SetPerformanceCountersParams
 
  @Description   Calling this routine defines port's performance
                 counters parameters.

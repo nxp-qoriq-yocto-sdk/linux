@@ -46,7 +46,7 @@
 #include "fm_mac.h"
 
 
-/* ........................................................................... */
+/* ......................................................................... */
 
 t_Handle FM_MAC_Config (t_FmMacParams *p_FmMacParam)
 {
@@ -57,12 +57,11 @@ t_Handle FM_MAC_Config (t_FmMacParams *p_FmMacParam)
 #if (DPAA_VERSION == 10)
     if (ENET_SPEED_FROM_MODE(p_FmMacParam->enetMode) < e_ENET_SPEED_10000)
         p_FmMacControllerDriver = (t_FmMacControllerDriver *)DTSEC_Config(p_FmMacParam);
+    else
 #if FM_MAX_NUM_OF_10G_MACS > 0
-    else
-       p_FmMacControllerDriver = (t_FmMacControllerDriver *)TGEC_Config(p_FmMacParam);
+        p_FmMacControllerDriver = (t_FmMacControllerDriver *)TGEC_Config(p_FmMacParam);
 #else
-    else
-        p_FmMacControllerDriver = NULL; /* should not be reached */
+        p_FmMacControllerDriver = NULL;
 #endif /* FM_MAX_NUM_OF_10G_MACS > 0 */
 #else
     p_FmMacControllerDriver = (t_FmMacControllerDriver *)MEMAC_Config(p_FmMacParam);
@@ -85,7 +84,7 @@ t_Handle FM_MAC_Config (t_FmMacParams *p_FmMacParam)
     return (t_Handle)p_FmMacControllerDriver;
 }
 
-/* ........................................................................... */
+/* ......................................................................... */
 
 t_Error FM_MAC_Init (t_Handle h_FmMac)
 {
@@ -106,7 +105,7 @@ t_Error FM_MAC_Init (t_Handle h_FmMac)
     RETURN_ERROR(MINOR, E_NOT_SUPPORTED, NO_MSG);
 }
 
-/* ........................................................................... */
+/* ......................................................................... */
 
 t_Error FM_MAC_Free (t_Handle h_FmMac)
 {
@@ -120,7 +119,7 @@ t_Error FM_MAC_Free (t_Handle h_FmMac)
     RETURN_ERROR(MINOR, E_NOT_SUPPORTED, NO_MSG);
 }
 
-/* ........................................................................... */
+/* ......................................................................... */
 
 t_Error FM_MAC_ConfigResetOnInit (t_Handle h_FmMac, bool enable)
 {
@@ -136,7 +135,7 @@ t_Error FM_MAC_ConfigResetOnInit (t_Handle h_FmMac, bool enable)
     return E_OK;
 }
 
-/* ........................................................................... */
+/* ......................................................................... */
 
 t_Error FM_MAC_ConfigLoopback (t_Handle h_FmMac, bool newVal)
 {
@@ -150,7 +149,7 @@ t_Error FM_MAC_ConfigLoopback (t_Handle h_FmMac, bool newVal)
     RETURN_ERROR(MINOR, E_NOT_SUPPORTED, NO_MSG);
 }
 
-/* ........................................................................... */
+/* ......................................................................... */
 
 t_Error FM_MAC_ConfigMaxFrameLength (t_Handle h_FmMac, uint16_t newVal)
 {
@@ -163,7 +162,7 @@ t_Error FM_MAC_ConfigMaxFrameLength (t_Handle h_FmMac, uint16_t newVal)
     RETURN_ERROR(MINOR, E_NOT_SUPPORTED, NO_MSG);
 }
 
-/* ........................................................................... */
+/* ......................................................................... */
 
 t_Error FM_MAC_ConfigWan (t_Handle h_FmMac, bool flag)
 {
@@ -177,7 +176,7 @@ t_Error FM_MAC_ConfigWan (t_Handle h_FmMac, bool flag)
     RETURN_ERROR(MINOR, E_NOT_SUPPORTED, NO_MSG);
 }
 
-/* ........................................................................... */
+/* ......................................................................... */
 
 t_Error FM_MAC_ConfigPadAndCrc (t_Handle h_FmMac, bool newVal)
 {
@@ -191,7 +190,7 @@ t_Error FM_MAC_ConfigPadAndCrc (t_Handle h_FmMac, bool newVal)
     RETURN_ERROR(MINOR, E_NOT_SUPPORTED, NO_MSG);
 }
 
-/* ........................................................................... */
+/* ......................................................................... */
 
 t_Error FM_MAC_ConfigHalfDuplex (t_Handle h_FmMac, bool newVal)
 {
@@ -205,7 +204,7 @@ t_Error FM_MAC_ConfigHalfDuplex (t_Handle h_FmMac, bool newVal)
     RETURN_ERROR(MINOR, E_NOT_SUPPORTED, NO_MSG);
 }
 
-/* ........................................................................... */
+/* ......................................................................... */
 
 t_Error FM_MAC_ConfigTbiPhyAddr (t_Handle h_FmMac, uint8_t newVal)
 {
@@ -219,7 +218,7 @@ t_Error FM_MAC_ConfigTbiPhyAddr (t_Handle h_FmMac, uint8_t newVal)
     RETURN_ERROR(MINOR, E_NOT_SUPPORTED, NO_MSG);
 }
 
-/* ........................................................................... */
+/* ......................................................................... */
 
 t_Error FM_MAC_ConfigLengthCheck (t_Handle h_FmMac, bool newVal)
 {
@@ -233,7 +232,7 @@ t_Error FM_MAC_ConfigLengthCheck (t_Handle h_FmMac, bool newVal)
     RETURN_ERROR(MINOR, E_NOT_SUPPORTED, NO_MSG);
 }
 
-/* ........................................................................... */
+/* ......................................................................... */
 
 t_Error FM_MAC_ConfigException (t_Handle h_FmMac, e_FmMacExceptions ex, bool enable)
 {
@@ -248,7 +247,7 @@ t_Error FM_MAC_ConfigException (t_Handle h_FmMac, e_FmMacExceptions ex, bool ena
 }
 
 #ifdef FM_TX_ECC_FRMS_ERRATA_10GMAC_A004
-/* ........................................................................... */
+/* ......................................................................... */
 
 t_Error FM_MAC_ConfigSkipFman11Workaround (t_Handle h_FmMac)
 {
@@ -268,7 +267,7 @@ t_Error FM_MAC_ConfigSkipFman11Workaround (t_Handle h_FmMac)
 /* Run Time Control                                                          */
 /*****************************************************************************/
 
-/* ........................................................................... */
+/* ......................................................................... */
 
 t_Error FM_MAC_Enable  (t_Handle h_FmMac,  e_CommMode mode)
 {
@@ -282,7 +281,7 @@ t_Error FM_MAC_Enable  (t_Handle h_FmMac,  e_CommMode mode)
     RETURN_ERROR(MINOR, E_NOT_SUPPORTED, NO_MSG);
 }
 
-/* ........................................................................... */
+/* ......................................................................... */
 
 t_Error FM_MAC_Disable (t_Handle h_FmMac, e_CommMode mode)
 {
@@ -296,7 +295,7 @@ t_Error FM_MAC_Disable (t_Handle h_FmMac, e_CommMode mode)
     RETURN_ERROR(MINOR, E_NOT_SUPPORTED, NO_MSG);
 }
 
-/* ........................................................................... */
+/* ......................................................................... */
 
 t_Error FM_MAC_Enable1588TimeStamp (t_Handle h_FmMac)
 {
@@ -310,7 +309,7 @@ t_Error FM_MAC_Enable1588TimeStamp (t_Handle h_FmMac)
     RETURN_ERROR(MINOR, E_NOT_SUPPORTED, NO_MSG);
 }
 
-/* ........................................................................... */
+/* ......................................................................... */
 
 t_Error FM_MAC_Disable1588TimeStamp (t_Handle h_FmMac)
 {
@@ -324,7 +323,7 @@ t_Error FM_MAC_Disable1588TimeStamp (t_Handle h_FmMac)
     RETURN_ERROR(MINOR, E_NOT_SUPPORTED, NO_MSG);
 }
 
-/* ........................................................................... */
+/* ......................................................................... */
 
 t_Error FM_MAC_SetTxAutoPauseFrames(t_Handle h_FmMac,
                                     uint16_t pauseTime)
@@ -340,7 +339,7 @@ t_Error FM_MAC_SetTxAutoPauseFrames(t_Handle h_FmMac,
     RETURN_ERROR(MINOR, E_NOT_SUPPORTED, NO_MSG);
 }
 
-/* ........................................................................... */
+/* ......................................................................... */
 
 t_Error FM_MAC_SetTxPauseFrames(t_Handle h_FmMac,
                                 uint8_t  priority,
@@ -360,7 +359,7 @@ t_Error FM_MAC_SetTxPauseFrames(t_Handle h_FmMac,
     RETURN_ERROR(MINOR, E_NOT_SUPPORTED, NO_MSG);
 }
 
-/* ........................................................................... */
+/* ......................................................................... */
 
 t_Error FM_MAC_SetRxIgnorePauseFrames (t_Handle h_FmMac, bool en)
 {
@@ -374,7 +373,7 @@ t_Error FM_MAC_SetRxIgnorePauseFrames (t_Handle h_FmMac, bool en)
     RETURN_ERROR(MINOR, E_NOT_SUPPORTED, NO_MSG);
 }
 
-/* ........................................................................... */
+/* ......................................................................... */
 
 t_Error FM_MAC_ResetCounters (t_Handle h_FmMac)
 {
@@ -388,7 +387,7 @@ t_Error FM_MAC_ResetCounters (t_Handle h_FmMac)
     RETURN_ERROR(MINOR, E_NOT_SUPPORTED, NO_MSG);
 }
 
-/* ........................................................................... */
+/* ......................................................................... */
 
 t_Error FM_MAC_SetException(t_Handle h_FmMac, e_FmMacExceptions ex, bool enable)
 {
@@ -402,7 +401,7 @@ t_Error FM_MAC_SetException(t_Handle h_FmMac, e_FmMacExceptions ex, bool enable)
     RETURN_ERROR(MINOR, E_NOT_SUPPORTED, NO_MSG);
 }
 
-/* ........................................................................... */
+/* ......................................................................... */
 
 t_Error FM_MAC_SetStatistics (t_Handle h_FmMac, e_FmMacStatisticsLevel statisticsLevel)
 {
@@ -412,13 +411,11 @@ t_Error FM_MAC_SetStatistics (t_Handle h_FmMac, e_FmMacStatisticsLevel statistic
 
     if (p_FmMacControllerDriver->f_FM_MAC_SetStatistics)
         return p_FmMacControllerDriver->f_FM_MAC_SetStatistics(h_FmMac, statisticsLevel);
-#if (DPAA_VERSION >= 11)
-    return E_OK;
-#endif
+
     RETURN_ERROR(MINOR, E_NOT_SUPPORTED, NO_MSG);
 }
 
-/* ........................................................................... */
+/* ......................................................................... */
 
 t_Error FM_MAC_GetStatistics (t_Handle h_FmMac, t_FmMacStatistics *p_Statistics)
 {
@@ -432,7 +429,7 @@ t_Error FM_MAC_GetStatistics (t_Handle h_FmMac, t_FmMacStatistics *p_Statistics)
     RETURN_ERROR(MINOR, E_NOT_SUPPORTED, NO_MSG);
 }
 
-/* ........................................................................... */
+/* ......................................................................... */
 
 t_Error FM_MAC_ModifyMacAddr (t_Handle h_FmMac, t_EnetAddr *p_EnetAddr)
 {
@@ -446,7 +443,7 @@ t_Error FM_MAC_ModifyMacAddr (t_Handle h_FmMac, t_EnetAddr *p_EnetAddr)
     RETURN_ERROR(MINOR, E_NOT_SUPPORTED, NO_MSG);
 }
 
-/* ........................................................................... */
+/* ......................................................................... */
 
 t_Error FM_MAC_AddHashMacAddr (t_Handle h_FmMac, t_EnetAddr *p_EnetAddr)
 {
@@ -460,7 +457,7 @@ t_Error FM_MAC_AddHashMacAddr (t_Handle h_FmMac, t_EnetAddr *p_EnetAddr)
     RETURN_ERROR(MINOR, E_NOT_SUPPORTED, NO_MSG);
 }
 
-/* ........................................................................... */
+/* ......................................................................... */
 
 t_Error FM_MAC_RemoveHashMacAddr (t_Handle h_FmMac, t_EnetAddr *p_EnetAddr)
 {
@@ -474,7 +471,7 @@ t_Error FM_MAC_RemoveHashMacAddr (t_Handle h_FmMac, t_EnetAddr *p_EnetAddr)
     RETURN_ERROR(MINOR, E_NOT_SUPPORTED, NO_MSG);
 }
 
-/* ........................................................................... */
+/* ......................................................................... */
 
 t_Error FM_MAC_AddExactMatchMacAddr (t_Handle h_FmMac, t_EnetAddr *p_EnetAddr)
 {
@@ -488,7 +485,7 @@ t_Error FM_MAC_AddExactMatchMacAddr (t_Handle h_FmMac, t_EnetAddr *p_EnetAddr)
     RETURN_ERROR(MINOR, E_NOT_SUPPORTED, NO_MSG);
 }
 
-/* ........................................................................... */
+/* ......................................................................... */
 
 t_Error FM_MAC_RemovelExactMatchMacAddr (t_Handle h_FmMac, t_EnetAddr *p_EnetAddr)
 {
@@ -502,7 +499,7 @@ t_Error FM_MAC_RemovelExactMatchMacAddr (t_Handle h_FmMac, t_EnetAddr *p_EnetAdd
     RETURN_ERROR(MINOR, E_NOT_SUPPORTED, NO_MSG);
 }
 
-/* ........................................................................... */
+/* ......................................................................... */
 
 t_Error FM_MAC_GetVesrion (t_Handle h_FmMac, uint32_t *macVresion)
 {
@@ -517,7 +514,7 @@ t_Error FM_MAC_GetVesrion (t_Handle h_FmMac, uint32_t *macVresion)
 
 }
 
-/* ........................................................................... */
+/* ......................................................................... */
 
 t_Error FM_MAC_GetId (t_Handle h_FmMac, uint32_t *macId)
 {
@@ -531,7 +528,7 @@ t_Error FM_MAC_GetId (t_Handle h_FmMac, uint32_t *macId)
     RETURN_ERROR(MINOR, E_NOT_SUPPORTED, NO_MSG);
 }
 
-/* ........................................................................... */
+/* ......................................................................... */
 
 t_Error FM_MAC_SetPromiscuous (t_Handle h_FmMac, bool newVal)
 {
@@ -545,7 +542,7 @@ t_Error FM_MAC_SetPromiscuous (t_Handle h_FmMac, bool newVal)
     RETURN_ERROR(MINOR, E_NOT_SUPPORTED, NO_MSG);
 }
 
-/* ........................................................................... */
+/* ......................................................................... */
 
 t_Error FM_MAC_AdjustLink(t_Handle h_FmMac, e_EnetSpeed speed, bool fullDuplex)
 {
@@ -556,14 +553,10 @@ t_Error FM_MAC_AdjustLink(t_Handle h_FmMac, e_EnetSpeed speed, bool fullDuplex)
     if (p_FmMacControllerDriver->f_FM_MAC_AdjustLink)
         return p_FmMacControllerDriver->f_FM_MAC_AdjustLink(h_FmMac, speed, fullDuplex);
 
-#if (DPAA_VERSION >= 11)
-    return E_OK;
-#endif
-
     RETURN_ERROR(MINOR, E_NOT_SUPPORTED, NO_MSG);
 }
 
-/* ........................................................................... */
+/* ......................................................................... */
 
 t_Error FM_MAC_RestartAutoneg(t_Handle h_FmMac)
 {
@@ -577,9 +570,7 @@ t_Error FM_MAC_RestartAutoneg(t_Handle h_FmMac)
     RETURN_ERROR(MINOR, E_NOT_SUPPORTED, NO_MSG);
 }
 
-
-
-/* ........................................................................... */
+/* ......................................................................... */
 
 t_Error FM_MAC_MII_WritePhyReg (t_Handle h_FmMac, uint8_t phyAddr, uint8_t reg, uint16_t data)
 {
@@ -593,7 +584,7 @@ t_Error FM_MAC_MII_WritePhyReg (t_Handle h_FmMac, uint8_t phyAddr, uint8_t reg, 
     RETURN_ERROR(MINOR, E_NOT_SUPPORTED, NO_MSG);
 }
 
-/* ........................................................................... */
+/* ......................................................................... */
 
 t_Error FM_MAC_MII_ReadPhyReg(t_Handle h_FmMac,  uint8_t phyAddr, uint8_t reg, uint16_t *p_Data)
 {
@@ -607,7 +598,7 @@ t_Error FM_MAC_MII_ReadPhyReg(t_Handle h_FmMac,  uint8_t phyAddr, uint8_t reg, u
     RETURN_ERROR(MINOR, E_NOT_SUPPORTED, NO_MSG);
 }
 
-/* ........................................................................... */
+/* ......................................................................... */
 
 uint16_t FM_MAC_GetMaxFrameLength(t_Handle h_FmMac)
 {

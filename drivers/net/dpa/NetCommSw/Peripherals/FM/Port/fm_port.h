@@ -166,18 +166,24 @@ typedef uint32_t fmPcdEngines_t; /**< options as defined below: */
 #define FM_PORT_MAX_NUM_OF_CONGESTION_GRPS_ALL_INTEGRATIONS 256
 #define FM_PORT_CG_REG_NUM(_cgId) (((FM_PORT_NUM_OF_CONGESTION_GRPS/32)-1)-_cgId/32)
 
+#define FM_OH_PORT_ID                               0
+
 /***********************************************************************/
 /*          SW parser IP-fragmentation labels (offsets)                */
 /***********************************************************************/
 #if (DPAA_VERSION == 10)
-#define IP_FRAG_SW_PATCH_IPv4_LABEL             0x300
 #define IP_FRAG_SW_PATCH_IPv4_SIZE              0x025
+#define IP_FRAG_SW_PATCH_IPv4_LABEL             0x300
 #else
-#define IP_FRAG_SW_PATCH_IPv4_LABEL             0x2E0
 #define IP_FRAG_SW_PATCH_IPv4_SIZE              0x046
+#define IP_FRAG_SW_PATCH_IPv4_LABEL             0x2E0
 #endif /* (DPAA_VERSION == 10) */
 #define IP_FRAG_SW_PATCH_IPv6_LABEL             \
     (IP_FRAG_SW_PATCH_IPv4_LABEL + IP_FRAG_SW_PATCH_IPv4_SIZE)
+
+#ifdef FM_CAPWAP_SUPPORT
+#define UDP_LITE_SW_PATCH_LABEL                 0x2E0
+#endif /* FM_CAPWAP_SUPPORT */
 
 /**************************************************************************//**
  @Description       Memory Mapped Registers
@@ -525,17 +531,11 @@ typedef _Packed struct
                                                  FM_PORT_FRM_ERR_KEYSIZE_OVERFLOW       | \
                                                  FM_PORT_FRM_ERR_IPRE)
 
-#ifdef FM_DISABLE_SEC_ERRORS
 #define OP_ERRS_TO_ENQ                          (RX_ERRS_TO_ENQ                         | \
                                                  FM_PORT_FRM_ERR_LENGTH                 | \
                                                  FM_PORT_FRM_ERR_NON_FM                 | \
                                                  FM_PORT_FRM_ERR_UNSUPPORTED_FORMAT)
 
-#else
-#define OP_ERRS_TO_ENQ                          (RX_ERRS_TO_ENQ                         | \
-                                                 FM_PORT_FRM_ERR_LENGTH                 | \
-                                                 FM_PORT_FRM_ERR_UNSUPPORTED_FORMAT)
-#endif /* FM_DISABLE_SEC_ERRORS */
 
 #define BMI_RX_FIFO_PRI_ELEVATION_MASK          0x03FF0000
 #define BMI_RX_FIFO_THRESHOLD_MASK              0x000003FF
@@ -812,9 +812,9 @@ typedef struct {
     bool                                noScatherGather;
 #endif /* (DPAA_VERSION >= 11) */
 
-#ifdef FM_BCB_ERRATA_BMI_SW001
+#ifdef FM_HEAVY_TRAFFIC_HANG_ERRATA_FMAN_A005669
     bool                                bcbWorkaround;
-#endif /* FM_BCB_ERRATA_BMI_SW001 */
+#endif /* FM_HEAVY_TRAFFIC_HANG_ERRATA_FMAN_A005669 */
 } t_FmPortDriverParam;
 
 

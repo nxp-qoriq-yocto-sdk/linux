@@ -145,28 +145,6 @@ typedef _Packed struct t_FmPcdPlcrProfileRegs {
     volatile uint32_t fmpl_res1[12];    /* 0x0D0-0x0FF Reserved */
 } _PackedType t_FmPcdPlcrProfileRegs;
 
-/**************************************************************************//**
- @Description   PCD KG scheme registers
-*//***************************************************************************/
-typedef _Packed struct t_FmPcdKgSchemeRegs {
-    volatile uint32_t kgse_mode;    /**< MODE */
-    volatile uint32_t kgse_ekfc;    /**< Extract Known Fields Command */
-    volatile uint32_t kgse_ekdv;    /**< Extract Known Default Value */
-    volatile uint32_t kgse_bmch;    /**< Bit Mask Command High */
-    volatile uint32_t kgse_bmcl;    /**< Bit Mask Command Low */
-    volatile uint32_t kgse_fqb;     /**< Frame Queue Base */
-    volatile uint32_t kgse_hc;      /**< Hash Command */
-    volatile uint32_t kgse_ppc;     /**< Policer Profile Command */
-    volatile uint32_t kgse_gec[FM_PCD_KG_NUM_OF_GENERIC_REGS];
-                                   /**< Generic Extract Command */
-    volatile uint32_t kgse_spc;     /**< KeyGen Scheme Entry Statistic Packet Counter */
-    volatile uint32_t kgse_dv0;     /**< KeyGen Scheme Entry Default Value 0 */
-    volatile uint32_t kgse_dv1;     /**< KeyGen Scheme Entry Default Value 1 */
-    volatile uint32_t kgse_ccbs;    /**< KeyGen Scheme Entry Coarse Classification Bit*/
-    volatile uint32_t kgse_mv;      /**< KeyGen Scheme Entry Match vector */
-    volatile uint32_t kgse_om;      /**< KeyGen Scheme Entry Operation Mode bits */
-    volatile uint32_t kgse_vsp;     /**< KeyGen Scheme Entry Virtual Storage Profile */
-} _PackedType t_FmPcdKgSchemeRegs;
 
 typedef _Packed struct t_FmPcdCcCapwapReassmTimeoutParams {
     volatile uint32_t                       portIdAndCapwapReassmTbl;

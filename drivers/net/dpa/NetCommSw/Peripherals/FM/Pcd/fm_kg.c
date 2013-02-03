@@ -48,6 +48,7 @@
 #include "fm_hc.h"
 #include "fm_pcd_ipc.h"
 #include "fm_kg.h"
+#include "fsl_fman_kg.h"
 
 
 /****************************************/
@@ -90,13 +91,14 @@ static void KgSchemeFlagUnlock(t_Handle h_Scheme)
     FmPcdLockUnlock(((t_FmPcdKgScheme *)h_Scheme)->p_Lock);
 }
 
-static t_Error WriteKgarWait(t_FmPcd *p_FmPcd, uint32_t kgar)
+static t_Error WriteKgarWait(t_FmPcd *p_FmPcd, uint32_t fmkg_ar)
 {
-    WRITE_UINT32(p_FmPcd->p_FmPcdKg->p_FmPcdKgRegs->kgar, kgar);
-    /* Wait for GO to be idle and read error */
-    while ((kgar = GET_UINT32(p_FmPcd->p_FmPcdKg->p_FmPcdKgRegs->kgar)) & FM_PCD_KG_KGAR_GO) ;
-    if (kgar & FM_PCD_KG_KGAR_ERR)
+
+    struct fman_kg_regs *regs = p_FmPcd->p_FmPcdKg->p_FmPcdKgRegs;
+
+    if (fman_kg_write_ar_wait(regs, fmkg_ar))
         RETURN_ERROR(MINOR, E_INVALID_STATE, ("Keygen scheme access violation"));
+
     return E_OK;
 }
 
@@ -758,16 +760,18 @@ static void UpateSchemePointedOwner(t_FmPcdKgScheme *p_Scheme, bool add)
 
 static t_Error KgWriteSp(t_FmPcd *p_FmPcd, uint8_t hardwarePortId, uint32_t spReg, bool add)
 {
-    t_FmPcdKgPortConfigRegs *p_FmPcdKgPortRegs;
-    uint32_t                tmpKgarReg = 0, tmpKgpeSp, intFlags;
+    struct fman_kg_regs *p_KgRegs;
+
+    uint32_t                tmpKgarReg = 0, intFlags;
     t_Error                 err = E_OK;
 
     /* The calling routine had locked the port, so for each port only one core can access
      * (so we don't need a lock here) */
+
     if (p_FmPcd->h_Hc)
         return FmHcKgWriteSp(p_FmPcd->h_Hc, hardwarePortId, spReg, add);
 
-    p_FmPcdKgPortRegs = &p_FmPcd->p_FmPcdKg->p_FmPcdKgRegs->indirectAccessRegs.portRegs;
+    p_KgRegs = p_FmPcd->p_FmPcdKg->p_FmPcdKgRegs;
 
     tmpKgarReg = FmPcdKgBuildReadPortSchemeBindActionReg(hardwarePortId);
     /* lock a common KG reg */
@@ -779,14 +783,7 @@ static t_Error KgWriteSp(t_FmPcd *p_FmPcd, uint8_t hardwarePortId, uint32_t spRe
         RETURN_ERROR(MINOR, err, NO_MSG);
     }
 
-    tmpKgpeSp = GET_UINT32(p_FmPcdKgPortRegs->kgoe_sp);
-
-    if (add)
-        tmpKgpeSp |= spReg;
-    else /* clear */
-        tmpKgpeSp &= ~spReg;
-
-    WRITE_UINT32(p_FmPcdKgPortRegs->kgoe_sp, tmpKgpeSp);
+    fman_kg_write_sp(p_KgRegs, spReg, add);
 
     tmpKgarReg = FmPcdKgBuildWritePortSchemeBindActionReg(hardwarePortId);
 
@@ -797,9 +794,11 @@ static t_Error KgWriteSp(t_FmPcd *p_FmPcd, uint8_t hardwarePortId, uint32_t spRe
 
 static t_Error KgWriteCpp(t_FmPcd *p_FmPcd, uint8_t hardwarePortId, uint32_t cppReg)
 {
-    t_FmPcdKgPortConfigRegs *p_FmPcdKgPortRegs;
+    struct fman_kg_regs    *p_KgRegs;
     uint32_t                tmpKgarReg, intFlags;
     t_Error                 err;
+
+    p_KgRegs = p_FmPcd->p_FmPcdKg->p_FmPcdKgRegs;
 
     if (p_FmPcd->h_Hc)
     {
@@ -808,8 +807,7 @@ static t_Error KgWriteCpp(t_FmPcd *p_FmPcd, uint8_t hardwarePortId, uint32_t cpp
     }
 
     intFlags = KgHwLock(p_FmPcd->p_FmPcdKg);
-    p_FmPcdKgPortRegs = &p_FmPcd->p_FmPcdKg->p_FmPcdKgRegs->indirectAccessRegs.portRegs;
-    WRITE_UINT32(p_FmPcdKgPortRegs->kgoe_cpp, cppReg);
+    fman_kg_write_cpp(p_KgRegs, cppReg);
     tmpKgarReg = FmPcdKgBuildWritePortClsPlanBindActionReg(hardwarePortId);
     err = WriteKgarWait(p_FmPcd, tmpKgarReg);
     KgHwUnlock(p_FmPcd->p_FmPcdKg, intFlags);
@@ -822,7 +820,7 @@ static uint32_t BuildCppReg(t_FmPcd *p_FmPcd, uint8_t clsPlanGrpId)
     uint32_t    tmpKgpeCpp;
 
     tmpKgpeCpp = (uint32_t)(p_FmPcd->p_FmPcdKg->clsPlanGrps[clsPlanGrpId].baseEntry / 8);
-    tmpKgpeCpp |= (uint32_t)(((p_FmPcd->p_FmPcdKg->clsPlanGrps[clsPlanGrpId].sizeOfGrp / 8) - 1) << FM_PCD_KG_PE_CPP_MASK_SHIFT);
+    tmpKgpeCpp |= (uint32_t)(((p_FmPcd->p_FmPcdKg->clsPlanGrps[clsPlanGrpId].sizeOfGrp / 8) - 1) << FM_KG_PE_CPP_MASK_SHIFT);
 
     return tmpKgpeCpp;
 }
@@ -842,8 +840,8 @@ static void UnbindPortToClsPlanGrp(t_FmPcd *p_FmPcd, uint8_t hardwarePortId)
 
 static uint32_t ReadClsPlanBlockActionReg(uint8_t grpId)
 {
-    return (uint32_t)(FM_PCD_KG_KGAR_GO |
-                      FM_PCD_KG_KGAR_READ |
+    return (uint32_t)(FM_KG_KGAR_GO |
+                      FM_KG_KGAR_READ |
                       FM_PCD_KG_KGAR_SEL_CLS_PLAN_ENTRY |
                       DUMMY_PORT_ID |
                       ((uint32_t)grpId << FM_PCD_KG_KGAR_NUM_SHIFT) |
@@ -857,28 +855,16 @@ static uint32_t ReadClsPlanBlockActionReg(uint8_t grpId)
 static void PcdKgErrorException(t_Handle h_FmPcd)
 {
     t_FmPcd                 *p_FmPcd = (t_FmPcd *)h_FmPcd;
-    uint32_t                event, force, schemeIndexes = 0,index = 0, mask = 0;
+    uint32_t                event,schemeIndexes = 0, index = 0;
+    struct fman_kg_regs    *p_KgRegs;
 
     ASSERT_COND(FmIsMaster(p_FmPcd->h_Fm));
-    event = GET_UINT32(p_FmPcd->p_FmPcdKg->p_FmPcdKgRegs->kgeer);
-    mask = GET_UINT32(p_FmPcd->p_FmPcdKg->p_FmPcdKgRegs->kgeeer);
+    p_KgRegs = p_FmPcd->p_FmPcdKg->p_FmPcdKgRegs;
+    fman_kg_get_event(p_KgRegs, &event, &schemeIndexes);
 
-    schemeIndexes = GET_UINT32(p_FmPcd->p_FmPcdKg->p_FmPcdKgRegs->kgseer);
-    schemeIndexes &= GET_UINT32(p_FmPcd->p_FmPcdKg->p_FmPcdKgRegs->kgseeer);
-
-    event &= mask;
-
-    /* clear the forced events */
-    force = GET_UINT32(p_FmPcd->p_FmPcdKg->p_FmPcdKgRegs->kgfeer);
-    if (force & event)
-        WRITE_UINT32(p_FmPcd->p_FmPcdKg->p_FmPcdKgRegs->kgfeer, force & ~event);
-
-    WRITE_UINT32(p_FmPcd->p_FmPcdKg->p_FmPcdKgRegs->kgeer, event);
-    WRITE_UINT32(p_FmPcd->p_FmPcdKg->p_FmPcdKgRegs->kgseer, schemeIndexes);
-
-    if (event & FM_PCD_KG_DOUBLE_ECC)
+    if (event & FM_EX_KG_DOUBLE_ECC)
         p_FmPcd->f_Exception(p_FmPcd->h_App,e_FM_PCD_KG_EXCEPTION_DOUBLE_ECC);
-    if (event & FM_PCD_KG_KEYSIZE_OVERFLOW)
+    if (event & FM_EX_KG_KEYSIZE_OVERFLOW)
     {
         if (schemeIndexes)
         {
@@ -932,44 +918,14 @@ static t_Error KgInitGuest(t_FmPcd *p_FmPcd)
 static t_Error KgInitMaster(t_FmPcd *p_FmPcd)
 {
     t_Error                     err = E_OK;
-    t_FmPcdKgRegs               *p_Regs = p_FmPcd->p_FmPcdKg->p_FmPcdKgRegs;
-    int                         i;
-    uint8_t                     hardwarePortId = 0;
-    uint32_t                    tmpReg;
+    struct fman_kg_regs         *p_Regs = p_FmPcd->p_FmPcdKg->p_FmPcdKgRegs;
 
     ASSERT_COND(p_FmPcd->guestId == NCSW_MASTER_ID);
 
-    /**********************KGEER******************/
-    WRITE_UINT32(p_Regs->kgeer, (FM_PCD_KG_DOUBLE_ECC | FM_PCD_KG_KEYSIZE_OVERFLOW));
-    /**********************KGEER******************/
-
-    /**********************KGEEER******************/
-    tmpReg = 0;
-    if (p_FmPcd->exceptions & FM_PCD_EX_KG_DOUBLE_ECC)
-    {
+    if (p_FmPcd->exceptions & FM_EX_KG_DOUBLE_ECC)
         FmEnableRamsEcc(p_FmPcd->h_Fm);
-        tmpReg |= FM_PCD_KG_DOUBLE_ECC;
-    }
-    if (p_FmPcd->exceptions & FM_PCD_EX_KG_KEYSIZE_OVERFLOW)
-        tmpReg |= FM_PCD_KG_KEYSIZE_OVERFLOW;
-    WRITE_UINT32(p_Regs->kgeeer,tmpReg);
-    /**********************KGEEER******************/
 
-    /**********************KGFDOR******************/
-    WRITE_UINT32(p_Regs->kgfdor,0);
-    /**********************KGFDOR******************/
-
-    /**********************KGGDV0R******************/
-    WRITE_UINT32(p_Regs->kggdv0r,0);
-    /**********************KGGDV0R******************/
-
-    /**********************KGGDV1R******************/
-    WRITE_UINT32(p_Regs->kggdv1r,0);
-    /**********************KGGDV1R******************/
-
-    /**********************KGGCR******************/
-    WRITE_UINT32(p_Regs->kggcr, GET_NIA_BMI_AC_ENQ_FRAME(p_FmPcd));
-    /**********************KGGCR******************/
+    fman_kg_init(p_Regs, p_FmPcd->exceptions, GET_NIA_BMI_AC_ENQ_FRAME(p_FmPcd));
 
     /* register even if no interrupts enabled, to allow future enablement */
     FmRegisterIntr(p_FmPcd->h_Fm,
@@ -979,23 +935,7 @@ static t_Error KgInitMaster(t_FmPcd *p_FmPcd)
                    PcdKgErrorException,
                    p_FmPcd);
 
-    /* clear binding between ports to schemes so that all ports are not bound to any schemes */
-    for (i=0;i<FM_MAX_NUM_OF_PORTS;i++)
-    {
-        SW_PORT_INDX_TO_HW_PORT_ID(hardwarePortId, i);
-
-        err = KgWriteSp(p_FmPcd, hardwarePortId, 0xffffffff, FALSE);
-        if (err)
-            RETURN_ERROR(MINOR, err, NO_MSG);
-
-        err = KgWriteCpp(p_FmPcd, hardwarePortId, 0);
-        if (err)
-            RETURN_ERROR(MINOR, err, NO_MSG);
-    }
-
-    /* enable and enable all scheme interrupts */
-    WRITE_UINT32(p_Regs->kgseer, 0xFFFFFFFF);
-    WRITE_UINT32(p_Regs->kgseeer, 0xFFFFFFFF);
+    fman_kg_enable_scheme_interrupts(p_Regs);
 
     if (p_FmPcd->p_FmPcdKg->numOfSchemes)
     {
@@ -1030,9 +970,9 @@ static t_Error InvalidateSchemeSw(t_FmPcdKgScheme *p_Scheme)
     return E_OK;
 }
 
-static t_Error BuildSchemeRegs(t_FmPcdKgScheme          *p_Scheme,
-                               t_FmPcdKgSchemeParams    *p_SchemeParams,
-                               t_FmPcdKgSchemeRegs      *p_SchemeRegs)
+static t_Error BuildSchemeRegs(t_FmPcdKgScheme            *p_Scheme,
+                               t_FmPcdKgSchemeParams      *p_SchemeParams,
+                               struct fman_kg_scheme_regs *p_SchemeRegs)
 {
     t_FmPcd                             *p_FmPcd = (t_FmPcd *)(p_Scheme->h_FmPcd);
     uint32_t                            grpBits = 0;
@@ -1057,7 +997,7 @@ static t_Error BuildSchemeRegs(t_FmPcdKgScheme          *p_Scheme,
     uint8_t                             currGenId = 0;
 
     memset(swDefaults, 0, NUM_OF_SW_DEFAULTS*sizeof(t_FmPcdKgExtractDflt));
-    memset(p_SchemeRegs, 0, sizeof(t_FmPcdKgSchemeRegs));
+    memset(p_SchemeRegs, 0, sizeof(struct fman_kg_scheme_regs));
 
     if (p_SchemeParams->netEnvParams.numOfDistinctionUnits > FM_PCD_MAX_NUM_OF_DISTINCTION_UNITS)
         RETURN_ERROR(MAJOR, E_INVALID_VALUE,
@@ -1423,6 +1363,12 @@ static t_Error BuildSchemeRegs(t_FmPcdKgScheme          *p_Scheme,
                 case (e_FM_PCD_EXTRACT_BY_HDR):
                     switch (p_Extract->extractByHdr.hdr)
                     {
+
+#ifdef FM_CAPWAP_SUPPORT
+                        case (HEADER_TYPE_UDP_LITE):
+                            p_Extract->extractByHdr.hdr = HEADER_TYPE_UDP;
+                            break;
+#endif
                         case (HEADER_TYPE_UDP_ENCAP_ESP):
                             switch (p_Extract->extractByHdr.type)
                             {
@@ -1558,7 +1504,7 @@ static t_Error BuildSchemeRegs(t_FmPcdKgScheme          *p_Scheme,
             if (generic)
             {
                 /* set generic register fields */
-                if (currGenId >= FM_PCD_KG_NUM_OF_GENERIC_REGS)
+                if (currGenId >= FM_KG_NUM_OF_GENERIC_REGS)
                     RETURN_ERROR(MAJOR, E_FULL, ("Generic registers are fully used"));
                 if (!code)
                     RETURN_ERROR(MAJOR, E_NOT_SUPPORTED, NO_MSG);
@@ -1709,7 +1655,7 @@ static t_Error BuildSchemeRegs(t_FmPcdKgScheme          *p_Scheme,
 
 
     /* check that are enough generic registers */
-    if (p_SchemeParams->numOfUsedExtractedOrs + currGenId > FM_PCD_KG_NUM_OF_GENERIC_REGS)
+    if (p_SchemeParams->numOfUsedExtractedOrs + currGenId > FM_KG_NUM_OF_GENERIC_REGS)
         RETURN_ERROR(MAJOR, E_FULL, ("Generic registers are fully used"));
 
     /* extracted OR mask on Qid */
@@ -1819,7 +1765,7 @@ static t_Error BuildSchemeRegs(t_FmPcdKgScheme          *p_Scheme,
 
     }
     /* clear all unused GEC registers */
-    for ( i=currGenId ;i<FM_PCD_KG_NUM_OF_GENERIC_REGS ; i++)
+    for ( i=currGenId ;i<FM_KG_NUM_OF_GENERIC_REGS ; i++)
         p_SchemeRegs->kgse_gec[i] = 0;
 
     /* add base Qid for this scheme */
@@ -1994,12 +1940,10 @@ void FmPcdKgDestroyClsPlanGrp(t_Handle h_FmPcd, uint8_t grpId)
 
     /* free blocks */
     if (p_FmPcd->guestId == NCSW_MASTER_ID)
-    {
         KgFreeClsPlanEntries(h_FmPcd,
                              p_FmPcd->p_FmPcdKg->clsPlanGrps[grpId].sizeOfGrp,
                              p_FmPcd->guestId,
                              p_FmPcd->p_FmPcdKg->clsPlanGrps[grpId].baseEntry);
-    }
     else    /* in GUEST_PARTITION, we use the IPC, to also set a private driver group if required */
     {
         memset(&reply, 0, sizeof(reply));
@@ -2314,30 +2258,30 @@ UNUSED(guestId);
 
 void KgEnable(t_FmPcd *p_FmPcd)
 {
-    t_FmPcdKgRegs               *p_Regs = p_FmPcd->p_FmPcdKg->p_FmPcdKgRegs;
+    struct fman_kg_regs *p_Regs = p_FmPcd->p_FmPcdKg->p_FmPcdKgRegs;
 
     ASSERT_COND(FmIsMaster(p_FmPcd->h_Fm));
-    WRITE_UINT32(p_Regs->kggcr, GET_UINT32(p_Regs->kggcr) | FM_PCD_KG_KGGCR_EN);
+    fman_kg_enable(p_Regs);
 }
 
 void KgDisable(t_FmPcd *p_FmPcd)
 {
-    t_FmPcdKgRegs               *p_Regs = p_FmPcd->p_FmPcdKg->p_FmPcdKgRegs;
+    struct fman_kg_regs *p_Regs = p_FmPcd->p_FmPcdKg->p_FmPcdKgRegs;
 
     ASSERT_COND(FmIsMaster(p_FmPcd->h_Fm));
-    WRITE_UINT32(p_Regs->kggcr, GET_UINT32(p_Regs->kggcr) & ~FM_PCD_KG_KGGCR_EN);
+    fman_kg_disable(p_Regs);
 }
 
 void KgSetClsPlan(t_Handle h_FmPcd, t_FmPcdKgInterModuleClsPlanSet *p_Set)
 {
     t_FmPcd                 *p_FmPcd = (t_FmPcd *)h_FmPcd;
-    t_FmPcdKgClsPlanRegs    *p_FmPcdKgPortRegs;
+    struct fman_kg_cp_regs  *p_FmPcdKgPortRegs;
     uint32_t                tmpKgarReg = 0, intFlags;
     uint16_t                i, j;
 
     /* This routine is protected by the calling routine ! */
     ASSERT_COND(FmIsMaster(p_FmPcd->h_Fm));
-    p_FmPcdKgPortRegs = &p_FmPcd->p_FmPcdKg->p_FmPcdKgRegs->indirectAccessRegs.clsPlanRegs;
+    p_FmPcdKgPortRegs = &p_FmPcd->p_FmPcdKg->p_IndirectAccessRegs->clsPlanRegs;
 
     intFlags = KgHwLock(p_FmPcd->p_FmPcdKg);
     for (i=p_Set->baseEntry;i<p_Set->baseEntry+p_Set->numOfClsPlanEntries;i+=8)
@@ -2381,10 +2325,12 @@ t_Handle KgConfig( t_FmPcd *p_FmPcd, t_FmPcdParams *p_FmPcdParams)
     }
     memset(p_FmPcdKg, 0, sizeof(t_FmPcdKg));
 
+
     if (FmIsMaster(p_FmPcd->h_Fm))
     {
-        p_FmPcdKg->p_FmPcdKgRegs  = (t_FmPcdKgRegs *)UINT_TO_PTR(FmGetPcdKgBaseAddr(p_FmPcdParams->h_Fm));
+        p_FmPcdKg->p_FmPcdKgRegs  = (struct fman_kg_regs *)UINT_TO_PTR(FmGetPcdKgBaseAddr(p_FmPcdParams->h_Fm));
         p_FmPcd->exceptions |= DEFAULT_fmPcdKgErrorExceptions;
+        p_FmPcdKg->p_IndirectAccessRegs = (u_FmPcdKgIndirectAccessRegs *)&p_FmPcdKg->p_FmPcdKgRegs->fmkg_indirect[0];
     }
 
     p_FmPcdKg->numOfSchemes = p_FmPcdParams->numOfSchemes;
@@ -2689,28 +2635,28 @@ bool FmPcdKgHwSchemeIsValid(uint32_t schemeModeReg)
 uint32_t FmPcdKgBuildWriteSchemeActionReg(uint8_t schemeId, bool updateCounter)
 {
     return (uint32_t)(((uint32_t)schemeId << FM_PCD_KG_KGAR_NUM_SHIFT) |
-                      FM_PCD_KG_KGAR_GO |
-                      FM_PCD_KG_KGAR_WRITE |
-                      FM_PCD_KG_KGAR_SEL_SCHEME_ENTRY |
+                      FM_KG_KGAR_GO |
+                      FM_KG_KGAR_WRITE |
+                      FM_KG_KGAR_SEL_SCHEME_ENTRY |
                       DUMMY_PORT_ID |
-                      (updateCounter ? FM_PCD_KG_KGAR_SCHEME_WSEL_UPDATE_CNT:0));
+                      (updateCounter ? FM_KG_KGAR_SCM_WSEL_UPDATE_CNT:0));
 }
 
 uint32_t FmPcdKgBuildReadSchemeActionReg(uint8_t schemeId)
 {
     return (uint32_t)(((uint32_t)schemeId << FM_PCD_KG_KGAR_NUM_SHIFT) |
-                      FM_PCD_KG_KGAR_GO |
-                      FM_PCD_KG_KGAR_READ |
-                      FM_PCD_KG_KGAR_SEL_SCHEME_ENTRY |
+                      FM_KG_KGAR_GO |
+                      FM_KG_KGAR_READ |
+                      FM_KG_KGAR_SEL_SCHEME_ENTRY |
                       DUMMY_PORT_ID |
-                      FM_PCD_KG_KGAR_SCHEME_WSEL_UPDATE_CNT);
+                      FM_KG_KGAR_SCM_WSEL_UPDATE_CNT);
 
 }
 
 uint32_t FmPcdKgBuildWriteClsPlanBlockActionReg(uint8_t grpId)
 {
-    return (uint32_t)(FM_PCD_KG_KGAR_GO |
-                      FM_PCD_KG_KGAR_WRITE |
+    return (uint32_t)(FM_KG_KGAR_GO |
+                      FM_KG_KGAR_WRITE |
                       FM_PCD_KG_KGAR_SEL_CLS_PLAN_ENTRY |
                       DUMMY_PORT_ID |
                       ((uint32_t)grpId << FM_PCD_KG_KGAR_NUM_SHIFT) |
@@ -2724,8 +2670,8 @@ uint32_t FmPcdKgBuildWriteClsPlanBlockActionReg(uint8_t grpId)
 uint32_t FmPcdKgBuildWritePortSchemeBindActionReg(uint8_t hardwarePortId)
 {
 
-    return (uint32_t)(FM_PCD_KG_KGAR_GO |
-                      FM_PCD_KG_KGAR_WRITE |
+    return (uint32_t)(FM_KG_KGAR_GO |
+                      FM_KG_KGAR_WRITE |
                       FM_PCD_KG_KGAR_SEL_PORT_ENTRY |
                       hardwarePortId |
                       FM_PCD_KG_KGAR_SEL_PORT_WSEL_SP);
@@ -2734,8 +2680,8 @@ uint32_t FmPcdKgBuildWritePortSchemeBindActionReg(uint8_t hardwarePortId)
 uint32_t FmPcdKgBuildReadPortSchemeBindActionReg(uint8_t hardwarePortId)
 {
 
-    return (uint32_t)(FM_PCD_KG_KGAR_GO |
-                      FM_PCD_KG_KGAR_READ |
+    return (uint32_t)(FM_KG_KGAR_GO |
+                      FM_KG_KGAR_READ |
                       FM_PCD_KG_KGAR_SEL_PORT_ENTRY |
                       hardwarePortId |
                       FM_PCD_KG_KGAR_SEL_PORT_WSEL_SP);
@@ -2744,8 +2690,8 @@ uint32_t FmPcdKgBuildReadPortSchemeBindActionReg(uint8_t hardwarePortId)
 uint32_t FmPcdKgBuildWritePortClsPlanBindActionReg(uint8_t hardwarePortId)
 {
 
-    return (uint32_t)(FM_PCD_KG_KGAR_GO |
-                      FM_PCD_KG_KGAR_WRITE |
+    return (uint32_t)(FM_KG_KGAR_GO |
+                      FM_KG_KGAR_WRITE |
                       FM_PCD_KG_KGAR_SEL_PORT_ENTRY |
                       hardwarePortId |
                       FM_PCD_KG_KGAR_SEL_PORT_WSEL_CPP);
@@ -2840,9 +2786,9 @@ t_Error FmPcdKgCcGetSetParams(t_Handle h_FmPcd, t_Handle h_Scheme, uint32_t requ
                         tmpKgarReg = FmPcdKgBuildReadSchemeActionReg(physicalSchemeId);
                         intFlags = KgHwLock(p_FmPcd->p_FmPcdKg);
                         WriteKgarWait(p_FmPcd, tmpKgarReg);
-                        tmpReg32 = GET_UINT32(p_FmPcd->p_FmPcdKg->p_FmPcdKgRegs->indirectAccessRegs.schemeRegs.kgse_mode);
+                        tmpReg32 = GET_UINT32(p_FmPcd->p_FmPcdKg->p_IndirectAccessRegs->schemeRegs.kgse_mode);
                         ASSERT_COND(tmpReg32 & (NIA_ENG_BMI | NIA_BMI_AC_ENQ_FRAME));
-                        WRITE_UINT32(p_FmPcd->p_FmPcdKg->p_FmPcdKgRegs->indirectAccessRegs.schemeRegs.kgse_mode, tmpReg32 | NIA_BMI_AC_ENQ_FRAME_WITHOUT_DMA);
+                        WRITE_UINT32(p_FmPcd->p_FmPcdKg->p_IndirectAccessRegs->schemeRegs.kgse_mode, tmpReg32 | NIA_BMI_AC_ENQ_FRAME_WITHOUT_DMA);
                         /* call indirect command for scheme write */
                         tmpKgarReg = FmPcdKgBuildWriteSchemeActionReg(physicalSchemeId, FALSE);
                         WriteKgarWait(p_FmPcd, tmpKgarReg);
@@ -2874,10 +2820,10 @@ t_Error FmPcdKgCcGetSetParams(t_Handle h_FmPcd, t_Handle h_Scheme, uint32_t requ
                 tmpKgarReg = FmPcdKgBuildReadSchemeActionReg(physicalSchemeId);
                 intFlags = KgHwLock(p_FmPcd->p_FmPcdKg);
                 WriteKgarWait(p_FmPcd, tmpKgarReg);
-                tmpReg32 = GET_UINT32(p_FmPcd->p_FmPcdKg->p_FmPcdKgRegs->indirectAccessRegs.schemeRegs.kgse_mode);
+                tmpReg32 = GET_UINT32(p_FmPcd->p_FmPcdKg->p_IndirectAccessRegs->schemeRegs.kgse_mode);
                 ASSERT_COND(tmpReg32 & (NIA_ENG_FM_CTL | NIA_FM_CTL_AC_CC));
                 tmpReg32 &= ~NIA_FM_CTL_AC_CC;
-                WRITE_UINT32(p_FmPcd->p_FmPcdKg->p_FmPcdKgRegs->indirectAccessRegs.schemeRegs.kgse_mode, tmpReg32 | NIA_FM_CTL_AC_PRE_CC);
+                WRITE_UINT32(p_FmPcd->p_FmPcdKg->p_IndirectAccessRegs->schemeRegs.kgse_mode, tmpReg32 | NIA_FM_CTL_AC_PRE_CC);
                 /* call indirect command for scheme write */
                 tmpKgarReg = FmPcdKgBuildWriteSchemeActionReg(physicalSchemeId, FALSE);
                 WriteKgarWait(p_FmPcd, tmpKgarReg);
@@ -2889,7 +2835,7 @@ t_Error FmPcdKgCcGetSetParams(t_Handle h_FmPcd, t_Handle h_Scheme, uint32_t requ
             tmpKgarReg = FmPcdKgBuildReadSchemeActionReg(physicalSchemeId);
             intFlags = KgHwLock(p_FmPcd->p_FmPcdKg);
             WriteKgarWait(p_FmPcd, tmpKgarReg);
-            WRITE_UINT32(p_FmPcd->p_FmPcdKg->p_FmPcdKgRegs->indirectAccessRegs.schemeRegs.kgse_om, value);
+            WRITE_UINT32(p_FmPcd->p_FmPcdKg->p_IndirectAccessRegs->schemeRegs.kgse_om, value);
             /* call indirect command for scheme write */
             tmpKgarReg = FmPcdKgBuildWriteSchemeActionReg(physicalSchemeId, FALSE);
             WriteKgarWait(p_FmPcd, tmpKgarReg);
@@ -2900,10 +2846,10 @@ t_Error FmPcdKgCcGetSetParams(t_Handle h_FmPcd, t_Handle h_Scheme, uint32_t requ
             tmpKgarReg = FmPcdKgBuildReadSchemeActionReg(physicalSchemeId);
             intFlags = KgHwLock(p_FmPcd->p_FmPcdKg);
             WriteKgarWait(p_FmPcd, tmpKgarReg);
-            tmpReg32 = GET_UINT32(p_FmPcd->p_FmPcdKg->p_FmPcdKgRegs->indirectAccessRegs.schemeRegs.kgse_mode);
+            tmpReg32 = GET_UINT32(p_FmPcd->p_FmPcdKg->p_IndirectAccessRegs->schemeRegs.kgse_mode);
             tmpReg32 &= ~(NIA_ENG_MASK | NIA_AC_MASK);
             tmpReg32 |= value;
-            WRITE_UINT32(p_FmPcd->p_FmPcdKg->p_FmPcdKgRegs->indirectAccessRegs.schemeRegs.kgse_mode, tmpReg32);
+            WRITE_UINT32(p_FmPcd->p_FmPcdKg->p_IndirectAccessRegs->schemeRegs.kgse_mode, tmpReg32);
             /* call indirect command for scheme write */
             tmpKgarReg = FmPcdKgBuildWriteSchemeActionReg(physicalSchemeId, FALSE);
             WriteKgarWait(p_FmPcd, tmpKgarReg);
@@ -2926,8 +2872,8 @@ t_Error FmPcdKgCcGetSetParams(t_Handle h_FmPcd, t_Handle h_Scheme, uint32_t requ
 t_Handle FM_PCD_KgSchemeSet(t_Handle h_FmPcd,  t_FmPcdKgSchemeParams *p_SchemeParams)
 {
     t_FmPcd                             *p_FmPcd;
-    t_FmPcdKgSchemeRegs                 schemeRegs;
-    t_FmPcdKgSchemeRegs                 *p_MemRegs;
+    struct fman_kg_scheme_regs          schemeRegs;
+    struct fman_kg_scheme_regs          *p_MemRegs;
     uint8_t                             i;
     t_Error                             err = E_OK;
     uint32_t                            tmpKgarReg;
@@ -3024,7 +2970,7 @@ t_Handle FM_PCD_KgSchemeSet(t_Handle h_FmPcd,  t_FmPcdKgSchemeParams *p_SchemePa
     physicalSchemeId = p_Scheme->schemeId;
 
     /* configure all 21 scheme registers */
-    p_MemRegs = &p_FmPcd->p_FmPcdKg->p_FmPcdKgRegs->indirectAccessRegs.schemeRegs;
+    p_MemRegs = &p_FmPcd->p_FmPcdKg->p_IndirectAccessRegs->schemeRegs;
     intFlags = KgHwLock(p_FmPcd->p_FmPcdKg);
     WRITE_UINT32(p_MemRegs->kgse_ppc,   schemeRegs.kgse_ppc);
     WRITE_UINT32(p_MemRegs->kgse_ccbs,  schemeRegs.kgse_ccbs);
@@ -3041,7 +2987,7 @@ t_Handle FM_PCD_KgSchemeSet(t_Handle h_FmPcd,  t_FmPcdKgSchemeParams *p_SchemePa
     WRITE_UINT32(p_MemRegs->kgse_fqb,   schemeRegs.kgse_fqb);
     WRITE_UINT32(p_MemRegs->kgse_om,    schemeRegs.kgse_om);
     WRITE_UINT32(p_MemRegs->kgse_vsp,   schemeRegs.kgse_vsp);
-    for (i=0 ; i<FM_PCD_KG_NUM_OF_GENERIC_REGS ; i++)
+    for (i=0 ; i<FM_KG_NUM_OF_GENERIC_REGS ; i++)
         WRITE_UINT32(p_MemRegs->kgse_gec[i], schemeRegs.kgse_gec[i]);
 
     /* call indirect command for scheme write */
@@ -3087,7 +3033,7 @@ t_Error  FM_PCD_KgSchemeDelete(t_Handle h_Scheme)
 
     intFlags = KgHwLock(p_FmPcd->p_FmPcdKg);
     /* clear mode register, including enable bit */
-    WRITE_UINT32(p_FmPcd->p_FmPcdKg->p_FmPcdKgRegs->indirectAccessRegs.schemeRegs.kgse_mode, 0);
+    WRITE_UINT32(p_FmPcd->p_FmPcdKg->p_IndirectAccessRegs->schemeRegs.kgse_mode, 0);
 
     /* call indirect command for scheme write */
     tmpKgarReg = FmPcdKgBuildWriteSchemeActionReg(physicalSchemeId, FALSE);
@@ -3121,9 +3067,9 @@ uint32_t  FM_PCD_KgSchemeGetCounter(t_Handle h_Scheme)
     tmpKgarReg = FmPcdKgBuildReadSchemeActionReg(physicalSchemeId);
     intFlags = KgHwLock(p_FmPcd->p_FmPcdKg);
     WriteKgarWait(p_FmPcd, tmpKgarReg);
-    if (!(GET_UINT32(p_FmPcd->p_FmPcdKg->p_FmPcdKgRegs->indirectAccessRegs.schemeRegs.kgse_mode) & KG_SCH_MODE_EN))
+    if (!(GET_UINT32(p_FmPcd->p_FmPcdKg->p_IndirectAccessRegs->schemeRegs.kgse_mode) & KG_SCH_MODE_EN))
        REPORT_ERROR(MAJOR, E_ALREADY_EXISTS, ("Scheme is Invalid"));
-    spc = GET_UINT32(p_FmPcd->p_FmPcdKg->p_FmPcdKgRegs->indirectAccessRegs.schemeRegs.kgse_spc);
+    spc = GET_UINT32(p_FmPcd->p_FmPcdKg->p_IndirectAccessRegs->schemeRegs.kgse_spc);
     KgHwUnlock(p_FmPcd->p_FmPcdKg, intFlags);
 
     return spc;
@@ -3154,14 +3100,14 @@ t_Error  FM_PCD_KgSchemeSetCounter(t_Handle h_Scheme, uint32_t value)
     tmpKgarReg = FmPcdKgBuildReadSchemeActionReg(physicalSchemeId);
     intFlags = KgHwLock(p_FmPcd->p_FmPcdKg);
     WriteKgarWait(p_FmPcd, tmpKgarReg);
-    if (!(GET_UINT32(p_FmPcd->p_FmPcdKg->p_FmPcdKgRegs->indirectAccessRegs.schemeRegs.kgse_mode) & KG_SCH_MODE_EN))
+    if (!(GET_UINT32(p_FmPcd->p_FmPcdKg->p_IndirectAccessRegs->schemeRegs.kgse_mode) & KG_SCH_MODE_EN))
     {
        KgHwUnlock(p_FmPcd->p_FmPcdKg, intFlags);
        RETURN_ERROR(MAJOR, E_ALREADY_EXISTS, ("Scheme is Invalid"));
     }
 
     /* change counter value */
-    WRITE_UINT32(p_FmPcd->p_FmPcdKg->p_FmPcdKgRegs->indirectAccessRegs.schemeRegs.kgse_spc, value);
+    WRITE_UINT32(p_FmPcd->p_FmPcdKg->p_IndirectAccessRegs->schemeRegs.kgse_spc, value);
 
     /* call indirect command for scheme write */
     tmpKgarReg = FmPcdKgBuildWriteSchemeActionReg(physicalSchemeId, TRUE);
@@ -3175,7 +3121,7 @@ t_Error  FM_PCD_KgSchemeSetCounter(t_Handle h_Scheme, uint32_t value)
 t_Error FM_PCD_KgSetAdditionalDataAfterParsing(t_Handle h_FmPcd, uint8_t payloadOffset)
 {
    t_FmPcd              *p_FmPcd = (t_FmPcd*)h_FmPcd;
-   t_FmPcdKgRegs        *p_Regs;
+   struct fman_kg_regs  *p_Regs;
 
     SANITY_CHECK_RETURN_ERROR(p_FmPcd, E_INVALID_HANDLE);
     SANITY_CHECK_RETURN_ERROR(!p_FmPcd->p_FmPcdDriverParam, E_NULL_POINTER);
@@ -3186,7 +3132,7 @@ t_Error FM_PCD_KgSetAdditionalDataAfterParsing(t_Handle h_FmPcd, uint8_t payload
     if (!FmIsMaster(p_FmPcd->h_Fm))
         RETURN_ERROR(MAJOR, E_NOT_SUPPORTED, ("FM_PCD_KgSetAdditionalDataAfterParsing - guest mode!"));
 
-    WRITE_UINT32(p_Regs->kgfdor,payloadOffset);
+    WRITE_UINT32(p_Regs->fmkg_fdor,payloadOffset);
 
     return E_OK;
 }
@@ -3194,7 +3140,7 @@ t_Error FM_PCD_KgSetAdditionalDataAfterParsing(t_Handle h_FmPcd, uint8_t payload
 t_Error FM_PCD_KgSetDfltValue(t_Handle h_FmPcd, uint8_t valueId, uint32_t value)
 {
    t_FmPcd              *p_FmPcd = (t_FmPcd*)h_FmPcd;
-   t_FmPcdKgRegs        *p_Regs;
+   struct fman_kg_regs  *p_Regs;
 
     SANITY_CHECK_RETURN_ERROR(p_FmPcd, E_INVALID_HANDLE);
     SANITY_CHECK_RETURN_ERROR(((valueId == 0) || (valueId == 1)), E_INVALID_VALUE);
@@ -3208,9 +3154,9 @@ t_Error FM_PCD_KgSetDfltValue(t_Handle h_FmPcd, uint8_t valueId, uint32_t value)
         RETURN_ERROR(MAJOR, E_NOT_SUPPORTED, ("FM_PCD_KgSetDfltValue - guest mode!"));
 
     if (valueId == 0)
-        WRITE_UINT32(p_Regs->kggdv0r,value);
+        WRITE_UINT32(p_Regs->fmkg_gdv0r,value);
     else
-        WRITE_UINT32(p_Regs->kggdv1r,value);
+        WRITE_UINT32(p_Regs->fmkg_gdv1r,value);
     return E_OK;
 }
 
@@ -3234,20 +3180,19 @@ t_Error FM_PCD_KgDumpRegs(t_Handle h_FmPcd)
     DUMP_SUBTITLE(("\n"));
     DUMP_TITLE(p_FmPcd->p_FmPcdKg->p_FmPcdKgRegs, ("FmPcdKgRegs Regs"));
 
-    DUMP_VAR(p_FmPcd->p_FmPcdKg->p_FmPcdKgRegs,kggcr);
-    DUMP_VAR(p_FmPcd->p_FmPcdKg->p_FmPcdKgRegs,kgeer);
-    DUMP_VAR(p_FmPcd->p_FmPcdKg->p_FmPcdKgRegs,kgeeer);
-    DUMP_VAR(p_FmPcd->p_FmPcdKg->p_FmPcdKgRegs,kgseer);
-    DUMP_VAR(p_FmPcd->p_FmPcdKg->p_FmPcdKgRegs,kgseeer);
-    DUMP_VAR(p_FmPcd->p_FmPcdKg->p_FmPcdKgRegs,kggsr);
-    DUMP_VAR(p_FmPcd->p_FmPcdKg->p_FmPcdKgRegs,kgtpc);
-    DUMP_VAR(p_FmPcd->p_FmPcdKg->p_FmPcdKgRegs,kgserc);
-    DUMP_VAR(p_FmPcd->p_FmPcdKg->p_FmPcdKgRegs,kgfdor);
-    DUMP_VAR(p_FmPcd->p_FmPcdKg->p_FmPcdKgRegs,kggdv0r);
-    DUMP_VAR(p_FmPcd->p_FmPcdKg->p_FmPcdKgRegs,kggdv1r);
-    DUMP_VAR(p_FmPcd->p_FmPcdKg->p_FmPcdKgRegs,kgfer);
-    DUMP_VAR(p_FmPcd->p_FmPcdKg->p_FmPcdKgRegs,kgfeer);
-    DUMP_VAR(p_FmPcd->p_FmPcdKg->p_FmPcdKgRegs,kgar);
+    DUMP_VAR(p_FmPcd->p_FmPcdKg->p_FmPcdKgRegs,fmkg_gcr);
+    DUMP_VAR(p_FmPcd->p_FmPcdKg->p_FmPcdKgRegs,fmkg_eer);
+    DUMP_VAR(p_FmPcd->p_FmPcdKg->p_FmPcdKgRegs,fmkg_eeer);
+    DUMP_VAR(p_FmPcd->p_FmPcdKg->p_FmPcdKgRegs,fmkg_seer);
+    DUMP_VAR(p_FmPcd->p_FmPcdKg->p_FmPcdKgRegs,fmkg_seeer);
+    DUMP_VAR(p_FmPcd->p_FmPcdKg->p_FmPcdKgRegs,fmkg_gsr);
+    DUMP_VAR(p_FmPcd->p_FmPcdKg->p_FmPcdKgRegs,fmkg_tpc);
+    DUMP_VAR(p_FmPcd->p_FmPcdKg->p_FmPcdKgRegs,fmkg_serc);
+    DUMP_VAR(p_FmPcd->p_FmPcdKg->p_FmPcdKgRegs,fmkg_fdor);
+    DUMP_VAR(p_FmPcd->p_FmPcdKg->p_FmPcdKgRegs,fmkg_gdv0r);
+    DUMP_VAR(p_FmPcd->p_FmPcdKg->p_FmPcdKgRegs,fmkg_gdv1r);
+    DUMP_VAR(p_FmPcd->p_FmPcdKg->p_FmPcdKgRegs,fmkg_feer);
+    DUMP_VAR(p_FmPcd->p_FmPcdKg->p_FmPcdKgRegs,fmkg_ar);
 
     DUMP_SUBTITLE(("\n"));
     intFlags = KgHwLock(p_FmPcd->p_FmPcdKg);
@@ -3257,28 +3202,28 @@ t_Error FM_PCD_KgDumpRegs(t_Handle h_FmPcd)
         if (WriteKgarWait(p_FmPcd, tmpKgarReg) != E_OK)
             RETURN_ERROR(MAJOR, E_INVALID_STATE, NO_MSG);
 
-        DUMP_TITLE(&p_FmPcd->p_FmPcdKg->p_FmPcdKgRegs->indirectAccessRegs.schemeRegs, ("FmPcdKgIndirectAccessSchemeRegs Scheme %d Regs", j));
+        DUMP_TITLE(&p_FmPcd->p_FmPcdKg->p_IndirectAccessRegs->schemeRegs, ("FmPcdKgIndirectAccessSchemeRegs Scheme %d Regs", j));
 
-        DUMP_VAR(&p_FmPcd->p_FmPcdKg->p_FmPcdKgRegs->indirectAccessRegs.schemeRegs,kgse_mode);
-        DUMP_VAR(&p_FmPcd->p_FmPcdKg->p_FmPcdKgRegs->indirectAccessRegs.schemeRegs,kgse_ekfc);
-        DUMP_VAR(&p_FmPcd->p_FmPcdKg->p_FmPcdKgRegs->indirectAccessRegs.schemeRegs,kgse_ekdv);
-        DUMP_VAR(&p_FmPcd->p_FmPcdKg->p_FmPcdKgRegs->indirectAccessRegs.schemeRegs,kgse_bmch);
-        DUMP_VAR(&p_FmPcd->p_FmPcdKg->p_FmPcdKgRegs->indirectAccessRegs.schemeRegs,kgse_bmcl);
-        DUMP_VAR(&p_FmPcd->p_FmPcdKg->p_FmPcdKgRegs->indirectAccessRegs.schemeRegs,kgse_fqb);
-        DUMP_VAR(&p_FmPcd->p_FmPcdKg->p_FmPcdKgRegs->indirectAccessRegs.schemeRegs,kgse_hc);
-        DUMP_VAR(&p_FmPcd->p_FmPcdKg->p_FmPcdKgRegs->indirectAccessRegs.schemeRegs,kgse_ppc);
+        DUMP_VAR(&p_FmPcd->p_FmPcdKg->p_IndirectAccessRegs->schemeRegs,kgse_mode);
+        DUMP_VAR(&p_FmPcd->p_FmPcdKg->p_IndirectAccessRegs->schemeRegs,kgse_ekfc);
+        DUMP_VAR(&p_FmPcd->p_FmPcdKg->p_IndirectAccessRegs->schemeRegs,kgse_ekdv);
+        DUMP_VAR(&p_FmPcd->p_FmPcdKg->p_IndirectAccessRegs->schemeRegs,kgse_bmch);
+        DUMP_VAR(&p_FmPcd->p_FmPcdKg->p_IndirectAccessRegs->schemeRegs,kgse_bmcl);
+        DUMP_VAR(&p_FmPcd->p_FmPcdKg->p_IndirectAccessRegs->schemeRegs,kgse_fqb);
+        DUMP_VAR(&p_FmPcd->p_FmPcdKg->p_IndirectAccessRegs->schemeRegs,kgse_hc);
+        DUMP_VAR(&p_FmPcd->p_FmPcdKg->p_IndirectAccessRegs->schemeRegs,kgse_ppc);
 
-        DUMP_TITLE(&p_FmPcd->p_FmPcdKg->p_FmPcdKgRegs->indirectAccessRegs.schemeRegs.kgse_gec, ("kgse_gec"));
-        DUMP_SUBSTRUCT_ARRAY(i, FM_PCD_KG_NUM_OF_GENERIC_REGS)
+        DUMP_TITLE(&p_FmPcd->p_FmPcdKg->p_IndirectAccessRegs->schemeRegs.kgse_gec, ("kgse_gec"));
+        DUMP_SUBSTRUCT_ARRAY(i, FM_KG_NUM_OF_GENERIC_REGS)
         {
-            DUMP_MEMORY(&p_FmPcd->p_FmPcdKg->p_FmPcdKgRegs->indirectAccessRegs.schemeRegs.kgse_gec[i], sizeof(uint32_t));
+            DUMP_MEMORY(&p_FmPcd->p_FmPcdKg->p_IndirectAccessRegs->schemeRegs.kgse_gec[i], sizeof(uint32_t));
         }
 
-        DUMP_VAR(&p_FmPcd->p_FmPcdKg->p_FmPcdKgRegs->indirectAccessRegs.schemeRegs,kgse_spc);
-        DUMP_VAR(&p_FmPcd->p_FmPcdKg->p_FmPcdKgRegs->indirectAccessRegs.schemeRegs,kgse_dv0);
-        DUMP_VAR(&p_FmPcd->p_FmPcdKg->p_FmPcdKgRegs->indirectAccessRegs.schemeRegs,kgse_dv1);
-        DUMP_VAR(&p_FmPcd->p_FmPcdKg->p_FmPcdKgRegs->indirectAccessRegs.schemeRegs,kgse_ccbs);
-        DUMP_VAR(&p_FmPcd->p_FmPcdKg->p_FmPcdKgRegs->indirectAccessRegs.schemeRegs,kgse_mv);
+        DUMP_VAR(&p_FmPcd->p_FmPcdKg->p_IndirectAccessRegs->schemeRegs,kgse_spc);
+        DUMP_VAR(&p_FmPcd->p_FmPcdKg->p_IndirectAccessRegs->schemeRegs,kgse_dv0);
+        DUMP_VAR(&p_FmPcd->p_FmPcdKg->p_IndirectAccessRegs->schemeRegs,kgse_dv1);
+        DUMP_VAR(&p_FmPcd->p_FmPcdKg->p_IndirectAccessRegs->schemeRegs,kgse_ccbs);
+        DUMP_VAR(&p_FmPcd->p_FmPcdKg->p_IndirectAccessRegs->schemeRegs,kgse_mv);
     }
     DUMP_SUBTITLE(("\n"));
 
@@ -3292,24 +3237,24 @@ t_Error FM_PCD_KgDumpRegs(t_Handle h_FmPcd)
         if (err)
             RETURN_ERROR(MINOR, err, NO_MSG);
 
-        DUMP_TITLE(&p_FmPcd->p_FmPcdKg->p_FmPcdKgRegs->indirectAccessRegs.portRegs, ("FmPcdKgIndirectAccessPortRegs PCD Port %d regs", hardwarePortId));
+        DUMP_TITLE(&p_FmPcd->p_FmPcdKg->p_IndirectAccessRegs->portRegs, ("FmPcdKgIndirectAccessPortRegs PCD Port %d regs", hardwarePortId));
 
-        DUMP_VAR(&p_FmPcd->p_FmPcdKg->p_FmPcdKgRegs->indirectAccessRegs.portRegs, kgoe_sp);
-        DUMP_VAR(&p_FmPcd->p_FmPcdKg->p_FmPcdKgRegs->indirectAccessRegs.portRegs, kgoe_cpp);
+        DUMP_VAR(&p_FmPcd->p_FmPcdKg->p_IndirectAccessRegs->portRegs, fmkg_pe_sp);
+        DUMP_VAR(&p_FmPcd->p_FmPcdKg->p_IndirectAccessRegs->portRegs, fmkg_pe_cpp);
     }
 
     DUMP_SUBTITLE(("\n"));
     for (j=0;j<FM_PCD_MAX_NUM_OF_CLS_PLANS/CLS_PLAN_NUM_PER_GRP;j++)
     {
-        DUMP_TITLE(&p_FmPcd->p_FmPcdKg->p_FmPcdKgRegs->indirectAccessRegs.clsPlanRegs, ("FmPcdKgIndirectAccessClsPlanRegs Regs group %d", j));
-        DUMP_TITLE(&p_FmPcd->p_FmPcdKg->p_FmPcdKgRegs->indirectAccessRegs.clsPlanRegs.kgcpe, ("kgcpe"));
+        DUMP_TITLE(&p_FmPcd->p_FmPcdKg->p_IndirectAccessRegs->clsPlanRegs, ("FmPcdKgIndirectAccessClsPlanRegs Regs group %d", j));
+        DUMP_TITLE(&p_FmPcd->p_FmPcdKg->p_IndirectAccessRegs->clsPlanRegs.kgcpe, ("kgcpe"));
 
         tmpKgarReg = ReadClsPlanBlockActionReg((uint8_t)j);
         err = WriteKgarWait(p_FmPcd, tmpKgarReg);
         if (err)
             RETURN_ERROR(MINOR, err, NO_MSG);
         DUMP_SUBSTRUCT_ARRAY(i, 8)
-            DUMP_MEMORY(&p_FmPcd->p_FmPcdKg->p_FmPcdKgRegs->indirectAccessRegs.clsPlanRegs.kgcpe[i], sizeof(uint32_t));
+            DUMP_MEMORY(&p_FmPcd->p_FmPcdKg->p_IndirectAccessRegs->clsPlanRegs.kgcpe[i], sizeof(uint32_t));
     }
     KgHwUnlock(p_FmPcd->p_FmPcdKg, intFlags);
 

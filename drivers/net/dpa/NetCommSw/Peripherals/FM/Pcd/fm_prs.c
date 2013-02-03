@@ -46,51 +46,43 @@
 #include "fm_pcd.h"
 #include "fm_pcd_ipc.h"
 #include "fm_prs.h"
+#include "fsl_fman_prs.h"
 
 
 static void PcdPrsErrorException(t_Handle h_FmPcd)
 {
     t_FmPcd                 *p_FmPcd = (t_FmPcd *)h_FmPcd;
-    uint32_t                event, mask, force;
+    uint32_t                event, ev_mask;
+    struct fman_prs_regs     *PrsRegs = (struct fman_prs_regs *)p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs;
 
     ASSERT_COND(p_FmPcd->guestId == NCSW_MASTER_ID);
-    event = GET_UINT32(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs->perr);
-    mask = GET_UINT32(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs->perer);
+    ev_mask = fman_prs_get_err_ev_mask(PrsRegs);
 
-    event &= mask;
+    event = fman_prs_get_err_event(PrsRegs, ev_mask);
 
-    /* clear the forced events */
-    force = GET_UINT32(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs->perfr);
-    if (force & event)
-        WRITE_UINT32(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs->perfr, force & ~event);
-
-    WRITE_UINT32(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs->perr, event);
+    fman_prs_ack_err_event(PrsRegs, event);
 
     DBG(TRACE, ("parser error - 0x%08x\n",event));
 
-    if (event & FM_PCD_PRS_DOUBLE_ECC)
+    if(event & FM_PCD_PRS_DOUBLE_ECC)
         p_FmPcd->f_Exception(p_FmPcd->h_App,e_FM_PCD_PRS_EXCEPTION_DOUBLE_ECC);
 }
 
 static void PcdPrsException(t_Handle h_FmPcd)
 {
     t_FmPcd             *p_FmPcd = (t_FmPcd *)h_FmPcd;
-    uint32_t            event, force;
+    uint32_t            event, ev_mask;
+    struct fman_prs_regs     *PrsRegs = (struct fman_prs_regs *)p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs;
 
     ASSERT_COND(p_FmPcd->guestId == NCSW_MASTER_ID);
-    event = GET_UINT32(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs->pevr);
-    event &= GET_UINT32(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs->pever);
+    ev_mask = fman_prs_get_expt_ev_mask(PrsRegs);
+    event = fman_prs_get_expt_event(PrsRegs, ev_mask);
 
     ASSERT_COND(event & FM_PCD_PRS_SINGLE_ECC);
 
     DBG(TRACE, ("parser event - 0x%08x\n",event));
 
-    /* clear the forced events */
-    force = GET_UINT32(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs->pevfr);
-    if (force & event)
-        WRITE_UINT32(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs->pevfr, force & ~event);
-
-    WRITE_UINT32(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs->pevr, event);
+    fman_prs_ack_expt_event(PrsRegs, event);
 
     p_FmPcd->f_Exception(p_FmPcd->h_App,e_FM_PCD_PRS_EXCEPTION_SINGLE_ECC);
 }
@@ -110,17 +102,18 @@ t_Handle PrsConfig(t_FmPcd *p_FmPcd,t_FmPcdParams *p_FmPcdParams)
         return NULL;
     }
     memset(p_FmPcdPrs, 0, sizeof(t_FmPcdPrs));
+    fman_prs_defconfig(&p_FmPcd->p_FmPcdDriverParam->dfltCfg);
 
     if (p_FmPcd->guestId == NCSW_MASTER_ID)
     {
         baseAddr = FmGetPcdPrsBaseAddr(p_FmPcdParams->h_Fm);
         p_FmPcdPrs->p_SwPrsCode  = (uint32_t *)UINT_TO_PTR(baseAddr);
-        p_FmPcdPrs->p_FmPcdPrsRegs  = (t_FmPcdPrsRegs *)UINT_TO_PTR(baseAddr + PRS_REGS_OFFSET);
+        p_FmPcdPrs->p_FmPcdPrsRegs  = (struct fman_prs_regs *)UINT_TO_PTR(baseAddr + PRS_REGS_OFFSET);
     }
 
-    p_FmPcdPrs->fmPcdPrsPortIdStatistics             = 0;
-    p_FmPcd->p_FmPcdDriverParam->prsMaxParseCycleLimit   = DEFAULT_prsMaxParseCycleLimit;
-    p_FmPcd->exceptions |= (DEFAULT_fmPcdPrsErrorExceptions | DEFAULT_fmPcdPrsExceptions);
+    p_FmPcdPrs->fmPcdPrsPortIdStatistics = p_FmPcd->p_FmPcdDriverParam->dfltCfg.port_id_stat;
+    p_FmPcd->p_FmPcdDriverParam->prsMaxParseCycleLimit = p_FmPcd->p_FmPcdDriverParam->dfltCfg.max_prs_cyc_lim;
+    p_FmPcd->exceptions |= p_FmPcd->p_FmPcdDriverParam->dfltCfg.prs_exceptions;
 
     return p_FmPcdPrs;
 }
@@ -128,12 +121,16 @@ t_Handle PrsConfig(t_FmPcd *p_FmPcd,t_FmPcdParams *p_FmPcdParams)
 t_Error PrsInit(t_FmPcd *p_FmPcd)
 {
     t_FmPcdDriverParam  *p_Param = p_FmPcd->p_FmPcdDriverParam;
-    t_FmPcdPrsRegs      *p_Regs = p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs;
     uint32_t            *p_TmpCode;
     uint32_t            *p_LoadTarget = (uint32_t *)PTR_MOVE(p_FmPcd->p_FmPcdPrs->p_SwPrsCode,
                                                              FM_PCD_SW_PRS_SIZE-FM_PCD_PRS_SW_PATCHES_SIZE);
+    struct fman_prs_regs *PrsRegs = (struct fman_prs_regs *)p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs;
+#ifdef FM_CAPWAP_SUPPORT
+    uint8_t             swPrsPatch[] = SW_PRS_UDP_LITE_PATCH;
+#else
     uint8_t             swPrsPatch[] = SW_PRS_IP_FRAG_PATCH;
-    uint32_t            tmpReg, i;
+#endif /* FM_CAPWAP_SUPPORT */
+    uint32_t            i;
 
     ASSERT_COND(sizeof(swPrsPatch) <= (FM_PCD_PRS_SW_PATCHES_SIZE-FM_PCD_PRS_SW_TAIL_SIZE));
 
@@ -147,9 +144,7 @@ t_Error PrsInit(t_FmPcd *p_FmPcd)
     memset((uint8_t *)p_TmpCode, 0, ROUND_UP(sizeof(swPrsPatch),4));
     memcpy((uint8_t *)p_TmpCode, (uint8_t *)swPrsPatch, sizeof(swPrsPatch));
 
-    /**********************RPCLIM******************/
-    WRITE_UINT32(p_Regs->rpclim, (uint32_t)p_Param->prsMaxParseCycleLimit);
-    /**********************FMPL_RPCLIM******************/
+    fman_prs_init(PrsRegs, &p_Param->dfltCfg);
 
     /* register even if no interrupts enabled, to allow future enablement */
     FmRegisterIntr(p_FmPcd->h_Fm, e_FM_MOD_PRS, 0, e_FM_INTR_TYPE_ERR, PcdPrsErrorException, p_FmPcd);
@@ -157,37 +152,11 @@ t_Error PrsInit(t_FmPcd *p_FmPcd)
     /* register even if no interrupts enabled, to allow future enablement */
     FmRegisterIntr(p_FmPcd->h_Fm, e_FM_MOD_PRS, 0, e_FM_INTR_TYPE_NORMAL, PcdPrsException, p_FmPcd);
 
-    /**********************PEVR******************/
-    WRITE_UINT32(p_Regs->pevr, (FM_PCD_PRS_SINGLE_ECC | FM_PCD_PRS_PORT_IDLE_STS) );
-    /**********************PEVR******************/
-
-    /**********************PEVER******************/
-    if (p_FmPcd->exceptions & FM_PCD_EX_PRS_SINGLE_ECC)
-    {
+    if(p_FmPcd->exceptions & FM_PCD_EX_PRS_SINGLE_ECC)
         FmEnableRamsEcc(p_FmPcd->h_Fm);
-        WRITE_UINT32(p_Regs->pever, FM_PCD_PRS_SINGLE_ECC);
-    }
-    else
-        WRITE_UINT32(p_Regs->pever, 0);
-    /**********************PEVER******************/
 
-    /**********************PERR******************/
-    WRITE_UINT32(p_Regs->perr, FM_PCD_PRS_DOUBLE_ECC);
-    /**********************PERR******************/
-
-    /**********************PERER******************/
-    tmpReg = 0;
-    if (p_FmPcd->exceptions & FM_PCD_EX_PRS_DOUBLE_ECC)
-    {
+    if(p_FmPcd->exceptions & FM_PCD_EX_PRS_DOUBLE_ECC)
         FmEnableRamsEcc(p_FmPcd->h_Fm);
-        tmpReg |= FM_PCD_PRS_DOUBLE_ECC;
-    }
-    WRITE_UINT32(p_Regs->perer, tmpReg);
-    /**********************PERER******************/
-
-    /**********************PPSC******************/
-    WRITE_UINT32(p_Regs->ppsc, p_FmPcd->p_FmPcdPrs->fmPcdPrsPortIdStatistics);
-    /**********************PPSC******************/
 
     /* load sw parser Ip-Frag patch */
     for (i=0; i<DIV_CEIL(sizeof(swPrsPatch),4); i++)
@@ -208,28 +177,31 @@ void PrsFree(t_FmPcd *p_FmPcd)
 
 void PrsEnable(t_FmPcd *p_FmPcd)
 {
-    t_FmPcdPrsRegs      *p_Regs = p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs;
+    struct fman_prs_regs *PrsRegs = (struct fman_prs_regs *)p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs;
 
     ASSERT_COND(p_FmPcd->guestId == NCSW_MASTER_ID);
-    WRITE_UINT32(p_Regs->rpimac, GET_UINT32(p_Regs->rpimac) | FM_PCD_PRS_RPIMAC_EN);
+    fman_prs_enable(PrsRegs);
 }
 
 void PrsDisable(t_FmPcd *p_FmPcd)
 {
-    t_FmPcdPrsRegs      *p_Regs = p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs;
+    struct fman_prs_regs *PrsRegs = (struct fman_prs_regs *)p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs;
 
     ASSERT_COND(p_FmPcd->guestId == NCSW_MASTER_ID);
-    WRITE_UINT32(p_Regs->rpimac, GET_UINT32(p_Regs->rpimac) & ~FM_PCD_PRS_RPIMAC_EN);
+    fman_prs_disable(PrsRegs);
 }
 
 t_Error PrsIncludePortInStatistics(t_FmPcd *p_FmPcd, uint8_t hardwarePortId, bool include)
 {
+    struct fman_prs_regs *PrsRegs;
     uint32_t    bitMask = 0;
     uint8_t     prsPortId;
 
     SANITY_CHECK_RETURN_ERROR((hardwarePortId >=1 && hardwarePortId <= 16), E_INVALID_VALUE);
     SANITY_CHECK_RETURN_ERROR(p_FmPcd, E_INVALID_HANDLE);
     SANITY_CHECK_RETURN_ERROR(p_FmPcd->p_FmPcdPrs, E_INVALID_HANDLE);
+
+    PrsRegs = (struct fman_prs_regs *)p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs;
 
     GET_FM_PCD_PRS_PORT_ID(prsPortId, hardwarePortId);
     GET_FM_PCD_INDEX_FLAG(bitMask, prsPortId);
@@ -239,7 +211,8 @@ t_Error PrsIncludePortInStatistics(t_FmPcd *p_FmPcd, uint8_t hardwarePortId, boo
     else
         p_FmPcd->p_FmPcdPrs->fmPcdPrsPortIdStatistics &= ~bitMask;
 
-    WRITE_UINT32(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs->ppsc, p_FmPcd->p_FmPcdPrs->fmPcdPrsPortIdStatistics);
+    fman_prs_set_stst_port_msk(PrsRegs,
+            p_FmPcd->p_FmPcdPrs->fmPcdPrsPortIdStatistics);
 
     return E_OK;
 }
@@ -344,20 +317,21 @@ uint32_t FmPcdGetSwPrsOffset(t_Handle h_FmPcd, e_NetHeaderType hdr, uint8_t inde
 void FM_PCD_SetPrsStatistics(t_Handle h_FmPcd, bool enable)
 {
     t_FmPcd             *p_FmPcd = (t_FmPcd*)h_FmPcd;
+    struct fman_prs_regs *PrsRegs;
 
     SANITY_CHECK_RETURN(p_FmPcd, E_INVALID_HANDLE);
     SANITY_CHECK_RETURN(p_FmPcd->p_FmPcdPrs, E_INVALID_HANDLE);
 
-    if (p_FmPcd->guestId != NCSW_MASTER_ID)
+    PrsRegs = (struct fman_prs_regs *)p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs;
+
+
+    if(p_FmPcd->guestId != NCSW_MASTER_ID)
     {
         REPORT_ERROR(MAJOR, E_NOT_SUPPORTED, ("FM_PCD_SetPrsStatistics - guest mode!"));
         return;
     }
 
-    if (enable)
-        WRITE_UINT32(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs->ppsc, FM_PCD_PRS_PPSC_ALL_PORTS);
-    else
-        WRITE_UINT32(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs->ppsc, 0);
+    fman_prs_set_stst(PrsRegs, enable);
 }
 
 t_Error FM_PCD_PrsLoadSw(t_Handle h_FmPcd, t_FmPcdPrsSwParams *p_SwPrs)
@@ -378,7 +352,7 @@ t_Error FM_PCD_PrsLoadSw(t_Handle h_FmPcd, t_FmPcdPrsSwParams *p_SwPrs)
 
     if (!p_SwPrs->override)
     {
-        if (p_FmPcd->p_FmPcdPrs->p_CurrSwPrs > p_FmPcd->p_FmPcdPrs->p_SwPrsCode + p_SwPrs->base*2/4)
+        if(p_FmPcd->p_FmPcdPrs->p_CurrSwPrs > p_FmPcd->p_FmPcdPrs->p_SwPrsCode + p_SwPrs->base*2/4)
             RETURN_ERROR(MAJOR, E_INVALID_VALUE, ("SW parser base must be larger than current loaded code"));
     }
     else
@@ -404,7 +378,7 @@ t_Error FM_PCD_PrsLoadSw(t_Handle h_FmPcd, t_FmPcdPrsSwParams *p_SwPrs)
 
     /* load sw parser code */
     p_LoadTarget = p_FmPcd->p_FmPcdPrs->p_SwPrsCode + p_SwPrs->base*2/4;
-    for (i=0; i<DIV_CEIL(p_SwPrs->size,4); i++)
+    for(i=0; i<DIV_CEIL(p_SwPrs->size,4); i++)
         WRITE_UINT32(p_LoadTarget[i], p_TmpCode[i]);
     p_FmPcd->p_FmPcdPrs->p_CurrSwPrs =
         p_FmPcd->p_FmPcdPrs->p_SwPrsCode + p_SwPrs->base*2/4 + ROUND_UP(p_SwPrs->size,4);
@@ -428,7 +402,7 @@ t_Error FM_PCD_ConfigPrsMaxCycleLimit(t_Handle h_FmPcd,uint16_t value)
     SANITY_CHECK_RETURN_ERROR(p_FmPcd, E_INVALID_HANDLE);
     SANITY_CHECK_RETURN_ERROR(p_FmPcd->p_FmPcdDriverParam, E_INVALID_HANDLE);
 
-    if (p_FmPcd->guestId != NCSW_MASTER_ID)
+    if(p_FmPcd->guestId != NCSW_MASTER_ID)
         RETURN_ERROR(MAJOR, E_NOT_SUPPORTED, ("FM_PCD_ConfigPrsMaxCycleLimit - guest mode!"));
 
     p_FmPcd->p_FmPcdDriverParam->prsMaxParseCycleLimit = value;
@@ -452,33 +426,31 @@ t_Error FM_PCD_PrsDumpRegs(t_Handle h_FmPcd)
     DUMP_SUBTITLE(("\n"));
     DUMP_TITLE(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs, ("FM-PCD parser regs"));
 
-    DUMP_VAR(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs,rpclim);
-    DUMP_VAR(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs,rpimac);
+    DUMP_VAR(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs,fmpr_rpclim);
+    DUMP_VAR(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs,fmpr_rpimac);
     DUMP_VAR(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs,pmeec);
-    DUMP_VAR(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs,pevr);
-    DUMP_VAR(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs,pever);
-    DUMP_VAR(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs,pevfr);
-    DUMP_VAR(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs,perr);
-    DUMP_VAR(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs,perer);
-    DUMP_VAR(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs,perfr);
-    DUMP_VAR(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs,ppsc);
-    DUMP_VAR(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs,pds);
-    DUMP_VAR(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs,l2rrs);
-    DUMP_VAR(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs,l3rrs);
-    DUMP_VAR(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs,l4rrs);
-    DUMP_VAR(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs,srrs);
-    DUMP_VAR(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs,l2rres);
-    DUMP_VAR(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs,l3rres);
-    DUMP_VAR(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs,l4rres);
-    DUMP_VAR(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs,srres);
-    DUMP_VAR(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs,spcs);
-    DUMP_VAR(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs,spscs);
-    DUMP_VAR(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs,hxscs);
-    DUMP_VAR(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs,mrcs);
-    DUMP_VAR(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs,mwcs);
-    DUMP_VAR(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs,mrscs);
-    DUMP_VAR(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs,mwscs);
-    DUMP_VAR(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs,fcscs);
+    DUMP_VAR(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs,fmpr_pevr);
+    DUMP_VAR(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs,fmpr_pever);
+    DUMP_VAR(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs,fmpr_perr);
+    DUMP_VAR(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs,fmpr_perer);
+    DUMP_VAR(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs,fmpr_ppsc);
+    DUMP_VAR(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs,fmpr_pds);
+    DUMP_VAR(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs,fmpr_l2rrs);
+    DUMP_VAR(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs,fmpr_l3rrs);
+    DUMP_VAR(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs,fmpr_l4rrs);
+    DUMP_VAR(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs,fmpr_srrs);
+    DUMP_VAR(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs,fmpr_l2rres);
+    DUMP_VAR(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs,fmpr_l3rres);
+    DUMP_VAR(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs,fmpr_l4rres);
+    DUMP_VAR(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs,fmpr_srres);
+    DUMP_VAR(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs,fmpr_spcs);
+    DUMP_VAR(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs,fmpr_spscs);
+    DUMP_VAR(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs,fmpr_hxscs);
+    DUMP_VAR(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs,fmpr_mrcs);
+    DUMP_VAR(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs,fmpr_mwcs);
+    DUMP_VAR(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs,fmpr_mrscs);
+    DUMP_VAR(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs,fmpr_mwscs);
+    DUMP_VAR(p_FmPcd->p_FmPcdPrs->p_FmPcdPrsRegs,fmpr_fcscs);
 
     return E_OK;
 }

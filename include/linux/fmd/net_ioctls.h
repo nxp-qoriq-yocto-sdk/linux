@@ -85,7 +85,6 @@ typedef uint8_t ioc_header_field_eth_t;
 
 #define IOC_NET_HEADER_FIELD_ETH_ADDR_SIZE                 6
 
-
 typedef uint16_t ioc_header_field_ip_t;
 
 #define IOC_NET_HEADER_FIELD_IP_VER                         (1)
@@ -195,6 +194,14 @@ typedef uint8_t ioc_header_field_udp_t;
 #define IOC_NET_HEADER_FIELD_UDP_ALL_FIELDS                 ((IOC_NET_HEADER_FIELD_UDP_PORT_SRC << 4) - 1)
 
 #define IOC_NET_HEADER_FIELD_UDP_PORT_SIZE                  2
+
+typedef uint8_t ioc_header_field_udp_lite_t;
+
+#define IOC_NET_HEADER_FIELD_UDP_LITE_PORT_SRC              (1)
+#define IOC_NET_HEADER_FIELD_UDP_LITE_PORT_DST              (IOC_NET_HEADER_FIELD_UDP_LITE_PORT_SRC << 1)
+#define IOC_NET_HEADER_FIELD_UDP_LITE_ALL_FIELDS            ((IOC_NET_HEADER_FIELD_UDP_LITE_PORT_SRC << 2) - 1)
+
+#define IOC_NET_HEADER_FIELD_UDP_LITE_PORT_SIZE             2
 
 typedef uint8_t ioc_header_field_udp_encap_esp_t;
 
@@ -382,6 +389,7 @@ typedef enum {
     e_IOC_NET_HEADER_TYPE_IP,
     e_IOC_NET_HEADER_TYPE_TCP,
     e_IOC_NET_HEADER_TYPE_UDP,
+    e_IOC_NET_HEADER_TYPE_UDP_LITE,
     e_IOC_NET_HEADER_TYPE_IPHC,
     e_IOC_NET_HEADER_TYPE_SCTP,
     e_IOC_NET_HEADER_TYPE_SCTP_CHUNK_DATA,

@@ -36,7 +36,7 @@
 
 #include "std_ext.h"
 #include "error_ext.h"
-
+#include "fsl_fman_kg.h"
 
 #define __ERR_MODULE__  MODULE_FM_PCD
 
@@ -57,10 +57,10 @@ t_Error     FmHcDumpRegs(t_Handle h_FmHc);
 
 void        FmHcTxConf(t_Handle h_FmHc, t_DpaaFD *p_Fd);
 
-t_Error     FmHcPcdKgSetScheme(t_Handle             h_FmHc,
-                               t_Handle             h_Scheme,
-                               t_FmPcdKgSchemeRegs  *p_SchemeRegs,
-                               bool                 updateCounter);
+t_Error     FmHcPcdKgSetScheme(t_Handle                   h_FmHc,
+                               t_Handle                   h_Scheme,
+                               struct fman_kg_scheme_regs *p_SchemeRegs,
+                               bool                       updateCounter);
 t_Error     FmHcPcdKgDeleteScheme(t_Handle h_FmHc, t_Handle h_Scheme);
 t_Error     FmHcPcdCcCapwapTimeoutReassm(t_Handle h_FmHc, t_FmPcdCcCapwapReassmTimeoutParams *p_CcCapwapReassmTimeoutParams );
 t_Error     FmHcPcdCcIpFragScratchPollCmd(t_Handle h_FmHc, bool fill, t_FmPcdCcFragScratchPoolCmdParams *p_FmPcdCcFragScratchPoolCmdParams);

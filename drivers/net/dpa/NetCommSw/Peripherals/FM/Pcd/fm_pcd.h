@@ -44,6 +44,8 @@
 #include "list_ext.h"
 #include "fm_pcd_ext.h"
 #include "fm_common.h"
+#include "fsl_fman_prs.h"
+#include "fsl_fman_kg.h"
 
 #define __ERR_MODULE__  MODULE_FM_PCD
 
@@ -52,8 +54,7 @@
 /* Defaults                 */
 /****************************/
 #define DEFAULT_plcrAutoRefresh                 FALSE
-#define DEFAULT_prsMaxParseCycleLimit           0
-#define DEFAULT_fmPcdKgErrorExceptions          (FM_PCD_EX_KG_DOUBLE_ECC | FM_PCD_EX_KG_KEYSIZE_OVERFLOW)
+#define DEFAULT_fmPcdKgErrorExceptions          (FM_EX_KG_DOUBLE_ECC | FM_EX_KG_KEYSIZE_OVERFLOW)
 #define DEFAULT_fmPcdPlcrErrorExceptions        (FM_PCD_EX_PLCR_DOUBLE_ECC | FM_PCD_EX_PLCR_INIT_ENTRY_ERROR)
 #define DEFAULT_fmPcdPlcrExceptions             0
 #define DEFAULT_fmPcdPrsErrorExceptions         (FM_PCD_EX_PRS_DOUBLE_ECC)
@@ -83,25 +84,20 @@
 /****************************/
 /* Error defines           */
 /****************************/
-#define FM_PCD_EX_KG_DOUBLE_ECC                     0x80000000
-#define FM_PCD_EX_KG_KEYSIZE_OVERFLOW               0x40000000
 
 #define FM_PCD_EX_PLCR_DOUBLE_ECC                   0x20000000
 #define FM_PCD_EX_PLCR_INIT_ENTRY_ERROR             0x10000000
 #define FM_PCD_EX_PLCR_PRAM_SELF_INIT_COMPLETE      0x08000000
 #define FM_PCD_EX_PLCR_ATOMIC_ACTION_COMPLETE       0x04000000
 
-#define FM_PCD_EX_PRS_DOUBLE_ECC                    0x02000000
-#define FM_PCD_EX_PRS_SINGLE_ECC                    0x01000000
-
 #define GET_FM_PCD_EXCEPTION_FLAG(bitMask, exception)               \
 switch (exception){                                                 \
     case e_FM_PCD_KG_EXCEPTION_DOUBLE_ECC:                          \
-        bitMask = FM_PCD_EX_KG_DOUBLE_ECC; break;                   \
+        bitMask = FM_EX_KG_DOUBLE_ECC; break;                   \
     case e_FM_PCD_PLCR_EXCEPTION_DOUBLE_ECC:                        \
         bitMask = FM_PCD_EX_PLCR_DOUBLE_ECC; break;                 \
     case e_FM_PCD_KG_EXCEPTION_KEYSIZE_OVERFLOW:                    \
-        bitMask = FM_PCD_EX_KG_KEYSIZE_OVERFLOW; break;             \
+        bitMask = FM_EX_KG_KEYSIZE_OVERFLOW; break;             \
     case e_FM_PCD_PLCR_EXCEPTION_INIT_ENTRY_ERROR:                  \
         bitMask = FM_PCD_EX_PLCR_INIT_ENTRY_ERROR; break;           \
     case e_FM_PCD_PLCR_EXCEPTION_PRAM_SELF_INIT_COMPLETE:           \
@@ -113,19 +109,6 @@ switch (exception){                                                 \
     case e_FM_PCD_PRS_EXCEPTION_SINGLE_ECC:                         \
         bitMask = FM_PCD_EX_PRS_SINGLE_ECC; break;                  \
     default: bitMask = 0;break;}
-
-/****************************/
-/* Parser defines           */
-/****************************/
-#define FM_PCD_PRS_SINGLE_ECC                 0x00004000
-#define FM_PCD_PRS_DOUBLE_ECC                 0x00004000
-#define PRS_MAX_CYCLE_LIMIT                   8191
-
-/***********************************************************************/
-/*          Keygen defines                                             */
-/***********************************************************************/
-#define FM_PCD_KG_DOUBLE_ECC                  0x80000000
-#define FM_PCD_KG_KEYSIZE_OVERFLOW            0x40000000
 
 /***********************************************************************/
 /*          Policer defines                                            */
@@ -143,46 +126,6 @@ switch (exception){                                                 \
 #pragma pack(push,1)
 #endif /* defined(__MWERKS__) && ... */
 
-typedef _Packed struct {
-   volatile uint32_t kgoe_sp;
-   volatile uint32_t kgoe_cpp;
-} _PackedType t_FmPcdKgPortConfigRegs;
-
-typedef _Packed struct {
-    volatile uint32_t kgcpe[8];
-} _PackedType t_FmPcdKgClsPlanRegs;
-
-typedef _Packed union {
-    t_FmPcdKgSchemeRegs             schemeRegs;
-    t_FmPcdKgPortConfigRegs         portRegs;
-    t_FmPcdKgClsPlanRegs            clsPlanRegs;
-} _PackedType u_FmPcdKgIndirectAccessRegs;
-
-typedef _Packed struct {
-    volatile uint32_t kggcr;
-    volatile uint32_t res0;
-    volatile uint32_t res1;
-    volatile uint32_t kgeer;
-    volatile uint32_t kgeeer;
-    volatile uint32_t res2;
-    volatile uint32_t res3;
-    volatile uint32_t kgseer;
-    volatile uint32_t kgseeer;
-    volatile uint32_t kggsr;
-    volatile uint32_t kgtpc;
-    volatile uint32_t kgserc;
-    volatile uint32_t res4[4];
-    volatile uint32_t kgfdor;
-    volatile uint32_t kggdv0r;
-    volatile uint32_t kggdv1r;
-    volatile uint32_t res5[5];
-    volatile uint32_t kgfer;
-    volatile uint32_t kgfeer;
-    volatile uint32_t res6[38];
-    u_FmPcdKgIndirectAccessRegs   indirectAccessRegs;
-    volatile uint32_t res[40];                  /*(0xfc-sizeof(u_FmPcdKgIndirectAccessRegs))/4 */
-    volatile uint32_t kgar;
-} _PackedType t_FmPcdKgRegs;
 
 typedef _Packed struct {
 /* General Configuration and Status Registers */
@@ -216,39 +159,6 @@ typedef _Packed struct {
     volatile uint32_t fmpl_pmr[63];     /*+default 0x204-0x2FF FMPL_PMR1 - FMPL_PMR63, - FM Policer Profile Mapping Registers.
                                            (for port-ID 1-11, only for supported Port-ID registers) */
 } _PackedType t_FmPcdPlcrRegs;
-
-typedef _Packed struct {
-    volatile uint32_t rpclim;
-    volatile uint32_t rpimac;
-    volatile uint32_t pmeec;
-    volatile uint32_t res1[5];
-    volatile uint32_t pevr;
-    volatile uint32_t pever;
-    volatile uint32_t pevfr;
-    volatile uint32_t perr;
-    volatile uint32_t perer;
-    volatile uint32_t perfr;
-    volatile uint32_t res2[0xA];
-    volatile uint32_t ppsc;
-    volatile uint32_t res3;
-    volatile uint32_t pds;
-    volatile uint32_t l2rrs;
-    volatile uint32_t l3rrs;
-    volatile uint32_t l4rrs;
-    volatile uint32_t srrs;
-    volatile uint32_t l2rres;
-    volatile uint32_t l3rres;
-    volatile uint32_t l4rres;
-    volatile uint32_t srres;
-    volatile uint32_t spcs;
-    volatile uint32_t spscs;
-    volatile uint32_t hxscs;
-    volatile uint32_t mrcs;
-    volatile uint32_t mwcs;
-    volatile uint32_t mrscs;
-    volatile uint32_t mwscs;
-    volatile uint32_t fcscs;
-} _PackedType t_FmPcdPrsRegs;
 
 #if defined(__MWERKS__) && !defined(__GNUC__)
 #pragma pack(pop)
@@ -328,8 +238,14 @@ typedef struct {
 #endif
 } t_FmPcdKgScheme;
 
+typedef _Packed union {
+    struct fman_kg_scheme_regs schemeRegs;
+    struct fman_kg_pe_regs portRegs;
+    struct fman_kg_cp_regs clsPlanRegs;
+} _PackedType u_FmPcdKgIndirectAccessRegs;
+
 typedef struct {
-    t_FmPcdKgRegs       *p_FmPcdKgRegs;
+    struct fman_kg_regs *p_FmPcdKgRegs;
     uint32_t            schemeExceptionsBitMask;
     uint8_t             numOfSchemes;
     t_Handle            h_HwSpinlock;
@@ -339,6 +255,7 @@ typedef struct {
     uint8_t             emptyClsPlanGrpId;
     t_FmPcdAllocMng     schemesMng[FM_PCD_KG_NUM_OF_SCHEMES]; /* only for MASTER ! */
     t_FmPcdAllocMng     clsPlanBlocksMng[FM_PCD_MAX_NUM_OF_CLS_PLANS/CLS_PLAN_NUM_PER_GRP];
+    u_FmPcdKgIndirectAccessRegs *p_IndirectAccessRegs;
 } t_FmPcdKg;
 
 typedef struct {
@@ -381,7 +298,7 @@ typedef struct {
     uint32_t                        *p_SwPrsCode;
     uint32_t                        *p_CurrSwPrs;
     uint8_t                         currLabel;
-    t_FmPcdPrsRegs                  *p_FmPcdPrsRegs;
+    struct fman_prs_regs            *p_FmPcdPrsRegs;
     t_FmPcdPrsLabelParams           labelsTable[FM_PCD_PRS_NUM_OF_LABELS];
     uint32_t                        fmPcdPrsPortIdStatistics;
 } t_FmPcdPrs;
@@ -414,6 +331,7 @@ typedef struct {
 } t_FmPcdNetEnv;
 
 typedef struct {
+    struct fman_prs_cfg          dfltCfg;
     bool                        plcrAutoRefresh;
     uint16_t                    prsMaxParseCycleLimit;
 } t_FmPcdDriverParam;
@@ -526,7 +444,7 @@ uint16_t    FmPcdCcGetNumOfKeys(t_Handle h_CcNode);
 t_Error     ValidateNextEngineParams(t_Handle h_FmPcd, t_FmPcdCcNextEngineParams *p_FmPcdCcNextEngineParams, e_FmPcdCcStatsMode supportedStatsMode);
 
 void        FmPcdManipUpdateOwner(t_Handle h_Manip, bool add);
-t_Error     FmPcdManipCheckParamsForCcNextEgine(t_FmPcdCcNextEngineParams *p_InfoForManip, uint32_t *requiredAction);
+t_Error     FmPcdManipCheckParamsForCcNextEngine(t_FmPcdCcNextEngineParams *p_InfoForManip, uint32_t *requiredAction);
 void        FmPcdManipUpdateAdResultForCc(t_Handle                     h_Manip,
                                           t_FmPcdCcNextEngineParams    *p_CcNextEngineParams,
                                           t_Handle                     p_Ad,

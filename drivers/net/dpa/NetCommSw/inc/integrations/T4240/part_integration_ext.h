@@ -40,6 +40,8 @@
 #define __PART_INTEGRATION_EXT_H
 
 #include "std_ext.h"
+#include "ddr_std_ext.h"
+#include "enet_ext.h"
 #include "dpaa_integration_ext.h"
 
 
