@@ -918,6 +918,7 @@ u16 qman_affine_channel(int cpu)
 	BUG_ON(!cpumask_test_cpu(cpu, &affine_mask));
 	return affine_channels[cpu];
 }
+EXPORT_SYMBOL(qman_affine_channel);
 
 int qman_poll_dqrr(unsigned int limit)
 {
