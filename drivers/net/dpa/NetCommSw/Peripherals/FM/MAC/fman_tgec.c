@@ -336,9 +336,10 @@ int tgec_init(struct tgec_regs *regs, struct tgec_cfg *cfg,
 	iowrite32be((uint32_t)cfg->max_frame_length, &regs->maxfrm);
 	/* Pause Time */
 	iowrite32be(cfg->pause_quant, &regs->pause_quant);
-	/* 2 ERRATAs here ? */
-	iowrite32be(EVENTS_MASK, &regs->ievent);
-	iowrite32be(exception_mask, &regs->imask);
+
+	/* clear all pending events and set-up interrupts */
+	tgec_ack_event(regs, 0xffffffff);
+	tgec_enable_interrupt(regs, exception_mask);
 	return 0;
 }
 
