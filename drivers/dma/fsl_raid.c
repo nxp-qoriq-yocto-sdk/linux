@@ -933,6 +933,7 @@ static int __devinit raide_probe(struct platform_device *ofdev)
 	dma_dev = &repriv->dma_dev;
 	dma_dev->dev = dev;
 	INIT_LIST_HEAD(&dma_dev->channels);
+	dma_set_mask(dev, DMA_BIT_MASK(40));
 
 	dma_dev->device_alloc_chan_resources = re_jr_alloc_chan_resources;
 	dma_dev->device_tx_status = re_jr_tx_status;
