@@ -17,12 +17,16 @@
 /* Freescale Book E Performance Monitor APU Registers */
 #define PMRN_PMC0	0x010	/* Performance Monitor Counter 0 */
 #define PMRN_PMC1	0x011	/* Performance Monitor Counter 1 */
-#define PMRN_PMC2	0x012	/* Performance Monitor Counter 1 */
-#define PMRN_PMC3	0x013	/* Performance Monitor Counter 1 */
+#define PMRN_PMC2	0x012	/* Performance Monitor Counter 2 */
+#define PMRN_PMC3	0x013	/* Performance Monitor Counter 3 */
+#define PMRN_PMC4	0x014	/* Performance Monitor Counter 4 */
+#define PMRN_PMC5	0x015	/* Performance Monitor Counter 5 */
 #define PMRN_PMLCA0	0x090	/* PM Local Control A0 */
 #define PMRN_PMLCA1	0x091	/* PM Local Control A1 */
 #define PMRN_PMLCA2	0x092	/* PM Local Control A2 */
 #define PMRN_PMLCA3	0x093	/* PM Local Control A3 */
+#define PMRN_PMLCA4	0x094	/* PM Local Control A4 */
+#define PMRN_PMLCA5	0x095	/* PM Local Control A5 */
 
 #define PMLCA_FC	0x80000000	/* Freeze Counter */
 #define PMLCA_FCS	0x40000000	/* Freeze in Supervisor */
@@ -30,14 +34,18 @@
 #define PMLCA_FCM1	0x10000000	/* Freeze when PMM==1 */
 #define PMLCA_FCM0	0x08000000	/* Freeze when PMM==0 */
 #define PMLCA_CE	0x04000000	/* Condition Enable */
+#define PMLCA_FCGS1	0x00000002	/* Freeze in guest state */
+#define PMLCA_FCGS0	0x00000001	/* Freeze in hypervisor state */
 
-#define PMLCA_EVENT_MASK 0x00ff0000	/* Event field */
+#define PMLCA_EVENT_MASK 0x01ff0000	/* Event field */
 #define PMLCA_EVENT_SHIFT	16
 
 #define PMRN_PMLCB0	0x110	/* PM Local Control B0 */
 #define PMRN_PMLCB1	0x111	/* PM Local Control B1 */
 #define PMRN_PMLCB2	0x112	/* PM Local Control B2 */
 #define PMRN_PMLCB3	0x113	/* PM Local Control B3 */
+#define PMRN_PMLCB4	0x114	/* PM Local Control B4 */
+#define PMRN_PMLCB5	0x115	/* PM Local Control B5 */
 
 #define PMLCB_THRESHMUL_MASK	0x0700	/* Threshold Multiple Field */
 #define PMLCB_THRESHMUL_SHIFT	8
