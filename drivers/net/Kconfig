@@ -3119,6 +3119,16 @@ choice DPA_ETH_WQ_ASSIGN
 		  Rx Error and Tx Error FQs go to WQ2.
 endchoice
 
+config DPAA_ETH_USE_NDO_SELECT_QUEUE
+	bool "Use driver's Tx queue selection mechanism"
+	default y
+	---help---
+	  The DPAA-Ethernet driver defines a ndo_select_queue() callback for optimal selection
+	  of the egress FQ. That will override the XPS support for this netdevice.
+	  If for whatever reason you want to be in control of the egress FQ-to-CPU selection and mapping,
+	  or simply don't want to use the driver's ndo_select_queue() callback, then unselect this
+	  and use the standard XPS support instead.
+
 config DPAA_ETH_UNIT_TESTS
 	bool "Run Unit Tests for DPAA Ethernet"
 	depends on DPA
