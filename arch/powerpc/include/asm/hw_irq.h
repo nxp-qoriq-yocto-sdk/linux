@@ -23,19 +23,22 @@ extern void machine_check_exception(struct pt_regs *regs);
 #ifdef CONFIG_FSL_ERRATUM_A_006198
 static inline void __hard_irq_disable(void)
 {
+	void fsl_erratum_a006198_return(void);
 	unsigned long tmp;
 
-	asm volatile("ld %0, 1f@got(2);"
+	asm volatile("bl 2f;"
+		     "2: mflr %0;"
+		     "addi %0, %0, 1f-2b;"
 		     "mtlr %0;"
-		     "ld %0, .fsl_erratum_a006198_return@got(2);"
-		     "mtspr %1, %0;"
+		     "mtspr %1, %4;"
 		     "mfmsr %0;"
 		     "rlwinm %0, %0, 0, ~%3;"
 		     "mtspr %2, %0;"
 		     "rfmci;"
 		     "1: mtmsr %0" : "=&r" (tmp) :
 		     "i" (SPRN_MCSRR0), "i" (SPRN_MCSRR1),
-		     "i" (MSR_EE) : "memory", "lr");
+		     "i" (MSR_EE), "r" (*(u64 *)fsl_erratum_a006198_return) :
+		     "memory", "lr");
 }
 #else
 #define __hard_irq_disable()	asm volatile("wrteei 0" : : : "memory");
@@ -110,17 +113,20 @@ static inline void arch_local_irq_restore(unsigned long flags)
 {
 #if defined(CONFIG_BOOKE)
 #ifdef CONFIG_FSL_ERRATUM_A_006198
+	void fsl_erratum_a006198_return(void);
 	unsigned long tmp;
 
-	asm volatile("ld %0, 1f@got(2);"
+	asm volatile("bl 2f;"
+		     "2: mflr %0;"
+		     "addi %0, %0, 1f-2b;"
 		     "mtlr %0;"
-		     "ld %0, .fsl_erratum_a006198_return@got(2);"
 		     "mtspr %1, %3;"
-		     "mtspr %2, %0;"
+		     "mtspr %2, %4;"
 		     "rfmci;"
 		     "1: mtmsr %3" : "=&r" (tmp) :
 		     "i" (SPRN_MCSRR1), "i" (SPRN_MCSRR0),
-		     "r" (flags) : "memory", "lr");
+		     "r" (flags), "r" (*(u64 *)fsl_erratum_a006198_return) :
+		     "memory", "lr");
 #else
 	asm volatile("wrtee %0" : : "r" (flags) : "memory");
 #endif
