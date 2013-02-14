@@ -1,8 +1,9 @@
 The FMan driver
 Sysfs file description
 
-Author: Andrei Sorin Pistirica <sorin.pistirica@freescale.com>
-Updated: 2010-12-08
+Author: Andrei Sorin Pistirica
+Created: 2010-12-08
+Updated: 2012-08-14 by Stefan Szabo <szbs001@freescale.com>
 
 FMAN SYSFS statistics counters
 ------------------------------
@@ -25,7 +26,7 @@ port_dealloc_buf:FMBM_TBDC
     "counts the number of buffer deallocate operations."
 
 port_enq_total:FMQM_PnETFC
-    "counts the number of enqueue operations preformed for this portID."
+    "counts the number of enqueue operations performed for this portID."
 
 port_length_err:FMBM_TFLEDC
     "counts the number of frames that were discarded due to frame length error."
@@ -59,7 +60,7 @@ port_dealloc_buf:FMBM_RBDC
     "counts the number of buffer deallocate operations."
 
 port_enq_total:FMQM_PnETFC
-    "counts the number of enqueue operations preformed for this portID"
+    "counts the number of enqueue operations performed for this portID"
 
 port_rx_bad_frame:FMBM_RBFC
     "counts the number of frames received on the Rx port with an error
@@ -117,6 +118,10 @@ deq_1:FMQM_DC1
 
 deq_2:FMQM_DC2
     "counts the number of times the QMI got 2 FD from the QMan as a response
+     to a dequeue request (command)"
+
+deq_3:FMQM_DC3
+    "counts the number of times the QMI got 3 FD from the QMan as a response
      to a dequeue request (command)"
 
 deq_from_default:FMQM_DDCFQC
