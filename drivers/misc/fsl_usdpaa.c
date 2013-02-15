@@ -115,7 +115,7 @@ static const struct alloc_backend {
 		.id_type = usdpaa_id_ceetm0_channelid,
 		.alloc = qman_alloc_ceetm0_channel_range,
 		.release = qman_release_ceetm0_channel_range,
-		.acronym = "CEETM0_LFQID"
+		.acronym = "CEETM0_CHANNELID"
 	},
 	{
 		.id_type = usdpaa_id_ceetm1_lfqid,
@@ -127,7 +127,7 @@ static const struct alloc_backend {
 		.id_type = usdpaa_id_ceetm1_channelid,
 		.alloc = qman_alloc_ceetm1_channel_range,
 		.release = qman_release_ceetm1_channel_range,
-		.acronym = "CEETM1_LFQID"
+		.acronym = "CEETM1_CHANNELID"
 	},
 	{
 		/* This terminates the array */
