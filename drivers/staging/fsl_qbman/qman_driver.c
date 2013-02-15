@@ -184,7 +184,7 @@ static __init int fsl_ceetm_init(struct device_node *node)
 		qman_release_ceetm0_lfqid_range(range[0], range[1]);
 	if (dcp_portal == qm_dc_portal_fman1)
 		qman_release_ceetm1_lfqid_range(range[0], range[1]);
-	pr_info("Qman: The lfqid allocator of CEETM %d includes range"
+	pr_debug("Qman: The lfqid allocator of CEETM %d includes range"
 			" 0x%x:0x%x\n", dcp_portal, range[0], range[1]);
 
 	qman_ceetms[dcp_portal].idx = dcp_portal;
@@ -204,7 +204,7 @@ static __init int fsl_ceetm_init(struct device_node *node)
 	}
 
 	for (i = 0; i < range[1]; i++) {
-		sp = kmalloc(sizeof(*sp), GFP_KERNEL);
+		sp = kzalloc(sizeof(*sp), GFP_KERNEL);
 		if (!sp) {
 			pr_err("Can't alloc memory for sub-portal %d\n",
 							range[0] + i);
@@ -216,7 +216,7 @@ static __init int fsl_ceetm_init(struct device_node *node)
 		list_add_tail(&sp->node, &qman_ceetms[dcp_portal].sub_portals);
 		sp++;
 	}
-	pr_info("Qman: Reserve sub-portal %d:%d for CEETM %d\n",
+	pr_debug("Qman: Reserve sub-portal %d:%d for CEETM %d\n",
 					range[0], range[1], dcp_portal);
 	qman_ceetms[dcp_portal].sp_range[0] = range[0];
 	qman_ceetms[dcp_portal].sp_range[1] = range[1];
@@ -234,7 +234,7 @@ static __init int fsl_ceetm_init(struct device_node *node)
 	}
 
 	for (i = 0; i < range[1]; i++) {
-		lni = kmalloc(sizeof(*lni), GFP_KERNEL);
+		lni = kzalloc(sizeof(*lni), GFP_KERNEL);
 		if (!lni) {
 			pr_err("Can't alloc memory for LNI %d\n",
 							range[0] + i);
@@ -247,7 +247,7 @@ static __init int fsl_ceetm_init(struct device_node *node)
 		list_add_tail(&lni->node, &qman_ceetms[dcp_portal].lnis);
 		lni++;
 	}
-	pr_info("Qman: Reserve LNI %d:%d for CEETM %d\n",
+	pr_debug("Qman: Reserve LNI %d:%d for CEETM %d\n",
 					range[0], range[1], dcp_portal);
 	qman_ceetms[dcp_portal].lni_range[0] = range[0];
 	qman_ceetms[dcp_portal].lni_range[1] = range[1];
@@ -269,7 +269,7 @@ static __init int fsl_ceetm_init(struct device_node *node)
 		qman_release_ceetm0_channel_range(range[0], range[1]);
 	if (dcp_portal == qm_dc_portal_fman1)
 		qman_release_ceetm1_channel_range(range[0], range[1]);
-	pr_info("Qman: The channel allocator of CEETM %d includes"
+	pr_debug("Qman: The channel allocator of CEETM %d includes"
 			" range %d:%d\n", dcp_portal, range[0], range[1]);
 
 	/* Set CEETM PRES register */

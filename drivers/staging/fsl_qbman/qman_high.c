@@ -2307,7 +2307,7 @@ int qman_ceetm_configure_cq(struct qm_mcc_ceetm_cq_config *opts)
 	return 0;
 }
 
-int qman_ceetm_query_cq(struct qm_ceetm_cq *cq, u32 dcp_idx,
+int qman_ceetm_query_cq(unsigned int cqid, unsigned int dcpid,
 				struct qm_mcr_ceetm_cq_query *cq_query)
 {
 	struct qm_mc_command *mcc;
@@ -2320,8 +2320,8 @@ int qman_ceetm_query_cq(struct qm_ceetm_cq *cq, u32 dcp_idx,
 	PORTAL_IRQ_LOCK(p, irqflags);
 
 	mcc = qm_mc_start(&p->p);
-	mcc->cq_query.cqid = cq->idx;
-	mcc->cq_query.dcpid = cq->parent->dcp_idx;
+	mcc->cq_query.cqid = cqid;
+	mcc->cq_query.dcpid = dcpid;
 	qm_mc_commit(&p->p, QM_CEETM_VERB_CQ_QUERY);
 	while (!(mcr = qm_mc_result(&p->p)))
 		cpu_relax();
@@ -2608,7 +2608,7 @@ int qman_ceetm_cq_peek_pop_xsfdrread(struct qm_ceetm_cq *cq,
 	switch (command_type) {
 	case 0:
 	case 1:
-		mcc->cq_ppxr.cqid = cq->idx;
+		mcc->cq_ppxr.cqid = (cq->parent->idx << 4) | cq->idx;
 		break;
 	case 2:
 		mcc->cq_ppxr.xsfdr = xsfdr;
@@ -2800,7 +2800,7 @@ int qman_ceetm_sp_claim(struct qm_ceetm_sp **sp, enum qm_dc_portal dcp_idx,
 {
 	struct qm_ceetm_sp *p;
 
-	DPA_ASSERT((dcp_id ==  qm_dc_portal_fman0) ||
+	DPA_ASSERT((dcp_idx ==  qm_dc_portal_fman0) ||
 			(dcp_idx == qm_dc_portal_fman1));
 
 	if ((sp_idx < qman_ceetms[dcp_idx].sp_range[0]) ||
@@ -2832,9 +2832,10 @@ int qman_ceetm_sp_release(struct qm_ceetm_sp *sp)
 	}
 
 	list_for_each_entry(p, &qman_ceetms[sp->dcp_idx].sub_portals, node) {
-		if (p->idx == sp->idx)
+		if (p->idx == sp->idx) {
 			p->is_claimed = 0;
 			p->lni = NULL;
+		}
 	}
 	/* Disable CEETM mode of this sub-portal */
 	qman_sp_disable_ceetm_mode(sp->idx, sp->dcp_idx);
@@ -2871,26 +2872,31 @@ EXPORT_SYMBOL(qman_ceetm_lni_claim);
 int qman_ceetm_lni_release(struct qm_ceetm_lni *lni)
 {
 	struct qm_ceetm_lni *p;
+	struct qm_mcc_ceetm_mapping_shaper_tcfc_config config_opts;
 
 	if (!list_empty(&lni->channels)) {
 		pr_err("The LNI dependencies are not released!\n");
 		return -EBUSY;
 	}
 
-	lni->shaper_enable = 0;
-	lni->shaper_couple = 0;
-	lni->cr_token_rate.whole = 0;
-	lni->cr_token_rate.fraction = 0;
-	lni->er_token_rate.whole = 0;
-	lni->er_token_rate.fraction = 0;
-	lni->cr_token_bucket_limit = 0;
-	lni->er_token_bucket_limit = 0;
-	lni->is_claimed = 0;
 	list_for_each_entry(p, &qman_ceetms[lni->dcp_idx].lnis, node) {
-		if (p->idx == lni->idx)
+		if (p->idx == lni->idx) {
+			p->shaper_enable = 0;
+			p->shaper_couple = 0;
+			p->cr_token_rate.whole = 0;
+			p->cr_token_rate.fraction = 0;
+			p->er_token_rate.whole = 0;
+			p->er_token_rate.fraction = 0;
+			p->cr_token_bucket_limit = 0;
+			p->er_token_bucket_limit = 0;
 			p->is_claimed = 0;
+		}
 	}
-	return 0;
+	config_opts.cid = CEETM_COMMAND_LNI_SHAPER | lni->idx;
+	config_opts.dcpid = lni->dcp_idx;
+	memset(&config_opts.shaper_config, 0,
+				sizeof(config_opts.shaper_config));
+	return	qman_ceetm_configure_mapping_shaper_tcfc(&config_opts);
 }
 EXPORT_SYMBOL(qman_ceetm_lni_release);
 
@@ -2898,11 +2904,6 @@ int qman_ceetm_sp_set_lni(struct qm_ceetm_sp *sp, struct qm_ceetm_lni *lni)
 {
 	struct qm_mcc_ceetm_mapping_shaper_tcfc_config config_opts;
 
-	/*if (sp->lni->idx == lni->idx) {
-		pr_err("This SP <-> LNI mapping has been set\n");
-		return -EINVAL;
-	}
-	*/
 	config_opts.cid = CEETM_COMMAND_SP_MAPPING | sp->idx;
 	config_opts.dcpid = sp->dcp_idx;
 	config_opts.sp_mapping.map_lni_id = lni->idx;
@@ -2912,8 +2913,7 @@ int qman_ceetm_sp_set_lni(struct qm_ceetm_sp *sp, struct qm_ceetm_lni *lni)
 		return -EINVAL;
 
 	/* Enable CEETM mode for this sub-portal */
-	qman_sp_enable_ceetm_mode(sp->dcp_idx, sp->idx);
-	return 0;
+	return qman_sp_enable_ceetm_mode(sp->dcp_idx, sp->idx);
 }
 EXPORT_SYMBOL(qman_ceetm_sp_set_lni);
 
@@ -2934,7 +2934,8 @@ int qman_ceetm_sp_get_lni(struct qm_ceetm_sp *sp, unsigned int *lni_idx)
 }
 EXPORT_SYMBOL(qman_ceetm_sp_get_lni);
 
-int qman_ceetm_lni_enable_shaper(struct qm_ceetm_lni *lni, int coupled)
+int qman_ceetm_lni_enable_shaper(struct qm_ceetm_lni *lni, int coupled,
+								int oal)
 {
 	struct qm_mcc_ceetm_mapping_shaper_tcfc_config config_opts;
 
@@ -2948,38 +2949,26 @@ int qman_ceetm_lni_enable_shaper(struct qm_ceetm_lni *lni, int coupled)
 
 	config_opts.cid = CEETM_COMMAND_LNI_SHAPER | lni->idx;
 	config_opts.dcpid = lni->dcp_idx;
-	config_opts.shaper_config.cpl = (coupled << 7);
-				 /* | oal_value;  TBD - oal_value */
+	config_opts.shaper_config.cpl = (coupled << 7) | oal;
 	config_opts.shaper_config.crtcr = (lni->cr_token_rate.whole << 13) |
 			 lni->cr_token_rate.fraction;
 	config_opts.shaper_config.ertcr = (lni->er_token_rate.whole << 13) |
-			 lni->cr_token_rate.fraction;
+			 lni->er_token_rate.fraction;
 	config_opts.shaper_config.crtbl = lni->cr_token_bucket_limit;
 	config_opts.shaper_config.ertbl = lni->er_token_bucket_limit;
-	return	qman_ceetm_configure_mapping_shaper_tcfc(&config_opts);
+	return qman_ceetm_configure_mapping_shaper_tcfc(&config_opts);
 }
 EXPORT_SYMBOL(qman_ceetm_lni_enable_shaper);
 
 int qman_ceetm_lni_disable_shaper(struct qm_ceetm_lni *lni)
 {
-	struct qm_mcc_ceetm_mapping_shaper_tcfc_config config_opts;
-
 	if (!lni->shaper_enable) {
 		pr_err("The shaper has been disabled\n");
 		return -EINVAL;
 	}
 
 	lni->shaper_enable = 0;
-	lni->shaper_couple = 0;
-
-	config_opts.cid = CEETM_COMMAND_LNI_SHAPER | lni->idx;
-	config_opts.dcpid = lni->dcp_idx;
-	config_opts.shaper_config.cpl = 0; /* | oal_value;  TBD - oal_value */
-	config_opts.shaper_config.crtcr = 0;
-	config_opts.shaper_config.ertcr = 0;
-	config_opts.shaper_config.ertbl = 0;
-	config_opts.shaper_config.crtbl = 0;
-	return	qman_ceetm_configure_mapping_shaper_tcfc(&config_opts);
+	return 0;
 }
 EXPORT_SYMBOL(qman_ceetm_lni_disable_shaper);
 
@@ -3079,7 +3068,8 @@ int qman_ceetm_lni_set_excess_rate(struct qm_ceetm_lni *lni,
 	config_opts.shaper_config.cpl = query_result.shaper_query.cpl;
 	config_opts.shaper_config.crtcr = query_result.shaper_query.crtcr;
 	config_opts.shaper_config.crtbl = query_result.shaper_query.crtbl;
-	return	qman_ceetm_configure_mapping_shaper_tcfc(&config_opts);
+
+	return qman_ceetm_configure_mapping_shaper_tcfc(&config_opts);
 }
 EXPORT_SYMBOL(qman_ceetm_lni_set_excess_rate);
 
@@ -3116,7 +3106,6 @@ int qman_ceetm_lni_set_tcfcc(struct qm_ceetm_lni *lni,
 	struct qm_mcc_ceetm_mapping_shaper_tcfc_query query_opts;
 	struct qm_mcr_ceetm_mapping_shaper_tcfc_query query_result;
 	u64 lnitcfcc;
-	int ret;
 
 	if ((cq_level > 15) | (traffic_class > 7)) {
 		pr_err("The CQ or traffic class id is out of range\n");
@@ -3125,15 +3114,23 @@ int qman_ceetm_lni_set_tcfcc(struct qm_ceetm_lni *lni,
 
 	query_opts.cid = CEETM_COMMAND_TCFC | lni->idx;
 	query_opts.dcpid = lni->dcp_idx;
-	ret = qman_ceetm_query_mapping_shaper_tcfc(&query_opts, &query_result);
+	if (qman_ceetm_query_mapping_shaper_tcfc(&query_opts, &query_result)) {
+		pr_err("Fail to query tcfcc\n");
+		return -EINVAL;
+	}
 
 	lnitcfcc = query_result.tcfc_query.lnitcfcc;
-	if (traffic_class == -1) /* disable tcfc for this CQ */
-		lnitcfcc &= ~(1 >> (cq_level * 4));
-	else
-		lnitcfcc |=
-			((QMAN_CEETM_LNITCFCC_ENABLE | traffic_class) & 0xF) <<
-			QMAN_CEETM_LNITCFCC_CQ_LEVEL_SHIFT(cq_level);
+	if (traffic_class == -1) {
+		/* disable tcfc for this CQ */
+		lnitcfcc &= ~((u64)QMAN_CEETM_LNITCFCC_ENABLE <<
+				QMAN_CEETM_LNITCFCC_CQ_LEVEL_SHIFT(cq_level));
+	} else {
+		lnitcfcc &= ~((u64)0xF <<
+				QMAN_CEETM_LNITCFCC_CQ_LEVEL_SHIFT(cq_level));
+		lnitcfcc |= ((u64)(QMAN_CEETM_LNITCFCC_ENABLE |
+				traffic_class)) <<
+				QMAN_CEETM_LNITCFCC_CQ_LEVEL_SHIFT(cq_level);
+	}
 	config_opts.tcfc_config.lnitcfcc = lnitcfcc;
 	config_opts.cid = CEETM_COMMAND_TCFC | lni->idx;
 	config_opts.dcpid = lni->dcp_idx;
@@ -3141,14 +3138,14 @@ int qman_ceetm_lni_set_tcfcc(struct qm_ceetm_lni *lni,
 }
 EXPORT_SYMBOL(qman_ceetm_lni_set_tcfcc);
 
-#define QMAN_CEETM_LNITCFCC_TC_MASK 0x00000007
+#define QMAN_CEETM_LNITCFCC_TC_MASK 0x7
 int qman_ceetm_lni_get_tcfcc(struct qm_ceetm_lni *lni, unsigned int cq_level,
 						int *traffic_class)
 {
 	struct qm_mcc_ceetm_mapping_shaper_tcfc_query query_opts;
 	struct qm_mcr_ceetm_mapping_shaper_tcfc_query query_result;
 	int ret;
-	int lnitcfcc;
+	u8 lnitcfcc;
 
 	if (cq_level > 15) {
 		pr_err("the CQ level is out of range\n");
@@ -3160,9 +3157,9 @@ int qman_ceetm_lni_get_tcfcc(struct qm_ceetm_lni *lni, unsigned int cq_level,
 	ret = qman_ceetm_query_mapping_shaper_tcfc(&query_opts, &query_result);
 	if (ret)
 		return ret;
-	lnitcfcc = query_result.tcfc_query.lnitcfcc >>
-		QMAN_CEETM_LNITCFCC_CQ_LEVEL_SHIFT(cq_level);
-	if ((lnitcfcc & QMAN_CEETM_LNITCFCC_ENABLE) > 1)
+	lnitcfcc = (u8)(query_result.tcfc_query.lnitcfcc >>
+				QMAN_CEETM_LNITCFCC_CQ_LEVEL_SHIFT(cq_level));
+	if (lnitcfcc & QMAN_CEETM_LNITCFCC_ENABLE)
 		*traffic_class = lnitcfcc & QMAN_CEETM_LNITCFCC_TC_MASK;
 	else
 		*traffic_class = -1;
@@ -3189,11 +3186,9 @@ int qman_ceetm_channel_claim(struct qm_ceetm_channel **channel,
 		return -ENODEV;
 	}
 
-	p = kmalloc(sizeof(*p), GFP_KERNEL);
+	p = kzalloc(sizeof(*p), GFP_KERNEL);
 	p->idx = channel_idx;
 	p->dcp_idx = lni->dcp_idx;
-	p->shaper_enable = 0;
-	p->shaper_couple = 0;
 	list_add_tail(&p->node, &lni->channels);
 	INIT_LIST_HEAD(&p->class_queues);
 	INIT_LIST_HEAD(&p->ccgs);
@@ -3214,6 +3209,7 @@ EXPORT_SYMBOL(qman_ceetm_channel_claim);
 
 int qman_ceetm_channel_release(struct qm_ceetm_channel *channel)
 {
+	struct qm_mcc_ceetm_mapping_shaper_tcfc_config config_opts;
 	if (!list_empty(&channel->class_queues)) {
 		pr_err("CEETM channel#%d has class queue unreleased!\n",
 						channel->idx);
@@ -3224,12 +3220,23 @@ int qman_ceetm_channel_release(struct qm_ceetm_channel *channel)
 						channel->idx);
 		return -EBUSY;
 	}
+
+	config_opts.cid = CEETM_COMMAND_CHANNEL_SHAPER | channel->idx;
+	config_opts.dcpid = channel->dcp_idx;
+	memset(&config_opts.shaper_config, 0,
+				sizeof(config_opts.shaper_config));
+	if (qman_ceetm_configure_mapping_shaper_tcfc(&config_opts)) {
+		pr_err("Can't reset channel shapping parameters\n");
+		return -EINVAL;
+	}
+
 	if (channel->dcp_idx == qm_dc_portal_fman0)
 		qman_release_ceetm0_channelid(channel->idx);
 	if (channel->dcp_idx == qm_dc_portal_fman1)
 		qman_release_ceetm1_channelid(channel->idx);
 	list_del(&channel->node);
 	kfree(channel);
+
 	return 0;
 }
 EXPORT_SYMBOL(qman_ceetm_channel_release);
@@ -3272,11 +3279,13 @@ int qman_ceetm_channel_enable_shaper(struct qm_ceetm_channel *channel,
 
 	config_opts.cid = CEETM_COMMAND_CHANNEL_SHAPER | channel->idx;
 	config_opts.shaper_config.cpl = coupled << 7;
-	if (qman_ceetm_configure_mapping_shaper_tcfc(&config_opts)) {
-		pr_err("Can't set coupled for channel #%d\n", channel->idx);
-		return -EINVAL;
-	}
-	return 0;
+	config_opts.shaper_config.crtcr = (channel->cr_token_rate.whole << 13) |
+					channel->cr_token_rate.fraction;
+	config_opts.shaper_config.ertcr = (channel->er_token_rate.whole << 13) |
+					channel->er_token_rate.fraction;
+	config_opts.shaper_config.crtbl = channel->cr_token_bucket_limit;
+	config_opts.shaper_config.ertbl = channel->er_token_bucket_limit;
+	return qman_ceetm_configure_mapping_shaper_tcfc(&config_opts);
 }
 EXPORT_SYMBOL(qman_ceetm_channel_enable_shaper);
 
@@ -3344,7 +3353,7 @@ int qman_ceetm_channel_set_commit_rate(struct qm_ceetm_channel *channel,
 	config_opts.shaper_config.cpl = query_result.shaper_query.cpl;
 	config_opts.shaper_config.ertcr = query_result.shaper_query.ertcr;
 	config_opts.shaper_config.ertbl = query_result.shaper_query.ertbl;
-	return	qman_ceetm_configure_mapping_shaper_tcfc(&config_opts);
+	return qman_ceetm_configure_mapping_shaper_tcfc(&config_opts);
 }
 EXPORT_SYMBOL(qman_ceetm_channel_set_commit_rate);
 
@@ -3405,7 +3414,7 @@ int qman_ceetm_channel_set_excess_rate(struct qm_ceetm_channel *channel,
 	config_opts.shaper_config.cpl = query_result.shaper_query.cpl;
 	config_opts.shaper_config.crtcr = query_result.shaper_query.crtcr;
 	config_opts.shaper_config.crtbl = query_result.shaper_query.crtbl;
-	return	qman_ceetm_configure_mapping_shaper_tcfc(&config_opts);
+	return qman_ceetm_configure_mapping_shaper_tcfc(&config_opts);
 }
 EXPORT_SYMBOL(qman_ceetm_channel_set_excess_rate);
 
@@ -3939,7 +3948,7 @@ int qman_ceetm_lfq_release(struct qm_ceetm_lfq *lfq)
 {
 	if (lfq->parent->dcp_idx == qm_dc_portal_fman0)
 		qman_release_ceetm0_lfqid(lfq->idx);
-	if (lfq->parent->dcp_idx == qm_dc_portal_fman0)
+	if (lfq->parent->dcp_idx == qm_dc_portal_fman1)
 		qman_release_ceetm1_lfqid(lfq->idx);
 	list_del(&lfq->node);
 	kfree(lfq);

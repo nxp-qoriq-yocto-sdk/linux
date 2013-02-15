@@ -2568,6 +2568,8 @@ int qman_ceetm_sp_get_lni(struct qm_ceetm_sp *sp,
  * qman_ceetm_lni_disable_shaper - Enables/disables shaping on the LNI.
  * @lni: the given LNI.
  * @coupled: indicates whether CR and ER are coupled.
+ * @oal: the overhead accounting length which is added to the actual length of
+ * each frame when performing shaper calculations.
  *
  * When the number of (unused) committed-rate tokens reach the committed-rate
  * token limit, 'coupled' indicates whether surplus tokens should be added to
@@ -2587,7 +2589,8 @@ int qman_ceetm_sp_get_lni(struct qm_ceetm_sp *sp,
  * a) -EINVAL if the shaper is has already disabled.
  * b) -EIO if calling configure shaper command returns error.
  */
-int qman_ceetm_lni_enable_shaper(struct qm_ceetm_lni *lni, int coupled);
+int qman_ceetm_lni_enable_shaper(struct qm_ceetm_lni *lni, int coupled,
+								int oal);
 int qman_ceetm_lni_disable_shaper(struct qm_ceetm_lni *lni);
 
 /**
