@@ -3079,6 +3079,7 @@ choice DPAA_ETH_OPTIMIZE
 
 	config DPAA_ETH_OPTIMIZE_FOR_IPFWD
 		bool "Optimize for forwarding"
+		select DPA_TX_RECYCLE if FMAN_T4240
 		help
 		  Optimize the DPAA-Ethernet driver for IP/IPSec forwarding use-cases.
 
@@ -3091,6 +3092,10 @@ choice DPAA_ETH_OPTIMIZE
 		  in the driver, which is momentarily not accessible otherwise.
 
 endchoice
+
+config DPA_TX_RECYCLE
+	bool
+	depends on FMAN_T4240
 
 config FSL_DPA_1588
 	tristate "IEEE 1588-compliant timestamping"
