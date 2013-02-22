@@ -1693,11 +1693,6 @@ typedef struct ioc_fm_pcd_manip_frag_ip_params_t {
     ioc_fm_pcd_manip_dont_frag_action  dont_frag_action;    /**< Dont Fragment Action - If an IP packet is larger
                                                                  than MTU and its DF bit is set, then this field will
                                                                  determine the action to be taken.*/
-#ifdef FM_EXP_FEATURES
-    bool                        options_counter_en;         /**< If TRUE, A counter is incremented each time an IPv4 frame with IPv4 Options
-                                                                 is encountered and the COPIED flag on one of the options is cleared.
-                                                                 The counter is located on the port page */
-#endif /* FM_EXP_FEATURES */
 } ioc_fm_pcd_manip_frag_ip_params_t;
 
 /**************************************************************************//**
