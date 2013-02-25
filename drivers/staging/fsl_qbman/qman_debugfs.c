@@ -1184,14 +1184,13 @@ static int query_cq_fields_show(struct seq_file *file, void *offset)
 {
 	int ret;
 	struct qm_mcr_ceetm_cq_query query_result;
-	struct qm_ceetm_cq cq;
+	unsigned int cqid;
 
-	cq.idx = query_cq_fields_data.cqid;
-	ret = qman_ceetm_query_cq(&cq, 0,  &query_result);
+	cqid = query_cq_fields_data.cqid;
+	ret = qman_ceetm_query_cq(cqid, 0,  &query_result);
 	if (ret)
 		return ret;
-	seq_printf(file, "Query CQ Fields Result cqid 0x%x\n",
-			cq.idx);
+	seq_printf(file, "Query CQ Fields Result cqid 0x%x\n", cqid);
 	seq_printf(file, " ccgid: %u\n", query_result.ccgid);
 	seq_printf(file, " state: %u\n", query_result.state);
 	seq_printf(file, " pfdr_hptr: %u\n", query_result.pfdr_hptr);
