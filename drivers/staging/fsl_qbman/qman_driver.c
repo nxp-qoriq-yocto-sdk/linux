@@ -36,7 +36,7 @@
  * where CCSR isn't available) */
 u16 qman_ip_rev;
 EXPORT_SYMBOL(qman_ip_rev);
-u16 qm_channel_pool1;
+u16 qm_channel_pool1 = QMAN_CHANNEL_POOL1;
 EXPORT_SYMBOL(qm_channel_pool1);
 u16 qm_channel_caam = QMAN_CHANNEL_CAAM;
 EXPORT_SYMBOL(qm_channel_caam);
@@ -99,7 +99,6 @@ static __init int fsl_pool_channel_range_sdqcr(struct device_node *node)
 		pr_err(STR_ERR_CELL, STR_POOL_CHAN_RANGE, 1, node->full_name);
 		return -EINVAL;
 	}
-	qm_channel_pool1 = chanid[0];
 	for (ret = 0; ret < chanid[1]; ret++)
 		pools_sdqcr |= QM_SDQCR_CHANNELS_POOL_CONV(chanid[0] + ret);
 	return 0;
@@ -119,7 +118,6 @@ static __init int fsl_pool_channel_range_init(struct device_node *node)
 		return -EINVAL;
 	}
 	qman_release_pool_range(chanid[0], chanid[1]);
-	qm_channel_pool1 = chanid[0];
 	pr_info("Qman: pool channel allocator includes range %d:%d\n",
 		chanid[0], chanid[1]);
 	return 0;
@@ -279,6 +277,63 @@ static __init int fsl_ceetm_init(struct device_node *node)
 	return 0;
 }
 
+void qman_get_ip_revision(struct device_node *dn)
+{
+	u16 ip_rev = 0;
+	for_each_compatible_node(dn, NULL, "fsl,qman-portal") {
+		if (!of_device_is_available(dn))
+			continue;
+		if (of_device_is_compatible(dn, "fsl,qman-portal-1.0") ||
+			of_device_is_compatible(dn, "fsl,qman-portal-1.0.0")) {
+			ip_rev = QMAN_REV10;
+			qman_portal_max = 10;
+		} else if (of_device_is_compatible(dn, "fsl,qman-portal-1.1") ||
+			of_device_is_compatible(dn, "fsl,qman-portal-1.1.0")) {
+			ip_rev = QMAN_REV11;
+			qman_portal_max = 10;
+		} else if (of_device_is_compatible(dn, "fsl,qman-portal-1.2") ||
+			of_device_is_compatible(dn, "fsl,qman-portal-1.2.0")) {
+			ip_rev = QMAN_REV12;
+			qman_portal_max = 10;
+		} else if (of_device_is_compatible(dn, "fsl,qman-portal-2.0") ||
+			of_device_is_compatible(dn, "fsl,qman-portal-2.0.0")) {
+			ip_rev = QMAN_REV20;
+			qman_portal_max = 3;
+		} else if (of_device_is_compatible(dn,
+						"fsl,qman-portal-3.0.0")) {
+			ip_rev = QMAN_REV30;
+			qman_portal_max = 50;
+		} else if (of_device_is_compatible(dn,
+						"fsl,qman-portal-3.0.1")) {
+			ip_rev = QMAN_REV30;
+			qman_portal_max = 25;
+		} else if (of_device_is_compatible(dn,
+						"fsl,qman-portal-3.0.2")) {
+			ip_rev = QMAN_REV30;
+			qman_portal_max = 10;
+		} else if (of_device_is_compatible(dn,
+						"fsl,qman-portal-3.0.3")) {
+			ip_rev = QMAN_REV30;
+			qman_portal_max = 18;
+		}
+
+		if (!qman_ip_rev) {
+			if (ip_rev) {
+				qman_ip_rev = ip_rev;
+			} else {
+				pr_warning("unknown Qman version,"
+					" default to rev1.1\n");
+				qman_ip_rev = QMAN_REV11;
+			}
+		} else if (ip_rev && (qman_ip_rev != ip_rev))
+			pr_warning("Revision=0x%04x, but portal '%s' has"
+							" 0x%04x\n",
+			qman_ip_rev, dn->full_name, ip_rev);
+		if (qman_ip_rev == ip_rev)
+			break;
+	}
+}
+
 /* Parse a portal node, perform generic mapping duties and return the config. It
  * is not known at this stage for what purpose (or even if) the portal will be
  * used. */
@@ -287,59 +342,11 @@ static struct qm_portal_config * __init parse_pcfg(struct device_node *node)
 	struct qm_portal_config *pcfg;
 	const u32 *index, *channel;
 	int irq, ret;
-	u16 ip_rev = 0;
 
 	pcfg = kmalloc(sizeof(*pcfg), GFP_KERNEL);
 	if (!pcfg) {
 		pr_err("can't allocate portal config");
 		return NULL;
-	}
-
-	if (of_device_is_compatible(node, "fsl,qman-portal-1.0") ||
-		of_device_is_compatible(node, "fsl,qman-portal-1.0.0")) {
-		ip_rev = QMAN_REV10;
-		qman_portal_max = 10;
-	} else if (of_device_is_compatible(node, "fsl,qman-portal-1.1") ||
-		of_device_is_compatible(node, "fsl,qman-portal-1.1.0")) {
-		ip_rev = QMAN_REV11;
-		qman_portal_max = 10;
-	} else if (of_device_is_compatible(node, "fsl,qman-portal-1.2") ||
-		of_device_is_compatible(node, "fsl,qman-portal-1.2.0")) {
-		ip_rev = QMAN_REV12;
-		qman_portal_max = 10;
-	} else if (of_device_is_compatible(node, "fsl,qman-portal-2.0") ||
-		of_device_is_compatible(node, "fsl,qman-portal-2.0.0")) {
-		ip_rev = QMAN_REV20;
-		qman_portal_max = 3;
-	} else if (of_device_is_compatible(node, "fsl,qman-portal-3.0.0")) {
-		ip_rev = QMAN_REV30;
-		qman_portal_max = 50;
-	} else if (of_device_is_compatible(node, "fsl,qman-portal-3.0.1")) {
-		ip_rev = QMAN_REV30;
-		qman_portal_max = 25;
-	} else if (of_device_is_compatible(node, "fsl,qman-portal-3.0.2")) {
-		ip_rev = QMAN_REV30;
-		qman_portal_max = 10;
-	} else if (of_device_is_compatible(node, "fsl,qman-portal-3.0.3")) {
-		ip_rev = QMAN_REV30;
-		qman_portal_max = 18;
-	}
-
-	if (!qman_ip_rev) {
-		if (ip_rev)
-			qman_ip_rev = ip_rev;
-		else {
-			pr_warning("unknown Qman version, default to rev1.1\n");
-			qman_ip_rev = QMAN_REV11;
-		}
-	} else if (ip_rev && (qman_ip_rev != ip_rev))
-		pr_warning("Revision=0x%04x, but portal '%s' has 0x%04x\n",
-			qman_ip_rev, node->full_name, ip_rev);
-
-	if ((qman_ip_rev & 0xff00) >= QMAN_REV30)
-	{
-		qm_channel_caam = QMAN_CHANNEL_CAAM_REV3;;
-		qm_channel_pme = QMAN_CHANNEL_PME_REV3;
 	}
 
 	ret = of_address_to_resource(node, DPA_PORTAL_CE,
@@ -602,6 +609,14 @@ static __init int qman_init(void)
 	if (ret)
 		return ret;
 #endif
+
+	/* Get qman ip revision */
+	qman_get_ip_revision(dn);
+	if ((qman_ip_rev & 0xff00) >= QMAN_REV30) {
+		qm_channel_pool1 = QMAN_CHANNEL_POOL1_REV3;
+		qm_channel_caam = QMAN_CHANNEL_CAAM_REV3;
+		qm_channel_pme = QMAN_CHANNEL_PME_REV3;
+	}
 
 	/* Parse pool channels into the SDQCR mask. (Must happen before portals
 	 * are initialised.) */
