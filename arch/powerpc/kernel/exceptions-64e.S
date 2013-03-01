@@ -1379,12 +1379,8 @@ _GLOBAL(__setup_base_ivors)
 	blr
 
 _GLOBAL(setup_altivec_ivors)
-#ifdef CONFIG_ALTIVEC
-BEGIN_FTR_SECTION
 	SET_IVOR(32, 0x200) /* AltiVec Unavailable */
 	SET_IVOR(33, 0x220) /* AltiVec Assist */
-END_FTR_SECTION_IFSET(CPU_FTR_ALTIVEC)
-#endif
 	blr
 
 _GLOBAL(setup_perfmon_ivor)
