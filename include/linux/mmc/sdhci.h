@@ -97,6 +97,8 @@ struct sdhci_host {
  * circuit has capability to support 3.3V
  */
 #define SDHCI_QUIRK_QORIQ_CIRCUIT_SUPPORT_VS33		(0x400000000U)
+/* Controller need long time to generate command complete interrupt */
+#define SDHCI_QUIRK_LONG_TIME_CMD_COMPLETE_IRQ		(0x800000000U)
 
 	int irq;		/* Device IRQ */
 	void __iomem *ioaddr;	/* Mapped address */

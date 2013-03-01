@@ -197,6 +197,7 @@ static int __devinit sdhci_of_probe(struct platform_device *ofdev)
 	if (of_device_is_compatible(np, "fsl,t4240-esdhc")) {
 		host->quirks |= SDHCI_QUIRK_BROKEN_ADMA;
 		host->quirks |= SDHCI_QUIRK_QORIQ_CIRCUIT_SUPPORT_VS33;
+		host->quirks |= SDHCI_QUIRK_LONG_TIME_CMD_COMPLETE_IRQ;
 	}
 
 	clk = of_get_property(np, "clock-frequency", &size);

@@ -950,6 +950,7 @@ static void sdhci_send_command(struct sdhci_host *host, struct mmc_command *cmd)
 	int flags;
 	u32 mask;
 	unsigned long timeout;
+	int timer = 10;
 
 	WARN_ON(host->cmd);
 
@@ -978,7 +979,13 @@ static void sdhci_send_command(struct sdhci_host *host, struct mmc_command *cmd)
 		mmc_delay(1);
 	}
 
-	mod_timer(&host->timer, jiffies + 10 * HZ);
+	/* In case some controller need long time to generate command
+	 * interrupt, 1000 * HZ will be enough.
+	 */
+	if (host->quirks & SDHCI_QUIRK_LONG_TIME_CMD_COMPLETE_IRQ)
+		timer = 1000;
+
+	mod_timer(&host->timer, jiffies + timer * HZ);
 
 	host->cmd = cmd;
 
