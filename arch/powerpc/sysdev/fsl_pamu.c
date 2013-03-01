@@ -600,7 +600,7 @@ static void __init setup_omt(struct ome *omt)
 	/* Configure OMI_FMAN */
 	ome = &omt[OMI_FMAN];
 	ome->moe[IOE_READ_IDX]  = EOE_VALID | EOE_READI;
-	ome->moe[IOE_WRITE_IDX] = EOE_VALID | EOE_WRITE;
+	ome->moe[IOE_WRITE_IDX] = EOE_VALID | EOE_WWSA;
 
 	/* Configure OMI_QMAN private */
 	ome = &omt[OMI_QMAN_PRIV];
@@ -689,6 +689,30 @@ static u32 __init get_stash_id(unsigned int stash_dest_hint,
 	return ~(u32)0;
 }
 
+#ifdef CONFIG_FSL_FMAN_CPC_STASH
+static void __init enable_fman_io_stashing(struct device_node *dn)
+{
+	const u32 *prop;
+	struct ppaace *ppaace;
+	u32 cache_id;
+
+	prop = of_get_property(dn, "fsl,liodn", NULL);
+	if (prop) {
+		ppaace = &ppaact[*prop];
+		ppaace->otm = PAACE_OTM_INDEXED;
+		ppaace->domain_attr.to_host.coherency_required = 1;
+		ppaace->op_encode.index_ot.omi = OMI_FMAN;
+		cache_id = get_stash_id(3, NULL);
+		pr_debug("%s cache_stash_id = %d\n", dn->full_name, cache_id);
+		if (~cache_id != 0)
+			ppaace->impl_attr.cid = cache_id;
+	} else {
+		pr_err("fsl-pamu: missing fsl,liodn property in %s\n",
+			dn->full_name);
+	}
+}
+#endif
+
 static void __init setup_liodns(void)
 {
 	int i, len;
@@ -698,6 +722,9 @@ static void __init setup_liodns(void)
 	struct device_node *bman_dn;
 	const u32 *prop;
 	u32 cache_id, prop_cnt;
+#ifdef CONFIG_FSL_FMAN_CPC_STASH
+	struct device_node *port_dn;
+#endif
 
 	for (i = 0; i < PAACE_NUMBER_ENTRIES; i++) {
 		ppaace = &ppaact[i];
@@ -764,6 +791,15 @@ static void __init setup_liodns(void)
 		of_node_put(qman_dn);
 	}
 
+#ifdef CONFIG_FSL_FMAN_CPC_STASH
+	port_dn = NULL;
+	for_each_compatible_node(port_dn, NULL, "fsl,fman-port-10g-rx")
+		enable_fman_io_stashing(port_dn);
+
+	port_dn = NULL;
+	for_each_compatible_node(port_dn, NULL, "fsl,fman-port-1g-rx")
+		enable_fman_io_stashing(port_dn);
+#endif
 	/*
 	 * For liodn used by BMAN for its private memory accesses,
 	 * turn the 'coherency required' off. This saves snoops to cores.
