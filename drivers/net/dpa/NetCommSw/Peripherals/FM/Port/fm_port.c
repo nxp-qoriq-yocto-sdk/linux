@@ -2690,6 +2690,8 @@ t_Error FM_PORT_Init(t_Handle h_FmPort)
            (p_FmPort->portType == e_FM_PORT_TYPE_RX))
     {
         p_FmPort->p_FmPortDriverParam->errorsToDiscard |= FM_PORT_FRM_ERR_PHYSICAL;
+	if (!p_FmPort->fifoBufs.num)
+	    p_FmPort->fifoBufs.num = 50 * BMI_FIFO_UNITS;
         p_FmPort->fifoBufs.num += 4*KILOBYTE;
     }
 #endif /* FM_HEAVY_TRAFFIC_HANG_ERRATA_FMAN_A005669 */
