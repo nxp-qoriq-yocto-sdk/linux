@@ -41,6 +41,7 @@
 
 	aliases {
 		ccsr = &soc;
+		dcsr = &dcsr;
 
 		serial0 = &serial0;
 		serial1 = &serial1;
@@ -68,12 +69,12 @@
 		#address-cells = <1>;
 		#size-cells = <0>;
 
-		PowerPC,e6500@0 {
+		cpu0: PowerPC,e6500@0 {
 			device_type = "cpu";
 			reg = <0 1>;
 			next-level-cache = <&L2>;
 		};
-		PowerPC,e6500@1 {
+		cpu1: PowerPC,e6500@1 {
 			device_type = "cpu";
 			reg = <2 3>;
 			next-level-cache = <&L2>;
