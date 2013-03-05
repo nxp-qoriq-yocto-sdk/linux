@@ -1107,6 +1107,11 @@ static int ehci_hub_control (
 				ehci->reset_done [wIndex] = jiffies
 						+ msecs_to_jiffies (50);
 			}
+
+			/* Force full-speed connect; disable HS Chirp */
+			if (ehci_has_fsl_hs_errata(ehci))
+				temp |= (1 << 24); /* set PFSC bit */
+
 			ehci_writel(ehci, temp, status_reg);
 			break;
 

@@ -16,6 +16,7 @@
 #include <linux/io.h>
 #include <linux/of_platform.h>
 #include <linux/clk.h>
+#include <asm/mpc85xx.h>
 
 struct fsl_usb2_dev_data {
 	char *dr_mode;		/* controller mode */
@@ -119,6 +120,33 @@ error:
 
 static const struct of_device_id fsl_usb2_mph_dr_of_match[];
 
+#ifndef CONFIG_USB_FSL_OVERRIDE_A_005275
+static int check_soc_ver(struct device_node *node)
+{
+	unsigned int svr = mfspr(SPRN_SVR);
+	int flag = 0;
+
+	/* Deal with USB Erratum USB A-005275
+	 * Packet corruption in HS mode, default to
+	 * FS mode for the following
+	 * P3041 and P2041 rev 1.0 and 1.1
+	 * P5020 and P5010 rev 1.0 and 2.0
+	 * P5040 and P1010 rev 1.0
+	 */
+	if ((fsl_svr_is(SVR_P3041)) || (fsl_svr_is(SVR_P3041_E)) ||
+		(fsl_svr_is(SVR_P2041)) || (fsl_svr_is(SVR_P2041_E)))
+		 flag = (IS_SVR_REV(svr, 1, 0)) || (IS_SVR_REV(svr, 1, 1));
+	else if ((fsl_svr_is(SVR_P5020)) || (fsl_svr_is(SVR_P5020_E)) ||
+			(fsl_svr_is(SVR_P5010)) || (fsl_svr_is(SVR_P5010_E)))
+		flag = (IS_SVR_REV(svr, 1, 0)) || (IS_SVR_REV(svr, 2, 0));
+	else if ((fsl_svr_is(SVR_P5040)) || (fsl_svr_is(SVR_P5040_E)) ||
+			(fsl_svr_is(SVR_P1010)) || (fsl_svr_is(SVR_P1010_E)))
+		flag = IS_SVR_REV(svr, 1, 0);
+
+	return flag;
+}
+#endif
+
 static int usb_get_ver_info(struct device_node *np)
 {
 	int ver = -1;
@@ -204,6 +232,11 @@ static int __devinit fsl_usb2_mph_dr_of_probe(struct platform_device *ofdev)
 	prop = of_get_property(np, "phy_type", NULL);
 	pdata->phy_mode = determine_usb_phy(prop);
 	pdata->controller_ver = usb_get_ver_info(np);
+
+#ifndef CONFIG_USB_FSL_OVERRIDE_A_005275
+	if (check_soc_ver(np))
+		pdata->force_fs_mode = 1;
+#endif
 
 	if (pdata->have_sysif_regs) {
 		if (pdata->controller_ver < 0) {

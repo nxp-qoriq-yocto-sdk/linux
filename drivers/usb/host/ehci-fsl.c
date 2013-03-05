@@ -224,7 +224,7 @@ static int ehci_fsl_setup_phy(struct usb_hcd *hcd,
 
 	if (pdata->controller_ver < 0) {
 		dev_warn(hcd->self.controller, "Could not get controller version\n");
-		return;
+		return -ENODEV;
 	}
 
 	portsc = ehci_readl(ehci, &ehci->regs->port_status[port_offset]);
@@ -304,6 +304,14 @@ static int ehci_fsl_usb_setup(struct ehci_hcd *ehci)
 		/* SNOOP2 starts from 0x80000000, size 2G */
 		out_be32(non_ehci + FSL_SOC_USB_SNOOP2, 0x80000000 | SNOOP_SIZE_2GB);
 	}
+
+	/* Deal with USB Erratum USB A-005275
+	 * Packet corruption in HS mode
+	 */
+#ifndef CONFIG_USB_FSL_OVERRIDE_A_005275
+	if (pdata->force_fs_mode == 1)
+		ehci->has_fsl_hs_errata = 1;
+#endif
 
 	if ((pdata->operating_mode == FSL_USB2_DR_HOST) ||
 			(pdata->operating_mode == FSL_USB2_DR_OTG))

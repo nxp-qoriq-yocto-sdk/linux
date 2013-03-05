@@ -919,7 +919,11 @@ qh_make (
 		break;
 
 	case USB_SPEED_HIGH:		/* no TT involved */
-		info1 |= (2 << 12);	/* EPS "high" */
+		if (!ehci_has_fsl_hs_errata(ehci))
+			info1 |= (2 << 12);	/* EPS "high" */
+		else
+			info1 |= (0 << 12);	/* EPS "full speed" */
+
 		if (type == PIPE_CONTROL) {
 			info1 |= (EHCI_TUNE_RL_HS << 28);
 			info1 |= 64 << 16;	/* usb2 fixed maxpacket */

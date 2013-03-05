@@ -93,6 +93,8 @@ struct fsl_usb2_platform_data {
 	unsigned	suspended:1;
 	unsigned	already_suspended:1;
 
+	unsigned	force_fs_mode:1;
+
 	/* register save area for suspend/resume */
 	u32		pm_command;
 	u32		pm_status;
