@@ -774,17 +774,14 @@ static inline int __prep_scan(__maybe_unused struct pme_ctx *ctx,
 	token->cmd_type = pme_cmd_scan;
 	pme_fd_cmd_scan(fd, args);
 #ifdef CONFIG_FSL_PME_BUG_4K_SCAN_REV_2_1_4
-	pr_info("max_scan_size %d\n", ctx->max_scan_size);
 	if (ctx->max_scan_size) {
 		if (fd->format == qm_fd_contig || fd->format == qm_fd_sg) {
 			if (fd->length20 > ctx->max_scan_size) {
-				pr_info("Length = %d\n", fd->length20);
 				return -EINVAL;
 			}
 		} else if (fd->format == qm_fd_contig_big ||
 				fd->format == qm_fd_sg_big) {
 			if (fd->length29 > ctx->max_scan_size) {
-				pr_info("Length = %d\n", fd->length29);
 				return -EINVAL;
 			}
 		}
