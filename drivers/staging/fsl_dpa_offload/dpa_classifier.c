@@ -1803,6 +1803,9 @@ static int table_get_entry_stats_by_ref(struct dpa_cls_table	*ptable,
 	uint8_t entry_index;
 	t_Handle cc_node;
 	struct dpa_cls_tbl_entry *index_entry;
+	t_FmPcdCcKeyStatistics key_stats;
+	t_Error err;
+	int ret = 0;
 
 	dpa_cls_dbg(("DEBUG: dpa_classifier %s (%d) -->\n", __func__,
 		__LINE__));
@@ -1830,13 +1833,23 @@ static int table_get_entry_stats_by_ref(struct dpa_cls_table	*ptable,
 	entry_index	= index_entry->entry_index;
 
 	cc_node = (t_Handle)ptable->int_cc_node[cc_node_index].cc_node;
-	stats->total_pkts = (unsigned long)
-		FM_PCD_MatchTableGetKeyCounter(cc_node,	entry_index);
+	err = FM_PCD_MatchTableGetKeyStatistics(cc_node, entry_index,
+								&key_stats);
+	if (err != E_OK) {
+		log_warn("FMan driver call failed - "
+			"FM_PCD_MatchTableGetKeyStatistics. Failed to acquire "
+			"key statistics.\n");
+		memset(stats, 0, sizeof(*stats));
+		ret = -EPERM;
+	} else {
+		stats->pkts	= key_stats.frameCount;
+		stats->bytes	= key_stats.byteCount;
+	}
 
 	dpa_cls_dbg(("DEBUG: dpa_classifier %s (%d) <--\n", __func__,
 		__LINE__));
 
-	return 0;
+	return ret;
 }
 
 int dpa_classif_table_get_params(int td, struct dpa_cls_tbl_params *params)
