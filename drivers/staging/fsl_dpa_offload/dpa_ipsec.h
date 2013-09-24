@@ -249,6 +249,7 @@ struct dpa_ipsec_sa {
 				* form the CAAM Descriptor length
 				* MAX_CAAM_DESCSIZE			      */
 	bool enable_stats; /* Enable counting packets and bytes processed     */
+	bool enable_extended_stats; /* Enable extended statistics per SA      */
 	bool dscp_copy; /* Enable DSCP propagation support		      */
 	bool ecn_copy; /* Enable DSCP propagation support		      */
 	bool enable_dpovrd; /* Enable DECO Protocol Override Register	      */

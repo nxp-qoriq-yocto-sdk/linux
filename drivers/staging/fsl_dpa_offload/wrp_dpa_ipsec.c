@@ -1315,6 +1315,23 @@ long wrp_dpa_ipsec_do_ioctl(struct file *filp, unsigned int cmd,
 		break;
 	}
 
+	case DPA_IPSEC_IOC_GET_STATS: {
+		struct dpa_ipsec_stats ipsec_stats;
+
+		ret = dpa_ipsec_get_stats(&ipsec_stats);
+		if (ret < 0) {
+			pr_err("Getting stats failed\n");
+			break;
+		}
+
+		if (copy_to_user((struct dpa_ipsec_stats *)args,
+				 &ipsec_stats, sizeof(ipsec_stats))) {
+			pr_err("Could not copy stats to user\n");
+			return -EINVAL;
+		}
+		break;
+	}
+
 	case DPA_IPSEC_IOC_SA_MODIFY: {
 		struct dpa_ipsec_sa_modify_prm modify_prm;
 		int sa_id, ret;
@@ -1481,6 +1498,23 @@ long wrp_dpa_ipsec_do_compat_ioctl(struct file *filp, unsigned int cmd,
 			return -EINVAL;
 		}
 
+		break;
+	}
+
+	case DPA_IPSEC_IOC_GET_STATS: {
+		struct dpa_ipsec_stats ipsec_stats;
+
+		ret = dpa_ipsec_get_stats(&ipsec_stats);
+		if (ret < 0) {
+			pr_err("Getting stats failed\n");
+			break;
+		}
+
+		if (copy_to_user((struct dpa_ipsec_stats *)args,
+				 &ipsec_stats, sizeof(ipsec_stats))) {
+			pr_err("Could not copy stats to user\n");
+			return -EINVAL;
+		}
 		break;
 	}
 

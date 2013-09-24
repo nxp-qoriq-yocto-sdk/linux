@@ -300,4 +300,7 @@ struct ioc_compat_dpa_ipsec_sa_modify_prm {
 	     struct ioc_compat_dpa_ipsec_sa_modify_prm)
 #endif
 
+#define DPA_IPSEC_IOC_GET_STATS \
+	_IOR(DPA_IPSEC_IOC_MAGIC, 13, struct dpa_ipsec_stats)
+
 #endif	/* __DPA_IPSEC_IOCTL_H */

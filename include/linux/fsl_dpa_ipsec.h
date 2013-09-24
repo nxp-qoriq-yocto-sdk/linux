@@ -337,6 +337,12 @@ struct dpa_ipsec_sa_params {
 	uint8_t sa_bpid;	/* Buffer Pool ID to be used with this SA     */
 	uint16_t sa_bufsize;	/* Buffer Pool buffer size		      */
 	bool	enable_stats;	/* Enable counting packets and bytes processed*/
+	/*
+	 * Enable extended statistics per SA, beside counting IPSec processed
+	 * packets the dpa offload will also count the input packets that
+	 * require IPSec processing.
+	 */
+	bool  enable_extended_stats;
 	struct dpa_ipsec_sa_crypto_params crypto_params;/* IPSec crypto params*/
 	enum dpa_ipsec_direction sa_dir;  /* SA direction: Outbound/Inbound   */
 	union {
@@ -486,14 +492,38 @@ int dpa_ipsec_sa_get_policies(int sa_id,
 /* This function will remove all policies associated with the specified SA */
 int dpa_ipsec_sa_flush_policies(int sa_id);
 
-/* DPA-IPSec Statistics */
+/* DPA-IPSec SA Statistics */
 struct dpa_ipsec_sa_stats {
-	uint32_t packets_count;
-	uint32_t bytes_count;
+	uint32_t packets_count; /* Number of IPSec processed packets */
+	uint32_t bytes_count;   /* Number of IPSec processed bytes   */
+	/*
+	 * Number of packets which required IPSec processing
+	 * for inbound SA: number of packets received
+	 * for outbound SA: number of packets sent
+	 */
+	uint32_t input_packets;
+};
+
+/* DPA-IPSec Global Statistics */
+struct dpa_ipsec_stats {
+	/* Packets that missed inbound SA lookup */
+	uint32_t inbound_miss_pkts;
+
+	/* Bytes that missed inbound SA lookup */
+	uint32_t inbound_miss_bytes;
+
+	/* Packets that missed outbound policy lookup */
+	uint32_t outbound_miss_pkts;
+
+	/* Bytes that missed outbound policy lookup */
+	uint32_t outbound_miss_bytes;
 };
 
 /* This function will populate sa_stats with SEC statistics for SA with sa_id */
 int dpa_ipsec_sa_get_stats(int sa_id, struct dpa_ipsec_sa_stats *sa_stats);
+
+/* Return IPSec global statistics in the "stats" data structure */
+int dpa_ipsec_get_stats(struct dpa_ipsec_stats *stats);
 
 enum dpa_ipsec_sa_modify_type {
 	DPA_IPSEC_SA_MODIFY_ARS = 0, /* Set the anti replay window size	      */

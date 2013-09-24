@@ -1758,7 +1758,8 @@ no_frag_or_manip:
 
 set_manipulation:
 		memset(&action, 0, sizeof(action));
-		fill_cls_action_enq(&action, FALSE,
+		fill_cls_action_enq(&action,
+				    (sa->enable_extended_stats)? TRUE: FALSE,
 				    qman_fq_fqid(sa->to_sec_fq), pol_hmd);
 
 		err = dpa_classif_table_insert_entry(table, &tbl_key, &action,
@@ -1913,7 +1914,8 @@ static int update_pre_sec_inbound_table(struct dpa_ipsec_sa *sa,
 
 		/* Complete the parameters for table insert function */
 		memset(&action, 0, sizeof(action));
-		fill_cls_action_enq(&action, FALSE,
+		fill_cls_action_enq(&action,
+			(sa->enable_extended_stats)? TRUE: FALSE,
 			qman_fq_fqid((sa->to_sec_fq)), sa->ipsec_hmd);
 
 		err = dpa_classif_table_insert_entry(table, &tbl_key, &action,
@@ -2459,6 +2461,7 @@ static int copy_sa_params_to_out_sa(struct dpa_ipsec_sa *sa,
 
 	sa->l2_hdr_size = sa_params->l2_hdr_size;
 	sa->enable_stats = sa_params->enable_stats;
+	sa->enable_extended_stats = sa_params->enable_extended_stats;
 #ifdef DEBUG_PARAM
 	/* Printing all the parameters */
 	print_sa_sec_param(sa);
@@ -2616,6 +2619,7 @@ static int copy_sa_params_to_in_sa(struct dpa_ipsec_sa *sa,
 	sa->policy_miss_action = sa_params->sa_in_params.policy_miss_action;
 	sa->l2_hdr_size = sa_params->l2_hdr_size;
 	sa->enable_stats = sa_params->enable_stats;
+	sa->enable_extended_stats = sa_params->enable_extended_stats;
 #ifdef DEBUG_PARAM
 	/* Printing all the parameters */
 	print_sa_sec_param(sa);
@@ -4805,6 +4809,8 @@ int dpa_ipsec_sa_get_stats(int sa_id, struct dpa_ipsec_sa_stats *sa_stats)
 		return -EBUSY;
 	}
 
+	memset(sa_stats, 0, sizeof(*sa_stats));
+
 	if (!sa->enable_stats) {
 		pr_err("Statistics are not enabled for SA id %d\n", sa_id);
 		mutex_unlock(&sa->lock);
@@ -4820,11 +4826,157 @@ int dpa_ipsec_sa_get_stats(int sa_id, struct dpa_ipsec_sa_stats *sa_stats)
 		sa_stats->packets_count = *(desc + sa->stats_offset / 4 + 1);
 	}
 
+	if (sa->enable_extended_stats) {
+		struct dpa_cls_tbl_entry_stats stats;
+
+		memset(&stats, 0, sizeof(stats));
+
+		if (sa_is_inbound(sa)) { /* Inbound SA */
+			ret = dpa_classif_table_get_entry_stats_by_ref(
+						sa->inbound_sa_td,
+						sa->inbound_hash_entry,
+						&stats);
+			if (ret != 0) {
+				log_err("Failed to acquire total packets "
+					"counter for inbound SA Id=%d.\n",
+					sa_id);
+				mutex_unlock(&sa->lock);
+				return -EINVAL;
+			} else
+				sa_stats->input_packets	= stats.pkts;
+		} else { /* Outbound SA */
+			struct dpa_ipsec_policy_entry *out_policy;
+			struct dpa_ipsec_policy_params *policy_params;
+			struct dpa_ipsec_pre_sec_out_params *psop;
+			int table_idx, td;
+
+			psop = &sa->dpa_ipsec->config.pre_sec_out_params;
+
+			list_for_each_entry(out_policy, &sa->policy_headlist,
+									node) {
+				policy_params = &out_policy->pol_params;
+				if (IP_ADDR_TYPE_IPV4(policy_params->dest_addr))
+					table_idx =
+						GET_POL_TABLE_IDX(
+							policy_params->protocol,
+							IPV4);
+				else
+					table_idx =
+						GET_POL_TABLE_IDX(
+							policy_params->protocol,
+							IPV6);
+				td = psop->table[table_idx].dpa_cls_td;
+				ret = dpa_classif_table_get_entry_stats_by_ref(
+							td,
+							out_policy->entry_id,
+							&stats);
+				if (ret != 0) {
+					log_err("Failed to acquire total "
+						"packets counter for outbound "
+						"SA Id=%d. Failure occured on "
+						"outbound policy table %d "
+						"(td=%d).\n", sa_id, table_idx,
+						td);
+					mutex_unlock(&sa->lock);
+					return -EINVAL;
+				} else
+					sa_stats->input_packets	+= stats.pkts;
+			}
+		}
+	}
+
 	mutex_unlock(&sa->lock);
+
+	return ret;
+}
+EXPORT_SYMBOL(dpa_ipsec_sa_get_stats);
+
+int dpa_ipsec_get_stats(struct dpa_ipsec_stats *stats)
+{
+	t_FmPcdCcKeyStatistics		miss_stats;
+	struct dpa_cls_tbl_params	table_params;
+	int				i, j, td;
+	t_Error				err;
+	struct dpa_ipsec		*dpa_ipsec;
+
+	dpa_ipsec = gbl_dpa_ipsec;
+
+	if (!stats) {
+		log_err("\"stats\" cannot be NULL.\n");
+		return -EINVAL;
+	}
+
+	memset(stats, 0, sizeof(*stats));
+
+	/* On inbound add up miss counters from all inbound pre-SEC tables: */
+	for (i = 0; i < DPA_IPSEC_MAX_SA_TYPE; i++) {
+		td = dpa_ipsec->config.pre_sec_in_params.dpa_cls_td[i];
+		if (dpa_classif_table_get_params(td, &table_params)) {
+			log_err("Failed to acquire params for inbound table "
+				"type %d (td=%d).\n", i, td);
+			return -EINVAL;
+		}
+		if (table_params.type == DPA_CLS_TBL_HASH)
+			err = FM_PCD_HashTableGetMissStatistics(
+						table_params.cc_node,
+						&miss_stats);
+		else
+			err = FM_PCD_MatchTableGetMissStatistics(
+					table_params.cc_node,
+					&miss_stats);
+		if (err != E_OK) {
+			log_err("Failed to acquire miss statistics for inbound "
+				"table type %d (td=%d, Cc node handle=0x%p).\n",
+				i, td, table_params.cc_node);
+			return -EINVAL;
+		} else {
+			stats->inbound_miss_pkts += miss_stats.frameCount;
+			stats->inbound_miss_bytes += miss_stats.byteCount;
+		}
+	}
+
+	/* On outbound add up miss statistics from all outbound pre-SEC tables: */
+	for (i = 0; i < DPA_IPSEC_MAX_SUPPORTED_PROTOS; i++) {
+		td = dpa_ipsec->config.pre_sec_out_params.table[i].dpa_cls_td;
+		/* Some applications are using the same tables in more than one
+		 * role on the outbound, hence we need check to whether we
+		 * haven't already processed this table: */
+		for (j = 0; j < i; j++) {
+			if (td == dpa_ipsec->config.pre_sec_out_params.
+							table[j].dpa_cls_td)
+				break;
+		}
+
+		if (j < i)
+			continue;
+
+		if (dpa_classif_table_get_params(td, &table_params)) {
+			log_err("Failed to acquire table params for outbound "
+				"proto type #%d (td=%d).\n", i, td);
+			return -EINVAL;
+		}
+		if (table_params.type == DPA_CLS_TBL_HASH)
+			err = FM_PCD_HashTableGetMissStatistics(
+						table_params.cc_node,
+						&miss_stats);
+		else
+			err = FM_PCD_MatchTableGetMissStatistics(
+						table_params.cc_node,
+						&miss_stats);
+		if (err != E_OK) {
+			log_err("Failed to acquire miss statistics for outbound "
+				"proto type %d (td=%d, Cc node handle=0x%p).\n",
+				i, td, table_params.cc_node);
+			return -EINVAL;
+		} else {
+			stats->outbound_miss_pkts += miss_stats.frameCount;
+			stats->outbound_miss_bytes += miss_stats.byteCount;
+		}
+	}
 
 	return 0;
 }
-EXPORT_SYMBOL(dpa_ipsec_sa_get_stats);
+EXPORT_SYMBOL(dpa_ipsec_get_stats);
 
 int dpa_ipsec_sa_modify(int sa_id, struct dpa_ipsec_sa_modify_prm *modify_prm)
 {
