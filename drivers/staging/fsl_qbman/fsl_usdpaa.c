@@ -1513,7 +1513,7 @@ static int __init usdpaa_init(void)
 	pr_info("Freescale USDPAA process driver\n");
 	if (!phys_start) {
 		pr_warn("fsl-usdpaa: no region found\n");
-		return 0;
+		goto skip_setup;
 	}
 
 	while (tmp_size != 0) {
@@ -1538,6 +1538,7 @@ static int __init usdpaa_init(void)
 		tmp_pfn_start += frag_size / PAGE_SIZE;
 		tmp_pfn_size -= frag_size / PAGE_SIZE;
 	}
+skip_setup:
 	ret = misc_register(&usdpaa_miscdev);
 	if (ret)
 		pr_err("fsl-usdpaa: failed to register misc device\n");
