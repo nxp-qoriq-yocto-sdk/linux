@@ -7286,7 +7286,7 @@ int dpa_classif_mcast_create_group(
 		const struct dpa_cls_mcast_group_resources *res)
 {
 
-	t_Error err = 0;
+	int err = 0;
 	struct dpa_cls_mcast_group *pgroup;
 	int member_id;
 	uint8_t max_members;
