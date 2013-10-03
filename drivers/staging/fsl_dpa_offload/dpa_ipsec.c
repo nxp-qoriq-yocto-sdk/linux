@@ -3576,7 +3576,9 @@ static int remove_inbound_sa(struct dpa_ipsec_sa *sa)
 		sa->child_sa = NULL;
 
 		/* Remove the child SA from rekeying list */
-		list_del(&child_sa->sa_rekeying_node);
+		if (child_sa->sa_rekeying_node.next != LIST_POISON1 &&
+		    child_sa->sa_rekeying_node.prev != LIST_POISON2)
+			list_del(&child_sa->sa_rekeying_node);
 
 		/* Invalidate the FROM SEC FQ of parent SA */
 		memset(sa->from_sec_fq, 0, sizeof(struct qman_fq));
@@ -4097,19 +4099,12 @@ int dpa_ipsec_sa_rekeying(int sa_id,
 	new_sa->ipsec_hmd = old_sa->ipsec_hmd;
 	new_sa->valid_flowid_entry = false;
 	new_sa->rekey_event_cb = rekey_event_cb;
-	if (auto_rmv_old_sa) {
-		new_sa->parent_sa = old_sa;
-		new_sa->child_sa  = NULL;
-			new_sa->sa_rekeying_node.next = LIST_POISON1;
-			new_sa->sa_rekeying_node.prev = LIST_POISON2;
-		old_sa->child_sa = new_sa;
-			old_sa->parent_sa = NULL;
-	} else {
-		new_sa->parent_sa = NULL;
-		new_sa->child_sa  = NULL;
-		old_sa->child_sa  = NULL;
-		old_sa->parent_sa = NULL;
-	}
+	new_sa->parent_sa = old_sa;
+	new_sa->child_sa  = NULL;
+	new_sa->sa_rekeying_node.next = LIST_POISON1;
+	new_sa->sa_rekeying_node.prev = LIST_POISON2;
+	old_sa->child_sa = new_sa;
+	old_sa->parent_sa = NULL;
 
 	/* Copy SA params into the internal SA structure */
 	if (sa_is_outbound(old_sa))
