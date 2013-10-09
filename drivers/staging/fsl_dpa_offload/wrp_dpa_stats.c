@@ -2250,6 +2250,7 @@ static long dpa_stats_reass_cls_compatcpy(struct dpa_stats_cls_cnt_reass *kprm,
 	if (copy_from_user(reass, compat_ptr(uprm->reass),
 			(sizeof(compat_uptr_t) * cls_members))) {
 		log_err("Cannot copy from user array of Reassembly objects\n");
+		kfree(reass);
 		return -EBUSY;
 	}
 
@@ -2258,6 +2259,7 @@ static long dpa_stats_reass_cls_compatcpy(struct dpa_stats_cls_cnt_reass *kprm,
 	if (!kprm->reass) {
 		log_err("Cannot allocate kernel memory for Reassembly objects "
 			"array\n");
+		kfree(reass);
 		return -ENOMEM;
 	}
 
@@ -2266,6 +2268,7 @@ static long dpa_stats_reass_cls_compatcpy(struct dpa_stats_cls_cnt_reass *kprm,
 				reass[i], FM_MAP_TYPE_PCD_NODE);
 
 	kprm->cnt_sel = uprm->cnt_sel;
+	kfree(reass);
 	return 0;
 }
 
@@ -2288,6 +2291,7 @@ static long dpa_stats_frag_cls_compatcpy(struct dpa_stats_cls_cnt_frag *kprm,
 			(sizeof(compat_uptr_t) * cls_members))) {
 		log_err("Cannot copy from user array of Fragmentation "
 			"objects\n");
+		kfree(ufrag);
 		return -EBUSY;
 	}
 
@@ -2296,6 +2300,7 @@ static long dpa_stats_frag_cls_compatcpy(struct dpa_stats_cls_cnt_frag *kprm,
 	if (!kprm->frag) {
 		log_err("Cannot allocate kernel memory for Fragmentation "
 			"objects array\n");
+		kfree(ufrag);
 		return -ENOMEM;
 	}
 
@@ -2304,6 +2309,7 @@ static long dpa_stats_frag_cls_compatcpy(struct dpa_stats_cls_cnt_frag *kprm,
 				ufrag[i], FM_MAP_TYPE_PCD_NODE);
 
 	kprm->cnt_sel = uprm->cnt_sel;
+	kfree(ufrag);
 	return 0;
 }
 
@@ -2324,6 +2330,7 @@ static long dpa_stats_plcr_cls_compatcpy(struct dpa_stats_cls_cnt_plcr *kprm,
 	if (copy_from_user(uplcr, compat_ptr(uprm->plcr),
 			(sizeof(compat_uptr_t) * cls_members))) {
 		log_err("Cannot copy from user array of Policer objects\n");
+		kfree(uplcr);
 		return -EBUSY;
 	}
 
@@ -2332,6 +2339,7 @@ static long dpa_stats_plcr_cls_compatcpy(struct dpa_stats_cls_cnt_plcr *kprm,
 	if (!kprm->plcr) {
 		log_err("Cannot allocate kernel memory for Policer objects "
 			"array\n");
+		kfree(uplcr);
 		return -ENOMEM;
 	}
 
@@ -2340,6 +2348,7 @@ static long dpa_stats_plcr_cls_compatcpy(struct dpa_stats_cls_cnt_plcr *kprm,
 				uplcr[i], FM_MAP_TYPE_PCD_NODE);
 
 	kprm->cnt_sel = uprm->cnt_sel;
+	kfree(uplcr);
 	return 0;
 }
 
