@@ -95,7 +95,7 @@ static int copy_key_descriptor(struct dpa_offload_lookup_key *src,
 static int copy_pair_descriptor(struct dpa_offload_lookup_key_pair *src,
 				struct dpa_offload_lookup_key_pair **dst);
 
-static int copy_class_members(void *objs, unsigned int size, void *dst);
+static void **copy_class_members(unsigned int size, void **src);
 
 static long store_get_cnts_async_params(
 		struct ioc_dpa_stats_cnt_request_params *kprm,
@@ -822,7 +822,7 @@ static int do_ioctl_stats_create_class_counter(void *args)
 	struct dpa_offload_lookup_key_pair **us_pairs = NULL;
 	uint32_t i = 0;
 	unsigned int cls_mbrs;
-	void *cls_objs = NULL;
+	void **cls_objs = NULL;
 	int *sa_ids = NULL;
 	long ret = 0;
 
@@ -856,29 +856,38 @@ static int do_ioctl_stats_create_class_counter(void *args)
 		break;
 	}
 	case DPA_STATS_CNT_REASS:
-		ret = copy_class_members(cls_objs, cls_mbrs,
+		/* Save the user-space pointer */
+		cls_objs = prm.cnt_params.reass_params.reass;
+
+		prm.cnt_params.reass_params.reass = copy_class_members(cls_mbrs,
 					prm.cnt_params.reass_params.reass);
-		if (ret < 0) {
+		if (!prm.cnt_params.reass_params.reass) {
 			log_err("Cannot copy array of Reassembly objects\n");
-			kfree(cls_objs);
+			prm.cnt_params.reass_params.reass = cls_objs;
 			return -EBUSY;
 		}
 		break;
 	case DPA_STATS_CNT_FRAG:
-		ret = copy_class_members(cls_objs, cls_mbrs,
-					 prm.cnt_params.frag_params.frag);
-		if (ret < 0) {
+		/* Save the user-space pointer */
+		cls_objs = prm.cnt_params.frag_params.frag;
+
+		prm.cnt_params.frag_params.frag = copy_class_members(cls_mbrs,
+					prm.cnt_params.frag_params.frag);
+		if (!prm.cnt_params.frag_params.frag) {
 			log_err("Cannot copy array of Fragmentation objects\n");
-			kfree(cls_objs);
+			prm.cnt_params.frag_params.frag = cls_objs;
 			return -EBUSY;
 		}
 		break;
 	case DPA_STATS_CNT_POLICER:
-		ret = copy_class_members(cls_objs, cls_mbrs,
-					 prm.cnt_params.plcr_params.plcr);
-		if (ret < 0) {
+		/* Save the user-space pointer */
+		cls_objs = prm.cnt_params.plcr_params.plcr;
+
+		prm.cnt_params.plcr_params.plcr = copy_class_members(cls_mbrs,
+					prm.cnt_params.plcr_params.plcr);
+		if (!prm.cnt_params.plcr_params.plcr) {
 			log_err("Cannot copy array of Policer objects\n");
-			kfree(cls_objs);
+			prm.cnt_params.plcr_params.plcr = cls_objs;
 			return -EBUSY;
 		}
 		break;
@@ -992,9 +1001,16 @@ create_cls_counter_cleanup:
 		kfree(prm.cnt_params.eth_params.src);
 		break;
 	case DPA_STATS_CNT_REASS:
+		kfree(prm.cnt_params.reass_params.reass);
+		prm.cnt_params.reass_params.reass = cls_objs;
+		break;
 	case DPA_STATS_CNT_FRAG:
+		kfree(prm.cnt_params.frag_params.frag);
+		prm.cnt_params.frag_params.frag = cls_objs;
+		break;
 	case DPA_STATS_CNT_POLICER:
-		kfree(cls_objs);
+		kfree(prm.cnt_params.plcr_params.plcr);
+		prm.cnt_params.plcr_params.plcr = cls_objs;
 		break;
 	case DPA_STATS_CNT_CLASSIF_TBL:
 		tbl = &prm.cnt_params.classif_tbl_params;
@@ -2085,23 +2101,23 @@ static int copy_pair_descriptor_compatcpy(
 }
 #endif
 
-static int copy_class_members(void *objs, unsigned int size, void *dst)
+static void **copy_class_members(unsigned int size, void **src)
 {
+	void **objs;
+
 	/* Allocate memory to store the array of objects */
 	objs = kcalloc(size, sizeof(void *), GFP_KERNEL);
 	if (!objs) {
 		log_err("Cannot allocate memory for objects array\n");
-		return -ENOMEM;
+		return NULL;
 	}
 
-	if (copy_from_user(objs, dst, (size * sizeof(void *)))) {
+	if (copy_from_user(objs, src, (size * sizeof(void *)))) {
 		log_err("Cannot copy from user array of objects\n");
 		kfree(objs);
-		return -EBUSY;
+		return NULL;
 	}
-	dst = objs;
-
-	return 0;
+	return objs;
 }
 
 #ifdef CONFIG_COMPAT
