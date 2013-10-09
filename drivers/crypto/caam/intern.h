@@ -2,7 +2,7 @@
  * CAAM/SEC 4.x driver backend
  * Private/internal definitions between modules
  *
- * Copyright 2008-2011 Freescale Semiconductor, Inc.
+ * Copyright 2008-2012 Freescale Semiconductor, Inc.
  *
  */
 
@@ -97,6 +97,8 @@ struct caam_drv_private {
 	struct list_head alg_list;
 	/* list of registered hash algorithms (mk generic context handle?) */
 	struct list_head hash_list;
+	/* list of registered pkc algorithms */
+	struct list_head pkc_list;
 
 	/*
 	 * debugfs entries for developer view into driver/device
