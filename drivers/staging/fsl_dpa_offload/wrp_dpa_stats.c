@@ -757,14 +757,14 @@ static int do_ioctl_stats_compat_create_counter(void *args)
 					&kprm.cnt_params.classif_tbl_params,
 					&uprm.cnt_params.classif_tbl_params);
 		if (ret < 0)
-			goto compat_create_counter_cleanup;
+			return ret;
 		break;
 	case DPA_STATS_CNT_CLASSIF_NODE:
 		ret = dpa_stats_ccnode_cnt_compatcpy(
 					&kprm.cnt_params.classif_node_params,
 					&uprm.cnt_params.classif_node_params);
 		if (ret < 0)
-			goto compat_create_counter_cleanup;
+			return ret;
 		break;
 	case DPA_STATS_CNT_IPSEC:
 		memcpy(&kprm.cnt_params.ipsec_params,
@@ -2172,18 +2172,11 @@ static long dpa_stats_tbl_cnt_compatcpy(struct dpa_stats_cnt_classif_tbl *kprm,
 {
 	kprm->td = uprm->td;
 	kprm->cnt_sel = uprm->cnt_sel;
-	/* If different than NULL, it will be overwritten */
-	kprm->key = compat_ptr(uprm->key);
+	kprm->key = NULL;
 
-	if (compat_ptr(uprm->key)) {
-		/* Allocate memory for kernel-space key descriptor */
-		kprm->key = kmalloc(sizeof(*kprm->key), GFP_KERNEL);
-		if (!kprm->key) {
-			log_err("Cannot allocate memory for key descriptor\n");
-			return -ENOMEM;
-		}
+	if (compat_ptr(uprm->key))
 		return copy_key_descriptor_compatcpy(&kprm->key, uprm->key);
-	}
+
 	return 0;
 }
 
@@ -2194,18 +2187,11 @@ static long dpa_stats_ccnode_cnt_compatcpy(
 	kprm->cnt_sel = uprm->cnt_sel;
 	kprm->ccnode_type = uprm->ccnode_type;
 	kprm->cc_node = compat_get_id2ptr(uprm->cc_node, FM_MAP_TYPE_PCD_NODE);
-	/* If different than NULL, it will be overwritten */
-	kprm->key = compat_ptr(uprm->key);
+	kprm->key = NULL;
 
-	if (compat_ptr(uprm->key)) {
-		/* Allocate memory for kernel-space key descriptor */
-		kprm->key = kmalloc(sizeof(*kprm->key), GFP_KERNEL);
-		if (!kprm->key) {
-			log_err("Cannot allocate memory for key descriptor\n");
-			return -ENOMEM;
-		}
+	if (compat_ptr(uprm->key))
 		return copy_key_descriptor_compatcpy(&kprm->key, uprm->key);
-	}
+
 	return 0;
 }
 
