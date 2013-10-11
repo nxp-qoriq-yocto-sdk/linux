@@ -3318,7 +3318,7 @@ static int get_cnt_us_stats(struct dpa_stats_req_cb *req_cb,
 			    struct dpa_stats_cnt_cb *cnt_cb)
 {
 	uint32_t i = 0, j = 0;
-	req_cb->config.cnts_ids[cnt_cb->id] = req_cb->bytes_num;
+	req_cb->config.cnts_ids[req_cb->cnts_num] = req_cb->bytes_num;
 
 	for (i = 0; i < cnt_cb->members_num; i++) {
 		for (j = 0; j < cnt_cb->info.stats_num; j++) {
