@@ -152,7 +152,7 @@ static void esdhc_writeb(struct sdhci_host *host, u8 val, int reg)
 		if (SVR_SOC_VER(svr) == SVR_T4240) {
 			u8 vol;
 
-			vol = sdhci_be32bs_readb(host, reg);
+			vol = esdhc_readb(host, reg);
 			if (host->pwr == SDHCI_POWER_180)
 				vol &= ~ESDHC_VOL_SEL;
 			else
