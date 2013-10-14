@@ -93,7 +93,7 @@ struct stats_info {
 	  * Array of statistics offsets relative to
 	  * corresponding statistics area
 	  */
-	unsigned int *stats_off;
+	int *stats_off;
 	unsigned int stats_num; /* Number of statistics to retrieve */
 	uint64_t **stats; /* Array to store statistics values */
 	uint64_t **last_stats;/* Array to store previous statistics values */
