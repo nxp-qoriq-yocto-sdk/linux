@@ -783,17 +783,7 @@ static int do_ioctl_stats_compat_create_counter(void *args)
 
 	ret = dpa_stats_create_counter(kprm.stats_id,
 				       &kprm.cnt_params, &kprm.cnt_id);
-	if (ret < 0)
-		goto compat_create_counter_cleanup;
 
-	uprm.cnt_id = kprm.cnt_id;
-
-	if (copy_to_user(args, &uprm, sizeof(uprm))) {
-		log_err("Cannot copy to user counter parameters\n");
-		ret = -EINVAL;
-	}
-
-compat_create_counter_cleanup:
 	if (kprm.cnt_params.type == DPA_STATS_CNT_CLASSIF_NODE &&
 	    compat_ptr(uprm.cnt_params.classif_node_params.key)) {
 		kfree(kprm.cnt_params.classif_node_params.key->byte);
@@ -807,6 +797,14 @@ compat_create_counter_cleanup:
 		kfree(kprm.cnt_params.classif_tbl_params.key->mask);
 		kfree(kprm.cnt_params.classif_tbl_params.key);
 	}
+
+	uprm.cnt_id = kprm.cnt_id;
+
+	if (copy_to_user(args, &uprm, sizeof(uprm))) {
+		log_err("Cannot copy to user counter parameters\n");
+		ret = -EINVAL;
+	}
+
 	return ret;
 }
 #endif
@@ -1155,16 +1153,6 @@ static int do_ioctl_stats_compat_create_class_counter(void *args)
 
 	ret = dpa_stats_create_class_counter(kprm.stats_id,
 					     kprm_cls, &kprm.cnt_id);
-	if (ret < 0)
-		goto compat_create_cls_counter_cleanup;
-
-	uprm.cnt_id = kprm.cnt_id;
-
-	if (copy_to_user(args, &uprm, sizeof(uprm))) {
-		log_err("Cannot copy to user the counter id\n");
-		ret = -EINVAL;
-	}
-
 compat_create_cls_counter_cleanup:
 	switch (uprm.cnt_params.type) {
 	case DPA_STATS_CNT_ETH:
@@ -1237,6 +1225,13 @@ compat_create_cls_counter_cleanup:
 
 	default:
 		break;
+	}
+
+	uprm.cnt_id = kprm.cnt_id;
+
+	if (copy_to_user(args, &uprm, sizeof(uprm))) {
+		log_err("Cannot copy to user the counter id\n");
+		ret = -EINVAL;
 	}
 
 	return ret;
@@ -1398,17 +1393,7 @@ static int do_ioctl_stats_compat_modify_class_counter(void *args)
 
 	ret = dpa_stats_modify_class_counter(kprm.cnt_id,
 					&kprm.params, kprm.member_index);
-	if (ret < 0)
-		goto compat_modify_counter_cleanup;
 
-	uprm.cnt_id = kprm.cnt_id;
-
-	if (copy_to_user(args, &uprm, sizeof(uprm))) {
-		log_err("Cannot copy to user class counter result\n");
-		return -EBUSY;
-	}
-
-compat_modify_counter_cleanup:
 	switch (kprm.params.type) {
 	case DPA_STATS_CLS_MEMBER_SINGLE_KEY:
 		if (!kprm.params.key)
@@ -1436,7 +1421,14 @@ compat_modify_counter_cleanup:
 	default:
 		break;
 	}
-	return 0;
+	uprm.cnt_id = kprm.cnt_id;
+
+	if (copy_to_user(args, &uprm, sizeof(uprm))) {
+		log_err("Cannot copy to user class counter result\n");
+		ret = -EBUSY;
+	}
+
+	return ret;
 }
 #endif
 
