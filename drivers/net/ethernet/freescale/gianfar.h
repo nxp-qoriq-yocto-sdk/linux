@@ -73,6 +73,11 @@ struct ethtool_rx_list {
 /* Number of bytes to align the rx bufs to */
 #define RXBUF_ALIGNMENT 64
 
+#ifdef CONFIG_AS_FASTPATH
+/* Headroom required for IPSec processing in ASF */
+#define EXTRA_HEADROOM 128
+#endif
+
 /* The number of bytes which composes a unit for the purpose of
  * allocating data buffers.  ie-for any given MTU, the data buffer
  * will be the next highest multiple of 512 bytes. */

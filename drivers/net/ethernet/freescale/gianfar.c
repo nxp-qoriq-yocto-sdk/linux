@@ -3217,6 +3217,10 @@ static void gfar_timeout(struct net_device *dev)
 
 static void gfar_align_skb(struct sk_buff *skb)
 {
+#ifdef CONFIG_AS_FASTPATH
+	/* Reserving the extra headroom required for ASF IPSec processing */
+	skb_reserve(skb, EXTRA_HEADROOM);
+#endif
 	/* We need the data buffer to be aligned properly.  We will reserve
 	 * as many bytes as needed to align the data properly
 	 */
@@ -3482,7 +3486,12 @@ static struct sk_buff *gfar_alloc_skb(struct net_device *dev)
 	struct gfar_private *priv = netdev_priv(dev);
 	struct sk_buff *skb;
 
+#ifndef CONFIG_AS_FASTPATH
 	skb = netdev_alloc_skb(dev, priv->rx_buffer_size + RXBUF_ALIGNMENT);
+#else
+	skb = netdev_alloc_skb(dev, priv->rx_buffer_size + RXBUF_ALIGNMENT +
+		EXTRA_HEADROOM);
+#endif
 	if (!skb)
 		return NULL;
 
