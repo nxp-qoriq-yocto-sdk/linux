@@ -631,10 +631,7 @@ static int free_cnts_resources(struct dpa_stats *dpa_stats)
 		if (id != DPA_OFFLD_INVALID_OBJECT_ID) {
 			/* Release the counter id in the Counter IDs cq */
 			err = put_cnt(dpa_stats, &dpa_stats->cnts_cb[id]);
-			if (err < 0) {
-				log_err("Cannot release counter id %d\n", id);
-				return err;
-			}
+			BUG_ON(err < 0);
 		}
 		for (j = 0; j < MAX_NUM_OF_MEMBERS; j++) {
 			kfree(dpa_stats->cnts_cb[i].info.stats[j]);
@@ -754,10 +751,7 @@ static int free_reqs_resources(struct dpa_stats *dpa_stats)
 
 			/* Release the request id in the Requests IDs cq */
 			err = put_req(dpa_stats, req_cb);
-			if (err < 0) {
-				log_err("Cannot release request id %d\n", id);
-				return err;
-			}
+			BUG_ON(err < 0);
 
 			/* Release the array of counter ids */
 			kfree(req_cb->cnts_ids);
