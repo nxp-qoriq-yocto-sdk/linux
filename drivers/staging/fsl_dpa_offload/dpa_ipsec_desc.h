@@ -93,5 +93,6 @@ int generate_split_key(struct auth_params *auth_param);
 int build_rjob_desc_ars_update(struct dpa_ipsec_sa *sa, enum dpa_ipsec_arw arw,
 			       u32 msg_len);
 int build_rjob_desc_seq_read(struct dpa_ipsec_sa *sa, u32 msg_len);
+int build_rjob_desc_seq_write(struct dpa_ipsec_sa *sa, u32 msg_len);
 
 #endif	/* _DPA_IPSEC_DESC_H_ */

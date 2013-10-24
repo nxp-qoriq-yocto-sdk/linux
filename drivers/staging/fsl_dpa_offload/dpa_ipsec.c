@@ -5014,11 +5014,21 @@ int dpa_ipsec_sa_modify(int sa_id, struct dpa_ipsec_sa_modify_prm *modify_prm)
 			return ret;
 		break;
 	case DPA_IPSEC_SA_MODIFY_SEQ_NUM:
-		pr_err("Modifying SEQ number is unsupported\n");
-		return -EOPNOTSUPP;
+		msg[0] = DPA_IPSEC_SA_MODIFY_SEQ_NUM_DONE;
+		sa->w_seq_num = modify_prm->seq_num;
+
+		ret = build_rjob_desc_seq_write(sa, msg_len);
+		if (ret < 0)
+			return ret;
+		break;
 	case DPA_IPSEC_SA_MODIFY_EXT_SEQ_NUM:
-		pr_err("Modifying extended SEQ number is unsupported\n");
-		return -EOPNOTSUPP;
+		msg[0] = DPA_IPSEC_SA_MODIFY_EXT_SEQ_NUM_DONE;
+		sa->w_seq_num = modify_prm->seq_num;
+
+		ret = build_rjob_desc_seq_write(sa, msg_len);
+		if (ret < 0)
+			return ret;
+		break;
 	case DPA_IPSEC_SA_MODIFY_CRYPTO:
 		pr_err("Modifying cryptographic parameters is unsupported\n");
 		return -EOPNOTSUPP;

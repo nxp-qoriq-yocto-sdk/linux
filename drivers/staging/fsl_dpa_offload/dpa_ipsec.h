@@ -242,6 +242,7 @@ struct dpa_ipsec_sa {
 	bool	 sec_desc_extended; /* true if SEC descriptor is extended     */
 	uint32_t *rjob_desc_unaligned;
 	uint32_t *rjob_desc; /* replacement job descriptor address	      */
+	uint64_t w_seq_num; /* RJD will write this SEQ number when modify     */
 	uint64_t r_seq_num; /* RJD will read here the SEQ number for this SA  */
 	bool	 read_seq_in_progress; /* true if a request came but a get not*/
 	uint32_t stats_offset; /* Offset of the statistics (in bytes)	      */
