@@ -1688,6 +1688,124 @@ int build_rjob_desc_ars_update(struct dpa_ipsec_sa *sa, enum dpa_ipsec_arw arw,
 	return 0;
 }
 
+/*
+ * The SEQ number value will be placed at the address specified by SEQ pointer
+ */
+int build_rjob_desc_seq_read(struct dpa_ipsec_sa *sa, u32 msg_len)
+{
+	uint32_t *rjobd, off_b = 0, off;
+	dma_addr_t dma_shdesc, out_addr;
+
+	/* Check input parameters */
+	BUG_ON(!sa);
+	BUG_ON(!sa->sec_desc);
+
+	/* Get DMA address for this SA shared descriptor */
+	dma_shdesc = dma_map_single(sa->dpa_ipsec->jrdev, sa->sec_desc->desc,
+				    desc_len(sa->sec_desc->desc) * sizeof(u32),
+				    DMA_BIDIRECTIONAL);
+	if (!dma_shdesc) {
+		pr_err("Failed DMA map shared descriptor for SA %d\n", sa->id);
+		return -ENXIO;
+	}
+
+	/* Get DMA address for this SA shared descriptor */
+	out_addr = dma_map_single(sa->dpa_ipsec->jrdev, &sa->r_seq_num,
+				  sizeof(sa->r_seq_num), DMA_BIDIRECTIONAL);
+	if (!out_addr) {
+		pr_err("Failed DMA map output address for SA %d\n", sa->id);
+		dma_unmap_single(sa->dpa_ipsec->jrdev, dma_shdesc,
+				 desc_len(sa->sec_desc->desc) * sizeof(u32),
+				 DMA_BIDIRECTIONAL);
+		return -ENXIO;
+	}
+
+	/* Create replacement job descriptor for SEQ/ESEQ Number update */
+	BUG_ON(!sa->rjob_desc);
+	rjobd = sa->rjob_desc;
+
+	init_job_desc(rjobd, HDR_SHARE_SERIAL | HDR_SHARED | HDR_REVERSE |
+		      (desc_len(sa->sec_desc->desc) << HDR_START_IDX_SHIFT));
+
+	/* Set DMA address of the shared descriptor */
+	append_ptr(rjobd, dma_shdesc);
+
+	/* Retrieve SEQ number from PDB in MATH 0 - offset is in bytes */
+	off_b = sa_is_inbound(sa) ?
+		offsetof(struct ipsec_decap_pdb, seq_num_ext_hi) + sizeof(u32) :
+		offsetof(struct ipsec_encap_pdb, seq_num_ext_hi) + sizeof(u32);
+
+	append_move(rjobd, MOVE_SRC_DESCBUF | MOVE_DEST_MATH0 | MOVE_WAITCOMP |
+		    (off_b << MOVE_OFFSET_SHIFT) | sizeof(u64));
+
+	/* Store SEQ number - length is in bytes */
+	append_store(rjobd, out_addr, sizeof(sa->r_seq_num),
+		     LDST_CLASS_DECO | LDST_SRCDST_WORD_DECO_MATH0);
+
+	/* wait for completion of previous operation */
+	append_jump(rjobd, JUMP_COND_CALM | (1 << JUMP_OFFSET_SHIFT));
+
+	/*
+	 * Overwrite RJD immediately after the SHD pointer i.e shared descriptor
+	 * length plus 1 plus another 3 words
+	 * Offset and length are expressed in words
+	 * 3w - RJD header + SHD pointer
+	 * 5w - five instructions for doing some part of SEQ number modification
+	 * 3w - load instruction + pointer
+	 * 1w - jump calm
+	 * 1w - jump back to the remaining descriptor
+	 */
+	append_load(rjobd, virt_to_phys((void *)(rjobd + 3 + 5 + 3 + 1 + 1)),
+		    6, LDST_CLASS_DECO | LDST_SRCDST_WORD_DESCBUF |
+		    ((desc_len(sa->sec_desc->desc) + 3) << LDST_OFFSET_SHIFT));
+
+	/* wait for completion of previous operation */
+	append_jump(rjobd, JUMP_COND_CALM | (1 << JUMP_OFFSET_SHIFT));
+
+	/* jump back to remaining descriptor i.e jump back 9 words */
+	off = (-9) & 0x000000FF;
+	append_jump(rjobd, (off << JUMP_OFFSET_SHIFT));
+
+	/*
+	 * The following instructions are used to copy the completion
+	 * message into the output frame
+	 */
+
+	/* ld: deco-deco-ctrl len=0 offs=8 imm -auto-nfifo-entries */
+	append_cmd(rjobd, CMD_LOAD | DISABLE_AUTO_INFO_FIFO);
+
+	/* seqfifold: both msgdata-last2-last1-flush1 len=4 */
+	append_seq_fifo_load(rjobd, msg_len, FIFOLD_TYPE_MSG |
+			     FIFOLD_CLASS_BOTH | FIFOLD_TYPE_LAST1 |
+			     FIFOLD_TYPE_LAST2 | FIFOLD_TYPE_FLUSH1);
+
+	/* ld: deco-deco-ctrl len=0 offs=4 imm +auto-nfifo-entries */
+	append_cmd(rjobd, CMD_LOAD | ENABLE_AUTO_INFO_FIFO);
+
+	/* copy completion message */
+	append_move(rjobd, MOVE_SRC_INFIFO | MOVE_DEST_OUTFIFO | msg_len);
+
+	/* seqfifostr: msgdata len=4 */
+	append_seq_fifo_store(rjobd, FIFOST_TYPE_MESSAGE_DATA, msg_len);
+
+	/*
+	 * Exit replacement job descriptor, halt with user error
+	 * FD status will be a special user error, generated only on request by
+	 * a descriptor command
+	 */
+	append_cmd(rjobd, 0xA1C01002);
+
+	dma_unmap_single(sa->dpa_ipsec->jrdev, dma_shdesc,
+			 desc_len(sa->sec_desc->desc) * sizeof(u32),
+			 DMA_BIDIRECTIONAL);
+
+	dma_unmap_single(sa->dpa_ipsec->jrdev, out_addr,
+			 sizeof(sa->r_seq_num),
+			 DMA_BIDIRECTIONAL);
+
+	return 0;
+}
+
 static void split_key_done(struct device *dev, u32 * desc, u32 err,
 			   void *context)
 {

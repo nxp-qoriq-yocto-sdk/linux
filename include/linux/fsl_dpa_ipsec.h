@@ -536,10 +536,19 @@ struct dpa_ipsec_sa_modify_prm {
 
 	/* Use to select a modify operation */
 	enum dpa_ipsec_sa_modify_type type;
+
 	union {
+		/* Anti replay window size */
 		enum dpa_ipsec_arw arw;
-		uint32_t seq;
-		uint64_t ext_seq;
+
+		/*
+		 * 32 bit or extended sequence number depending on how the
+		 * SA was created by dpa_ipsec_create_sa
+		 * Only the least significant word is used for 32 bit SEQ
+		 */
+		uint64_t seq_num;
+
+		/* New cryptographic parameters for this SA */
 		struct dpa_ipsec_sa_crypto_params crypto_params;
 	};
 };
@@ -563,6 +572,27 @@ struct dpa_ipsec_sa_modify_prm {
  *
  */
 int dpa_ipsec_sa_modify(int sa_id, struct dpa_ipsec_sa_modify_prm *modify_prm);
+
+/*
+ * Request the sequence number of an SA asynchronous
+ *
+ * SEC will dequeue a frame with RJD, run it and after this create an
+ * output frame with status of user error. The frame will have always the
+ * length of 5 bytes, first one representing the operation code that has
+ * finished and the next 4 will determine the SA id on which the operation took
+ * place.
+ *
+ *
+ * Returned error code:
+ *	0 if successful;
+ *	-EBUSY if can't acquire lock for this SA
+ *	-ENXIO if failed to DMA map Replacement Job Descriptor
+ *	-ETXTBSY if failed to enqueue to SEC the FD with RJD
+ */
+int dpa_ipsec_sa_request_seq_number(int sa_id);
+
+int dpa_ipsec_sa_get_seq_number(int sa_id, uint64_t *seq);
+
 /*
  * The dpa_ipsec_sa_modify and dpa_ipsec_sa_get_seq_number are asynchronous
  * operations.

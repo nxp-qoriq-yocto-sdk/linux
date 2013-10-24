@@ -3380,6 +3380,7 @@ int dpa_ipsec_create_sa(int dpa_ipsec_id,
 	sa->child_sa = NULL;
 	sa->sa_rekeying_node.next = LIST_POISON1;
 	sa->sa_rekeying_node.prev = LIST_POISON2;
+	sa->read_seq_in_progress = false;
 
 	/* Copy SA params into the internal SA structure */
 	if (sa_is_outbound(sa))
@@ -5064,3 +5065,124 @@ int dpa_ipsec_sa_modify(int sa_id, struct dpa_ipsec_sa_modify_prm *modify_prm)
 	return ret;
 }
 EXPORT_SYMBOL(dpa_ipsec_sa_modify);
+int dpa_ipsec_sa_request_seq_number(int sa_id)
+{
+	struct dpa_ipsec_sa *sa;
+	dma_addr_t dma_rjobd;
+	uint32_t *rjobd;
+	struct qm_fd fd;
+	char msg[5];
+	const size_t msg_len = 5;
+	int ret;
+
+	sa = get_sa_from_sa_id(sa_id);
+	if (!sa) {
+		pr_err("Invalid SA id provided\n");
+		return -EINVAL;
+	}
+
+	ret = mutex_trylock(&sa->lock);
+	if (ret == 0) {
+		pr_err("SA %d is being used\n", sa->id);
+		return -EBUSY;
+	}
+
+	BUG_ON(!sa->dpa_ipsec);
+
+	if (sa->read_seq_in_progress) {
+		pr_err("A new request for SA %d can be done only after a get SEQ is done\n",
+			sa->id);
+		mutex_unlock(&sa->lock);
+		return -EBUSY;
+	}
+
+	msg[0] = DPA_IPSEC_SA_GET_SEQ_NUM_DONE;
+	*(u32 *)(&msg[1]) = sa->id;
+
+	ret = build_rjob_desc_seq_read(sa, msg_len);
+	if (ret < 0) {
+		pr_err("Failed to create RJOB for reading SEQ number\n");
+		mutex_unlock(&sa->lock);
+		return ret;
+	}
+
+	rjobd = sa->rjob_desc;
+
+	/* Copy completion message to the end of the RJOB */
+	memcpy(((char *)rjobd) + desc_len(rjobd) * CAAM_CMD_SZ, msg, msg_len);
+
+	dma_rjobd = dma_map_single(sa->dpa_ipsec->jrdev, rjobd,
+				   desc_len(rjobd) * CAAM_CMD_SZ + msg_len,
+				   DMA_BIDIRECTIONAL);
+	if (!dma_rjobd) {
+		pr_err("Failed DMA mapping the RJD for SA %d\n", sa->id);
+		mutex_unlock(&sa->lock);
+		return -ENXIO;
+	}
+
+	memset(&fd, 0x00, sizeof(struct qm_fd));
+	/* fill frame descriptor parameters */
+	fd.format = qm_fd_contig;
+	qm_fd_addr_set64(&fd, dma_rjobd);
+	fd.length20 = desc_len(rjobd) * sizeof(uint32_t) + msg_len;
+	fd.offset = 0;
+	fd.bpid = 0;
+	fd.cmd = FD_CMD_REPLACE_JOB_DESC;
+	ret = qman_enqueue(sa->to_sec_fq, &fd, 0);
+	if (ret != 0) {
+		pr_err("Could not enqueue frame with RJAD for SA %d\n", sa->id);
+		ret = -ETXTBSY;
+	}
+
+	/* Request has been done successfully */
+	sa->read_seq_in_progress = true;
+
+	dma_unmap_single(sa->dpa_ipsec->jrdev, dma_rjobd,
+			 desc_len(rjobd) * CAAM_CMD_SZ + msg_len,
+			 DMA_BIDIRECTIONAL);
+
+	mutex_unlock(&sa->lock);
+
+	return ret;
+}
+EXPORT_SYMBOL(dpa_ipsec_sa_request_seq_number);
+
+int dpa_ipsec_sa_get_seq_number(int sa_id, uint64_t *seq)
+{
+	struct dpa_ipsec_sa *sa;
+	int ret;
+
+	sa = get_sa_from_sa_id(sa_id);
+	if (!sa) {
+		pr_err("Invalid SA id provided\n");
+		return -EINVAL;
+	}
+
+	if (!seq) {
+		pr_err("Invalid SEQ parameter handle\n");
+		return -EINVAL;
+	}
+
+	ret = mutex_trylock(&sa->lock);
+	if (ret == 0) {
+		pr_err("SA %d is being used\n", sa_id);
+		return -EBUSY;
+	}
+
+	BUG_ON(!sa->dpa_ipsec);
+
+	if (!sa->read_seq_in_progress) {
+		pr_err("Prior to getting the SEQ number for SA %d a request must be made\n",
+			sa->id);
+		mutex_unlock(&sa->lock);
+		return -EBUSY;
+	}
+
+	*seq = sa->r_seq_num;
+	sa->read_seq_in_progress = false;
+
+	mutex_unlock(&sa->lock);
+
+	return 0;
+}
+EXPORT_SYMBOL(dpa_ipsec_sa_get_seq_number);
