@@ -1351,6 +1351,48 @@ free:
 		}
 		break;
 	}
+
+	case DPA_IPSEC_IOC_SA_REQUEST_SEQ_NUMBER: {
+		int sa_id;
+
+		if (copy_from_user(&sa_id, (int *)args, sizeof(int))) {
+			pr_err("Could not copy SA id\n");
+			return -EINVAL;
+		}
+
+		ret = dpa_ipsec_sa_request_seq_number(sa_id);
+		break;
+	}
+
+	case DPA_IPSEC_IOC_SA_GET_SEQ_NUMBER: {
+		struct ioc_dpa_ipsec_sa_get_seq_num prm;
+
+		if (copy_from_user(&prm,
+				   (struct ioc_dpa_ipsec_sa_get_seq_num *)args,
+				   sizeof(prm))) {
+			pr_err("Could not copy from user stats params\n");
+			return -EINVAL;
+		}
+
+		if (prm.sa_id < 0) {
+			pr_err("Invalid input SA id\n");
+			return -EINVAL;
+		}
+
+		ret = dpa_ipsec_sa_get_seq_number(prm.sa_id, &prm.seq);
+		if (ret < 0) {
+			pr_err("Get SEQ number for SA %d failed\n", prm.sa_id);
+			break;
+		}
+
+		if (copy_to_user((struct ioc_dpa_ipsec_sa_get_seq_num *)args,
+				 &prm, sizeof(prm))) {
+			pr_err("Could not copy SEQ number to user for SA %d\n", prm.sa_id);
+			return -EINVAL;
+		}
+		break;
+	}
+
 	default:
 		pr_err("Invalid DPA IPsec ioctl (0x%x)\n", cmd);
 		ret = -EINVAL;
