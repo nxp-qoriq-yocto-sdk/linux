@@ -533,6 +533,8 @@ enum dpa_ipsec_sa_modify_type {
 };
 
 struct dpa_ipsec_sa_modify_prm {
+
+	/* Use to select a modify operation */
 	enum dpa_ipsec_sa_modify_type type;
 	union {
 		enum dpa_ipsec_arw arw;
@@ -542,6 +544,43 @@ struct dpa_ipsec_sa_modify_prm {
 	};
 };
 
+/*
+ * Modify an SA asynchronous
+ *
+ * SEC will dequeue a frame with RDJ, run it and after this create an
+ * output frame with status of user error. The frame will have always the
+ * length of 5 bytes, first one representing the operation code that has
+ * finished and the next 4 will determine the SA id on which the operation took
+ * place.
+ *
+ * Returned error code:
+ *	0 if successful;
+ *	-EBUSY if can't acquire lock for this SA
+ *	-EINVAL if input parameters are wrong
+ *	-ENXIO if failed to DMA map Replacement Job Descriptor or SHD
+ *	-ETXTBSY if failed to enqueue to SEC the FD with RJD
+ *	-EALREADY if ARS is already set to the required value
+ *
+ */
 int dpa_ipsec_sa_modify(int sa_id, struct dpa_ipsec_sa_modify_prm *modify_prm);
+/*
+ * The dpa_ipsec_sa_modify and dpa_ipsec_sa_get_seq_number are asynchronous
+ * operations.
+ *
+ * When finished the frame exiting the SEC will have the status
+ * of user error and inside the frame (total length 5 bytes) the first byte will
+ * be the code of the operation that has finished followed by the SA id in the
+ * next 4 bytes.
+ *
+ * Use this enumeration to know what asynchronous operation has finished and on
+ * what SA.
+ */
+enum dpa_ipsec_sa_operation_code {
+	DPA_IPSEC_SA_MODIFY_ARS_DONE = 0,
+	DPA_IPSEC_SA_MODIFY_SEQ_NUM_DONE,
+	DPA_IPSEC_SA_MODIFY_EXT_SEQ_NUM_DONE,
+	DPA_IPSEC_SA_MODIFY_CRYPTO_DONE,
+	DPA_IPSEC_SA_GET_SEQ_NUM_DONE
+};
 
 #endif	/* __FSL_DPA_IPSEC_H */

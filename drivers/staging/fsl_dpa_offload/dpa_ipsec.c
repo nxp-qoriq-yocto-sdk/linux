@@ -4979,6 +4979,8 @@ int dpa_ipsec_sa_modify(int sa_id, struct dpa_ipsec_sa_modify_prm *modify_prm)
 	dma_addr_t dma_rjobd;
 	uint32_t *rjobd;
 	struct qm_fd fd;
+	char msg[5];
+	const size_t msg_len = 5;
 	int ret;
 
 	if (!modify_prm) {
@@ -5000,9 +5002,13 @@ int dpa_ipsec_sa_modify(int sa_id, struct dpa_ipsec_sa_modify_prm *modify_prm)
 
 	BUG_ON(!sa->dpa_ipsec);
 
+	/* Set the SA id in the message that will be in the output SEC frame */
+	*(u32 *)(&msg[1]) = sa->id;
+
 	switch (modify_prm->type) {
 	case DPA_IPSEC_SA_MODIFY_ARS:
-		ret = build_rjob_desc_ars_update(sa, modify_prm->arw);
+		msg[0] = DPA_IPSEC_SA_MODIFY_ARS_DONE;
+		ret = build_rjob_desc_ars_update(sa, modify_prm->arw, msg_len);
 		if (ret < 0)
 			return ret;
 		break;
@@ -5022,11 +5028,16 @@ int dpa_ipsec_sa_modify(int sa_id, struct dpa_ipsec_sa_modify_prm *modify_prm)
 	}
 
 	rjobd = sa->rjob_desc;
+
+	/* Copy completion message to the end of the RJOB */
+	memcpy(((char *)rjobd) + desc_len(rjobd) * CAAM_CMD_SZ, msg, msg_len);
+
 	dma_rjobd = dma_map_single(sa->dpa_ipsec->jrdev, rjobd,
-				   desc_len(rjobd) * CAAM_CMD_SZ,
+				   desc_len(rjobd) * CAAM_CMD_SZ + msg_len,
 				   DMA_BIDIRECTIONAL);
 	if (!dma_rjobd) {
 		pr_err("Failed DMA mapping the RJD for SA %d\n", sa->id);
+		mutex_unlock(&sa->lock);
 		return -ENXIO;
 	}
 
@@ -5034,7 +5045,7 @@ int dpa_ipsec_sa_modify(int sa_id, struct dpa_ipsec_sa_modify_prm *modify_prm)
 	/* fill frame descriptor parameters */
 	fd.format = qm_fd_contig;
 	qm_fd_addr_set64(&fd, dma_rjobd);
-	fd.length20 = desc_len(rjobd) * sizeof(uint32_t);
+	fd.length20 = desc_len(rjobd) * sizeof(uint32_t) + msg_len;
 	fd.offset = 0;
 	fd.bpid = 0;
 	fd.cmd = FD_CMD_REPLACE_JOB_DESC;
@@ -5045,7 +5056,8 @@ int dpa_ipsec_sa_modify(int sa_id, struct dpa_ipsec_sa_modify_prm *modify_prm)
 	}
 
 	dma_unmap_single(sa->dpa_ipsec->jrdev, dma_rjobd,
-			 desc_len(rjobd) * CAAM_CMD_SZ, DMA_BIDIRECTIONAL);
+			 desc_len(rjobd) * CAAM_CMD_SZ + msg_len,
+			 DMA_BIDIRECTIONAL);
 
 	mutex_unlock(&sa->lock);
 

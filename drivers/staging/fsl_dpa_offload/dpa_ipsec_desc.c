@@ -1472,17 +1472,17 @@ done_shared_desc:
 
 /*
  * Create descriptor for updating the anti replay window size
- * [21] B0951A17       jobhdr: shrsz=21 shr share=serial reo len=23
- * [22] 00000000               sharedesc->@0x02abb5008
- * [23] 2ABB5008
+ * [21] B0951A1D       jobhdr: shrsz=21 shr share=serial reo len=29
+ * [22] 00000000               sharedesc->@0x029a9a608
+ * [23] 29A9A608
  * [24] 79340008         move: descbuf+0[00] -> math0, len=8 wait
  * [25] A82CC108         math: (0 - 1)->math1 len=8
  * [26] AC214108         math: (math1 - imm1)->math1 len=8 ifb
  * [27] 000000C0               imm1=192
  * [28] A8501008         math: (math0 & math1)->math0 len=8
  * [29] 1640180A           ld: deco-descbuf len=10 offs=24
- * [30] 00000000               ptr->@0x02abb5434
- * [31] 2ABB5434
+ * [30] 00000000               ptr->@0x02965ca34
+ * [31] 2965CA34
  * [32] A1001001         jump: jsl1 all-match[calm] offset=1 local->[33]
  * [33] A00000F7         jump: all-match[] always-jump offset=-9 local->[24]
  * [34] AC404008         math: (math0 | imm1)->math0 len=8 ifb
@@ -1490,13 +1490,23 @@ done_shared_desc:
  * [36] 79430008         move: math0 -> descbuf+0[00], len=8 wait
  * [37] 79631804         move: math2 -> descbuf+24[06], len=4 wait
  * [38] 56420107          str: deco-shrdesc+1 len=7
- * [39] A8034304         math: (math3 + imm1)->math3 len=4
- * [40] 00000000               imm1=0
- * [41] 78720008         move: math3+0 -> ofifo, len=8
- * [42] 68300008	 seqfifostr: msgdata len=8
- * [43] A1C01002         jump: jsl1 all-match[calm] halt-user status=2
+ * [39] 16401806           ld: deco-descbuf len=6 offs=24
+ * [40] 00000000               ptr->@0x02965ca5c
+ * [41] 2965CA5C
+ * [42] A1001001         jump: jsl1 all-match[calm] offset=1 local->[43]
+ * [43] A00000F7         jump: all-match[] always-jump offset=-9 local->[34]
+ * [44] 16860800           ld: deco-ctrl len=0 offs=8 imm -auto-nfifo-entries
+ * [45] 2E17000A    seqfifold: both msgdata-last2-last1-flush1 len=10
+ * [46] 16860400           ld: deco-ctrl len=0 offs=4 imm +auto-nfifo-entries
+ * [47] 7882000A         move: ififo->deco-alnblk -> ofifo, len=10
+ * [48] 6830000A   seqfifostr: msgdata len=10
+ * [49] A1C01002         jump: jsl1 all-match[calm] halt-user status=2
+ *
+ * The msg_len represent the length of the message written in the output frame
+ * in order to differentiate between modify operations
  */
-int build_rjob_desc_ars_update(struct dpa_ipsec_sa *sa, enum dpa_ipsec_arw arw)
+int build_rjob_desc_ars_update(struct dpa_ipsec_sa *sa, enum dpa_ipsec_arw arw,
+			       u32 msg_len)
 {
 	uint32_t *desc, *rjobd, off;
 	uint8_t options;
@@ -1633,13 +1643,34 @@ int build_rjob_desc_ars_update(struct dpa_ipsec_sa *sa, enum dpa_ipsec_arw arw)
 		     LDST_CLASS_DECO | (1 << LDST_OFFSET_SHIFT) |
 		     LDST_SRCDST_WORD_DESCBUF_SHARED);
 
-	append_math_add_imm_u32(rjobd, REG3, REG3, IMM, sa->id);
+	append_load(rjobd,
+		    virt_to_phys((void *)(rjobd + 3 + 5 + 3 + 1 + 1 + 10)), 6,
+		    LDST_CLASS_DECO | LDST_SRCDST_WORD_DESCBUF |
+		    ((desc_len(sa->sec_desc->desc) + 3) << LDST_OFFSET_SHIFT));
 
-	/* move: ififo->deco-alnblk -> ofifo, len=4 */
-	append_move(rjobd, MOVE_SRC_MATH3 | MOVE_DEST_OUTFIFO | 8);
+	/* wait for completion of the previous operation */
+	append_jump(rjobd, JUMP_COND_CALM | (1 << JUMP_OFFSET_SHIFT));
+
+	/* jump back to remaining descriptor i.e jump back 9 words */
+	off = (-9) & 0x000000FF;
+	append_jump(rjobd, (off << JUMP_OFFSET_SHIFT));
+
+	/* ld: deco-deco-ctrl len=0 offs=8 imm -auto-nfifo-entries */
+	append_cmd(rjobd, CMD_LOAD | DISABLE_AUTO_INFO_FIFO);
+
+	/* seqfifold: both msgdata-last2-last1-flush1 len=4 */
+	append_seq_fifo_load(rjobd, msg_len, FIFOLD_TYPE_MSG |
+			     FIFOLD_CLASS_BOTH | FIFOLD_TYPE_LAST1 |
+			     FIFOLD_TYPE_LAST2 | FIFOLD_TYPE_FLUSH1);
+
+	/* ld: deco-deco-ctrl len=0 offs=4 imm +auto-nfifo-entries */
+	append_cmd(rjobd, CMD_LOAD | ENABLE_AUTO_INFO_FIFO);
+
+	/* message "Modify anti replay window for SA n" */
+	append_move(rjobd, MOVE_SRC_INFIFO | MOVE_DEST_OUTFIFO | msg_len);
 
 	/* seqfifostr: msgdata len=4 */
-	append_seq_fifo_store(rjobd, FIFOST_TYPE_MESSAGE_DATA, 8);
+	append_seq_fifo_store(rjobd, FIFOST_TYPE_MESSAGE_DATA, msg_len);
 
 	/*
 	 * Exit replacement job descriptor, halt with user error
