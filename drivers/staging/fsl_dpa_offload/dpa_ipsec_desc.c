@@ -80,7 +80,7 @@ int get_sec_info(struct dpa_ipsec *dpa_ipsec)
 		dpa_ipsec->sec_ver = SEC_DEF_VER;
 		sec_node = of_find_compatible_node(NULL, NULL, "fsl,sec-v4.0");
 		if (!sec_node) {
-			pr_err("Can't find device node for SEC! Check device tree!\n");
+			log_err("Can't find device node for SEC! Check device tree!\n");
 			return -ENODEV;
 		}
 	}
@@ -109,13 +109,13 @@ static struct device *get_jrdev(struct dpa_ipsec *dpa_ipsec)
 
 	sec_jr_node = of_find_matching_node(NULL, &sec_jr_match[0]);
 	if (!sec_jr_node) {
-		pr_err("Couln't find the device_node SEC job-ring, check the device tree\n");
+		log_err("Couln't find the device_node SEC job-ring, check the device tree\n");
 		return NULL;
 	}
 
 	sec_of_jr_dev = of_find_device_by_node(sec_jr_node);
 	if (!sec_of_jr_dev) {
-		pr_err("SEC job-ring of_device null\n");
+		log_err("SEC job-ring of_device null\n");
 		return NULL;
 	}
 
@@ -220,7 +220,7 @@ static inline int get_cipher_params(enum dpa_ipsec_cipher_alg cipher_alg,
 		*iv_length = 0;
 		*icv_length = 0;
 		*max_pad_length = 0;
-		pr_err("Unsupported cipher suite %d\n", cipher_alg);
+		log_err("Unsupported cipher suite %d\n", cipher_alg);
 		return -EINVAL;
 	}
 
@@ -905,7 +905,7 @@ int build_extended_encap_shared_descriptor(struct dpa_ipsec_sa *sa,
 
 	ret = built_encap_extra_material(sa, auth_key_dma, crypto_key_dma, 64);
 	if (ret < 0) {
-		pr_err("Failed to create extra CAAM commands\n");
+		log_err("Failed to create extra CAAM commands\n");
 		return -EAGAIN;
 	}
 
@@ -915,7 +915,7 @@ int build_extended_encap_shared_descriptor(struct dpa_ipsec_sa *sa,
 	/* get the jr device  */
 	jrdev = get_jrdev(sa->dpa_ipsec);
 	if (!jrdev) {
-		pr_err("Failed to get the job ring device, check the dts\n");
+		log_err("Failed to get the job ring device, check the dts\n");
 		return -EINVAL;
 	}
 
@@ -923,7 +923,7 @@ int build_extended_encap_shared_descriptor(struct dpa_ipsec_sa *sa,
 					extra_cmds_len * sizeof(uint32_t),
 					DMA_TO_DEVICE);
 	if (!dma_extra_cmds) {
-		pr_err("Could not DMA map extra CAAM commands\n");
+		log_err("Could not DMA map extra CAAM commands\n");
 		return -ENXIO;
 	}
 
@@ -1141,7 +1141,7 @@ int build_extended_decap_shared_descriptor(struct dpa_ipsec_sa *sa,
 	/* get the jr device  */
 	jrdev = get_jrdev(sa->dpa_ipsec);
 	if (!jrdev) {
-		pr_err("Failed to get the job ring device, check the dts\n");
+		log_err("Failed to get the job ring device, check the dts\n");
 		return -EINVAL;
 	}
 
@@ -1149,7 +1149,7 @@ int build_extended_decap_shared_descriptor(struct dpa_ipsec_sa *sa,
 					extra_cmds_len * sizeof(uint32_t),
 					DMA_TO_DEVICE);
 	if (!dma_extra_cmds) {
-		pr_err("Could not DMA map extra CAAM commands\n");
+		log_err("Could not DMA map extra CAAM commands\n");
 		return -ENXIO;
 	}
 
@@ -1391,7 +1391,7 @@ int create_sec_descriptor(struct dpa_ipsec_sa *sa)
 	/* get the jr device  */
 	jrdev = get_jrdev(sa->dpa_ipsec);
 	if (!jrdev) {
-		pr_err("Failed to get the job ring device, check the dts\n");
+		log_err("Failed to get the job ring device, check the dts\n");
 		return -EINVAL;
 	}
 
@@ -1405,7 +1405,7 @@ int create_sec_descriptor(struct dpa_ipsec_sa *sa)
 					      sa->auth_data.auth_key_len,
 					      DMA_TO_DEVICE);
 	if (!auth_key_dma) {
-		pr_err("Could not DMA map authentication key\n");
+		log_err("Could not DMA map authentication key\n");
 		return -EINVAL;
 	}
 
@@ -1413,7 +1413,7 @@ int create_sec_descriptor(struct dpa_ipsec_sa *sa)
 					sa->cipher_data.cipher_key_len,
 					DMA_TO_DEVICE);
 	if (!crypto_key_dma) {
-		pr_err("Could not DMA map cipher key\n");
+		log_err("Could not DMA map cipher key\n");
 		return -EINVAL;
 	}
 
@@ -1433,7 +1433,7 @@ int create_sec_descriptor(struct dpa_ipsec_sa *sa)
 		sa->sec_desc_extended = true;
 		goto build_extended_shared_desc;
 	default:
-		pr_err("Failed to create SEC descriptor for SA %d\n", sa->id);
+		log_err("Failed to create SEC descriptor for SA %d\n", sa->id);
 		return -EFAULT;
 	}
 
@@ -1448,7 +1448,7 @@ build_extended_shared_desc:
 				crypto_key_dma, sa->l2_hdr_size,
 				sa->dpa_ipsec->sec_era);
 	if (ret < 0) {
-		pr_err("Failed to create SEC descriptor for SA %d\n", sa->id);
+		log_err("Failed to create SEC descriptor for SA %d\n", sa->id);
 		return -EFAULT;
 	}
 
@@ -1517,7 +1517,8 @@ int build_rjob_desc_ars_update(struct dpa_ipsec_sa *sa, enum dpa_ipsec_arw arw,
 	/* Check input parameters */
 	BUG_ON(!sa);
 	if (sa->sa_dir != DPA_IPSEC_INBOUND) {
-		pr_err("ARS update not supported for outbound SA %d\n", sa->id);
+		log_err("ARS update not supported for outbound SA %d\n",
+			sa->id);
 		return -EINVAL;
 	}
 
@@ -1526,7 +1527,7 @@ int build_rjob_desc_ars_update(struct dpa_ipsec_sa *sa, enum dpa_ipsec_arw arw,
 	options = (uint8_t)(*(desc + 1) & 0x000000FF);
 	c_arw = options >> 6;
 	if (c_arw == arw) {
-		pr_err("SA %d has already set this ARS %d\n", sa->id, arw);
+		log_err("SA %d has already set this ARS %d\n", sa->id, arw);
 		return -EALREADY;
 	}
 
@@ -1535,7 +1536,7 @@ int build_rjob_desc_ars_update(struct dpa_ipsec_sa *sa, enum dpa_ipsec_arw arw,
 				    desc_len(sa->sec_desc->desc) * sizeof(u32),
 				    DMA_BIDIRECTIONAL);
 	if (!dma_shdesc) {
-		pr_err("Failed DMA map shared descriptor for SA %d\n", sa->id);
+		log_err("Failed DMA map shared descriptor for SA %d\n", sa->id);
 		return -ENXIO;
 	}
 
@@ -1602,7 +1603,7 @@ int build_rjob_desc_ars_update(struct dpa_ipsec_sa *sa, enum dpa_ipsec_arw arw,
 				       PDBOPTS_ESP_ARS64);
 		break;
 	default:
-		pr_err("Invalid ARS\n");
+		log_err("Invalid ARS\n");
 		BUG();
 	}
 
@@ -1705,7 +1706,7 @@ int build_rjob_desc_seq_read(struct dpa_ipsec_sa *sa, u32 msg_len)
 				    desc_len(sa->sec_desc->desc) * sizeof(u32),
 				    DMA_BIDIRECTIONAL);
 	if (!dma_shdesc) {
-		pr_err("Failed DMA map shared descriptor for SA %d\n", sa->id);
+		log_err("Failed DMA map shared descriptor for SA %d\n", sa->id);
 		return -ENXIO;
 	}
 
@@ -1713,7 +1714,7 @@ int build_rjob_desc_seq_read(struct dpa_ipsec_sa *sa, u32 msg_len)
 	out_addr = dma_map_single(sa->dpa_ipsec->jrdev, &sa->r_seq_num,
 				  sizeof(sa->r_seq_num), DMA_BIDIRECTIONAL);
 	if (!out_addr) {
-		pr_err("Failed DMA map output address for SA %d\n", sa->id);
+		log_err("Failed DMA map output address for SA %d\n", sa->id);
 		dma_unmap_single(sa->dpa_ipsec->jrdev, dma_shdesc,
 				 desc_len(sa->sec_desc->desc) * sizeof(u32),
 				 DMA_BIDIRECTIONAL);
@@ -1824,14 +1825,14 @@ int build_rjob_desc_seq_write(struct dpa_ipsec_sa *sa, u32 msg_len)
 				    desc_len(sa->sec_desc->desc) * sizeof(u32),
 				    DMA_BIDIRECTIONAL);
 	if (!dma_shdesc) {
-		pr_err("Failed DMA map shared descriptor for SA %d\n", sa->id);
+		log_err("Failed DMA map shared descriptor for SA %d\n", sa->id);
 		return -ENXIO;
 	}
 
 	in_addr = dma_map_single(sa->dpa_ipsec->jrdev, &sa->w_seq_num,
 				 sizeof(sa->w_seq_num), DMA_BIDIRECTIONAL);
 	if (!in_addr) {
-		pr_err("Failed DMA map output address for SA %d\n", sa->id);
+		log_err("Failed DMA map output address for SA %d\n", sa->id);
 		dma_unmap_single(sa->dpa_ipsec->jrdev, dma_shdesc,
 				 desc_len(sa->sec_desc->desc) * sizeof(u32),
 				 DMA_BIDIRECTIONAL);
@@ -1974,7 +1975,7 @@ int get_split_key_info(struct auth_params *auth_param, u32 *hmac_alg)
 		auth_param->split_key_len = 0;
 		break;
 	default:
-		pr_err("Unsupported authentication algorithm\n");
+		log_err("Unsupported authentication algorithm\n");
 		return -EINVAL;
 	}
 
@@ -2005,13 +2006,13 @@ int generate_split_key(struct auth_params *auth_param)
 
 	jrdev = get_jrdev(sa->dpa_ipsec);
 	if (!jrdev) {
-		pr_err("Could not get job ring device, please check dts\n");
+		log_err("Could not get job ring device, please check dts\n");
 		return -ENODEV;
 	}
 
 	desc = kmalloc(CAAM_CMD_SZ * 6 + CAAM_PTR_SZ * 2, GFP_KERNEL | GFP_DMA);
 	if (!desc) {
-		pr_err("Allocate memory failed for split key desc\n");
+		log_err("Allocate memory failed for split key desc\n");
 		return -ENOMEM;
 	}
 
@@ -2065,7 +2066,7 @@ int generate_split_key(struct auth_params *auth_param)
 	}
 
 	if (timeout == 0)
-		pr_err("Timeout waiting for job ring to complete\n");
+		log_err("Timeout waiting for job ring to complete\n");
 
 	dma_unmap_single(jrdev, dma_addr_out, auth_param->split_key_pad_len,
 			 DMA_FROM_DEVICE);
