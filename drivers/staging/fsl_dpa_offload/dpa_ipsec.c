@@ -4788,6 +4788,7 @@ int dpa_ipsec_sa_get_stats(int sa_id, struct dpa_ipsec_sa_stats *sa_stats)
 	struct dpa_ipsec_sa *sa;
 	int ret = 0;
 	uint32_t *desc;
+	struct dpa_cls_tbl_entry_stats stats;
 
 	if (!sa_stats) {
 		log_err("Invalid SA statistics storage pointer\n");
@@ -4823,65 +4824,60 @@ int dpa_ipsec_sa_get_stats(int sa_id, struct dpa_ipsec_sa_stats *sa_stats)
 		sa_stats->packets_count = *(desc + sa->stats_offset / 4 + 1);
 	}
 
-	if (sa->enable_extended_stats) {
-		struct dpa_cls_tbl_entry_stats stats;
+	if (!sa->enable_extended_stats)
+		goto sa_get_stats_return;
 
-		memset(&stats, 0, sizeof(stats));
+	memset(&stats, 0, sizeof(stats));
 
-		if (sa_is_inbound(sa)) { /* Inbound SA */
+	if (sa_is_inbound(sa)) { /* Inbound SA */
+		ret = dpa_classif_table_get_entry_stats_by_ref(
+					sa->inbound_sa_td,
+					sa->inbound_hash_entry,
+					&stats);
+		if (ret != 0) {
+			log_err("Failed to acquire total packets counter for inbound SA Id=%d.\n",
+				sa_id);
+			mutex_unlock(&sa->lock);
+			return ret;
+		} else {
+			sa_stats->input_packets	= stats.pkts;
+		}
+	} else { /* Outbound SA */
+		struct dpa_ipsec_policy_entry *out_policy;
+		struct dpa_ipsec_policy_params *policy_params;
+		struct dpa_ipsec_pre_sec_out_params *psop;
+		int table_idx, td;
+
+		psop = &sa->dpa_ipsec->config.pre_sec_out_params;
+
+		list_for_each_entry(out_policy, &sa->policy_headlist,
+									node) {
+			policy_params = &out_policy->pol_params;
+			if (IP_ADDR_TYPE_IPV4(policy_params->dest_addr))
+				table_idx = GET_POL_TABLE_IDX(
+						policy_params->protocol,
+						IPV4);
+			else
+				table_idx = GET_POL_TABLE_IDX(
+						policy_params->protocol,
+						IPV6);
+			td = psop->table[table_idx].dpa_cls_td;
 			ret = dpa_classif_table_get_entry_stats_by_ref(
-						sa->inbound_sa_td,
-						sa->inbound_hash_entry,
+						td,
+						out_policy->entry_id,
 						&stats);
 			if (ret != 0) {
-				log_err("Failed to acquire total packets "
-					"counter for inbound SA Id=%d.\n",
-					sa_id);
+				log_err("Failed to acquire total packets counter for outbound SA Id=%d. Failure occured on outbound policy table %d (td=%d).\n",
+					sa_id, table_idx, td);
 				mutex_unlock(&sa->lock);
-				return -EINVAL;
-			} else
-				sa_stats->input_packets	= stats.pkts;
-		} else { /* Outbound SA */
-			struct dpa_ipsec_policy_entry *out_policy;
-			struct dpa_ipsec_policy_params *policy_params;
-			struct dpa_ipsec_pre_sec_out_params *psop;
-			int table_idx, td;
-
-			psop = &sa->dpa_ipsec->config.pre_sec_out_params;
-
-			list_for_each_entry(out_policy, &sa->policy_headlist,
-									node) {
-				policy_params = &out_policy->pol_params;
-				if (IP_ADDR_TYPE_IPV4(policy_params->dest_addr))
-					table_idx =
-						GET_POL_TABLE_IDX(
-							policy_params->protocol,
-							IPV4);
-				else
-					table_idx =
-						GET_POL_TABLE_IDX(
-							policy_params->protocol,
-							IPV6);
-				td = psop->table[table_idx].dpa_cls_td;
-				ret = dpa_classif_table_get_entry_stats_by_ref(
-							td,
-							out_policy->entry_id,
-							&stats);
-				if (ret != 0) {
-					log_err("Failed to acquire total "
-						"packets counter for outbound "
-						"SA Id=%d. Failure occured on "
-						"outbound policy table %d "
-						"(td=%d).\n", sa_id, table_idx,
-						td);
-					mutex_unlock(&sa->lock);
-					return -EINVAL;
-				} else
-					sa_stats->input_packets	+= stats.pkts;
+				return ret;
+			} else {
+				sa_stats->input_packets	+= stats.pkts;
 			}
 		}
 	}
 
+sa_get_stats_return:
 	mutex_unlock(&sa->lock);
 
 	return ret;
@@ -4905,6 +4901,8 @@ int dpa_ipsec_get_stats(struct dpa_ipsec_stats *stats)
 
 	memset(stats, 0, sizeof(*stats));
 
+	mutex_lock(&dpa_ipsec->lock);
+
 	/* On inbound add up miss counters from all inbound pre-SEC tables: */
 	for (i = 0; i < DPA_IPSEC_MAX_SA_TYPE; i++) {
 		td = dpa_ipsec->config.pre_sec_in_params.dpa_cls_td[i];
@@ -4919,6 +4917,7 @@ int dpa_ipsec_get_stats(struct dpa_ipsec_stats *stats)
 		if (dpa_classif_table_get_params(td, &table_params)) {
 			log_err("Failed to acquire params for inbound table type %d (td=%d).\n",
 				i, td);
+			mutex_unlock(&dpa_ipsec->lock);
 			return -EINVAL;
 		}
 		if (table_params.type == DPA_CLS_TBL_HASH)
@@ -4932,6 +4931,7 @@ int dpa_ipsec_get_stats(struct dpa_ipsec_stats *stats)
 		if (err != E_OK) {
 			log_err("Failed to acquire miss statistics for inbound table type %d (td=%d, Cc node handle=0x%p).\n",
 				i, td, table_params.cc_node);
+			mutex_unlock(&dpa_ipsec->lock);
 			return -EINVAL;
 		} else {
 			stats->inbound_miss_pkts += miss_stats.frameCount;
@@ -4967,6 +4967,7 @@ int dpa_ipsec_get_stats(struct dpa_ipsec_stats *stats)
 		if (dpa_classif_table_get_params(td, &table_params)) {
 			log_err("Failed to acquire table params for outbound proto type #%d (td=%d).\n",
 				i, td);
+			mutex_unlock(&dpa_ipsec->lock);
 			return -EINVAL;
 		}
 		if (table_params.type == DPA_CLS_TBL_HASH)
@@ -4980,12 +4981,15 @@ int dpa_ipsec_get_stats(struct dpa_ipsec_stats *stats)
 		if (err != E_OK) {
 			log_err("Failed to acquire miss statistics for outbound proto type %d (td=%d, Cc node handle=0x%p).\n",
 				i, td, table_params.cc_node);
+			mutex_unlock(&dpa_ipsec->lock);
 			return -EINVAL;
 		} else {
 			stats->outbound_miss_pkts += miss_stats.frameCount;
 			stats->outbound_miss_bytes += miss_stats.byteCount;
 		}
 	}
+
+	mutex_unlock(&dpa_ipsec->lock);
 
 	return 0;
 }
