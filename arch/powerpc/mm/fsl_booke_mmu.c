@@ -259,3 +259,44 @@ void setup_initial_memory_limit(phys_addr_t first_memblock_base,
 	memblock_set_current_limit(min_t(u64, limit, 0x04000000));
 }
 #endif
+
+#if defined(CONFIG_PPC64)
+void book3e_tlb_lock(void)
+{
+	struct paca_struct *paca = get_paca();
+	struct tlb_per_core *percore;
+	unsigned long tmp;
+
+	if (!(paca->tlb_per_core_ptr & 1))
+		return;
+
+	percore = (struct tlb_per_core *)(paca->tlb_per_core_ptr & ~1UL);
+
+	asm volatile("1: lbarx %0, 0, %1;"
+		     "cmpdi %0, 0;"
+		     "bne 2f;"
+		     "li %0, 1;"
+		     "stbcx. %0, 0, %1;"
+		     "bne 1b;"
+		     "b 3f;"
+		     "2: lbzx %0, 0, %1;"
+		     "cmpdi %0, 0;"
+		     "bne 2b;"
+		     "b 1b;"
+		     "3:" : "=&r" (tmp) : "r" (&percore->lock) : "memory");
+}
+
+void book3e_tlb_unlock(void)
+{
+	struct paca_struct *paca = get_paca();
+	struct tlb_per_core *percore;
+
+	if (!(paca->tlb_per_core_ptr & 1))
+		return;
+
+	percore = (struct tlb_per_core *)(paca->tlb_per_core_ptr & ~1UL);
+
+	isync();
+	percore->lock = 0;
+}
+#endif
