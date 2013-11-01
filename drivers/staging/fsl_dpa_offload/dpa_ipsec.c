@@ -4908,9 +4908,17 @@ int dpa_ipsec_get_stats(struct dpa_ipsec_stats *stats)
 	/* On inbound add up miss counters from all inbound pre-SEC tables: */
 	for (i = 0; i < DPA_IPSEC_MAX_SA_TYPE; i++) {
 		td = dpa_ipsec->config.pre_sec_in_params.dpa_cls_td[i];
+
+		/*
+		 * Check if this policy table is defined by the user. If not,
+		 * skip to the next.
+		 */
+		if (td == DPA_OFFLD_DESC_NONE)
+			continue;
+
 		if (dpa_classif_table_get_params(td, &table_params)) {
-			log_err("Failed to acquire params for inbound table "
-				"type %d (td=%d).\n", i, td);
+			log_err("Failed to acquire params for inbound table type %d (td=%d).\n",
+				i, td);
 			return -EINVAL;
 		}
 		if (table_params.type == DPA_CLS_TBL_HASH)
@@ -4922,8 +4930,7 @@ int dpa_ipsec_get_stats(struct dpa_ipsec_stats *stats)
 					table_params.cc_node,
 					&miss_stats);
 		if (err != E_OK) {
-			log_err("Failed to acquire miss statistics for inbound "
-				"table type %d (td=%d, Cc node handle=0x%p).\n",
+			log_err("Failed to acquire miss statistics for inbound table type %d (td=%d, Cc node handle=0x%p).\n",
 				i, td, table_params.cc_node);
 			return -EINVAL;
 		} else {
@@ -4935,9 +4942,19 @@ int dpa_ipsec_get_stats(struct dpa_ipsec_stats *stats)
 	/* On outbound add up miss statistics from all outbound pre-SEC tables: */
 	for (i = 0; i < DPA_IPSEC_MAX_SUPPORTED_PROTOS; i++) {
 		td = dpa_ipsec->config.pre_sec_out_params.table[i].dpa_cls_td;
-		/* Some applications are using the same tables in more than one
-		 * role on the outbound, hence we need check to whether we
-		 * haven't already processed this table: */
+
+		/*
+		 * Check if this protocol table is defined by the user. If not,
+		 * skip to the next.
+		 */
+		if (td == DPA_OFFLD_DESC_NONE)
+			continue;
+
+		/*
+		 * Some applications are using the same tables in more than one
+		 * role on the outbound, hence we need to check whether we
+		 * haven't already processed this table:
+		 */
 		for (j = 0; j < i; j++) {
 			if (td == dpa_ipsec->config.pre_sec_out_params.
 							table[j].dpa_cls_td)
@@ -4948,8 +4965,8 @@ int dpa_ipsec_get_stats(struct dpa_ipsec_stats *stats)
 			continue;
 
 		if (dpa_classif_table_get_params(td, &table_params)) {
-			log_err("Failed to acquire table params for outbound "
-				"proto type #%d (td=%d).\n", i, td);
+			log_err("Failed to acquire table params for outbound proto type #%d (td=%d).\n",
+				i, td);
 			return -EINVAL;
 		}
 		if (table_params.type == DPA_CLS_TBL_HASH)
@@ -4961,8 +4978,7 @@ int dpa_ipsec_get_stats(struct dpa_ipsec_stats *stats)
 						table_params.cc_node,
 						&miss_stats);
 		if (err != E_OK) {
-			log_err("Failed to acquire miss statistics for outbound "
-				"proto type %d (td=%d, Cc node handle=0x%p).\n",
+			log_err("Failed to acquire miss statistics for outbound proto type %d (td=%d, Cc node handle=0x%p).\n",
 				i, td, table_params.cc_node);
 			return -EINVAL;
 		} else {
