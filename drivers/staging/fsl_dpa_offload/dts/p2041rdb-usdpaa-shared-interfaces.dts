@@ -132,6 +132,14 @@
                         fsl,qman-frame-queues-tx = <5008 8>;
                         local-mac-address = [00 11 22 33 44 66];
                 };
+		ethernet@18 {
+                        compatible = "fsl,p2041-dpa-ethernet", "fsl,dpa-ethernet-macless";
+                        fsl,bman-buffer-pools = <&bp16>;
+                        fsl,qman-frame-queues-rx = <6000 8>;
+                        fsl,qman-frame-queues-tx = <6008 8>;
+                        local-mac-address = [00 11 22 33 44 77];
+                };
+
                 dpa-fman0-oh@1 {
                         compatible = "fsl,dpa-oh";
                         fsl,qman-frame-queues-oh = <0x64 1 0x65 1>;
