@@ -2619,7 +2619,7 @@ static int set_cls_cnt_ipsec_cb(struct dpa_stats_cnt_cb *cnt_cb,
 	}
 
 	/* Allocate memory for array of security association ids */
-	cnt_cb->ipsec_cb.sa_id = kcalloc(cnt_cb->members_num,
+	cnt_cb->ipsec_cb.sa_id = kcalloc(prm->class_members,
 				  sizeof(*cnt_cb->ipsec_cb.sa_id), GFP_KERNEL);
 	if (!cnt_cb->ipsec_cb.sa_id) {
 		log_err("Cannot allocate memory for array of security "
@@ -2628,7 +2628,7 @@ static int set_cls_cnt_ipsec_cb(struct dpa_stats_cnt_cb *cnt_cb,
 	}
 
 	/* Allocate memory for array that stores if SA id is valid */
-	cnt_cb->ipsec_cb.valid = kcalloc(cnt_cb->members_num,
+	cnt_cb->ipsec_cb.valid = kcalloc(prm->class_members,
 				  sizeof(*cnt_cb->ipsec_cb.valid), GFP_KERNEL);
 	if (!cnt_cb->ipsec_cb.valid) {
 		log_err("Cannot allocate memory for array that stores if "
@@ -2637,16 +2637,12 @@ static int set_cls_cnt_ipsec_cb(struct dpa_stats_cnt_cb *cnt_cb,
 		return -ENOMEM;
 	}
 
+	cnt_cb->members_num = prm->class_members;
+
 	/* Map IPSec counter selection to statistics */
 	err = cnt_gen_sel_to_stats(cnt_cb, prm->ipsec_params.cnt_sel);
 	if (err < 0)
 		return err;
-
-	cnt_cb->members_num = prm->class_members;
-
-	/* Set number of bytes that will be written by this counter */
-	cnt_cb->bytes_num = cnt_cb->members_num *
-			STATS_VAL_SIZE * cnt_cb->info.stats_num;
 
 	for (i = 0; i < prm->class_members; i++) {
 		if (prm->ipsec_params.sa_id[i] != DPA_OFFLD_INVALID_OBJECT_ID) {

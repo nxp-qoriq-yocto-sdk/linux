@@ -971,7 +971,7 @@ static int do_ioctl_stats_create_class_counter(void *args)
 		break;
 	case DPA_STATS_CNT_IPSEC:
 		/* Allocate memory to store the sa ids array */
-		sa_ids = kmalloc(prm.cnt_params.class_members, GFP_KERNEL);
+		sa_ids = kmalloc(cls_mbrs * sizeof(*sa_ids), GFP_KERNEL);
 		if (!sa_ids) {
 			log_err("Cannot allocate memory for SA ids array\n");
 			return -ENOMEM;
@@ -979,7 +979,7 @@ static int do_ioctl_stats_create_class_counter(void *args)
 
 		if (copy_from_user(sa_ids,
 				prm.cnt_params.ipsec_params.sa_id,
-				(prm.cnt_params.class_members * sizeof(int)))) {
+				(cls_mbrs * sizeof(*sa_ids)))) {
 			log_err("Cannot copy from user array of SA ids\n");
 			kfree(sa_ids);
 			return -EBUSY;
