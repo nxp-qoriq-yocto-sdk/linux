@@ -211,6 +211,11 @@ static int caam_probe(struct platform_device *pdev)
 #endif
 	u64 cha_vid;
 
+	nprop = pdev->dev.of_node;
+
+	if (of_device_is_compatible(nprop, "fsl,sec-v6.0"))
+		return -ENODEV;
+
 	ctrlpriv = kzalloc(sizeof(struct caam_drv_private), GFP_KERNEL);
 	if (!ctrlpriv)
 		return -ENOMEM;
@@ -218,7 +223,6 @@ static int caam_probe(struct platform_device *pdev)
 	dev = &pdev->dev;
 	dev_set_drvdata(dev, ctrlpriv);
 	ctrlpriv->pdev = pdev;
-	nprop = pdev->dev.of_node;
 
 	/* Get configuration properties from device tree */
 	/* First, get register page */

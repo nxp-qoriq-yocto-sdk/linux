@@ -2201,6 +2201,9 @@ static int __init caam_algapi_init(void)
 			return -ENODEV;
 	}
 
+	if (of_device_is_compatible(dev_node,"fsl,sec-v6.0"))
+		return -ENODEV;
+
 	pdev = of_find_device_by_node(dev_node);
 	if (!pdev)
 		return -ENODEV;
