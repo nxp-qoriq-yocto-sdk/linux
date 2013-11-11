@@ -74,6 +74,18 @@ config CRYPTO_DEV_FSL_CAAM_CRYPTO_API
 	  To compile this as a module, choose M here: the module
 	  will be called caamalg.
 
+config FSL_CAAM_PKC_SUPPORT
+	tristate "Public Key Cryptography Support in CAAM driver"
+	depends on CRYPTO_DEV_FSL_CAAM_CRYPTO_API
+	default y
+	help
+	  Selecting this will allow SEC Public key support for
+	  RSA, DSA, DH, ECDH, ECDSA. Supported operations includes
+	  Keygen, Sign and Verify.
+
+	  To compile this as a module, choose M here: the module
+	  will be called caam_pkc.
+
 config CRYPTO_DEV_FSL_CAAM_CRYPTO_API_QI
 	tristate "Queue Interface as Crypto API backend"
 	depends on CRYPTO_DEV_FSL_CAAM_CRYPTO_API && FSL_QMAN
