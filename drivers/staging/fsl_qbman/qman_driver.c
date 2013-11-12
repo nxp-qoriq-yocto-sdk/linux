@@ -592,7 +592,7 @@ static struct qman_portal *init_pcfg(struct qm_portal_config *pcfg)
 	struct qman_portal *p;
 
 	pcfg->iommu_domain = NULL;
-	portal_set_cpu(pcfg, pcfg->public_cfg.cpu);
+	portal_set_cpu(pcfg, get_hard_smp_processor_id(pcfg->public_cfg.cpu));
 	p = qman_create_affine_portal(pcfg, NULL);
 	if (p) {
 		u32 irq_sources = 0;
@@ -686,7 +686,8 @@ static void qman_online_cpu(unsigned int cpu)
 		pcfg = qman_get_qm_portal_config(p);
 		if (pcfg) {
 			irq_set_affinity(pcfg->public_cfg.irq, cpumask_of(cpu));
-			qman_portal_update_sdest(pcfg, cpu);
+			qman_portal_update_sdest(pcfg,
+					get_hard_smp_processor_id(cpu));
 		}
 	}
 }
