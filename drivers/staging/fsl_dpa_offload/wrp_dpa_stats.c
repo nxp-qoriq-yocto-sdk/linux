@@ -279,8 +279,7 @@ ssize_t wrp_dpa_stats_read(struct file *file,
 					 wrp_dpa_stats.k_mem +
 					 event->params.storage_area_offset,
 					 event->params.bytes_written)) {
-				log_err("Cannot copy counter values to storage "
-					"area\n");
+				log_err("Cannot copy counter values to storage area\n");
 				return -EFAULT;
 			}
 		}
@@ -344,8 +343,7 @@ ssize_t wrp_dpa_stats_read(struct file *file,
 					 wrp_dpa_stats.k_mem +
 					 event->params.storage_area_offset,
 					 event->params.bytes_written)) {
-				log_err("Cannot copy counter values to storage "
-					"area\n");
+				log_err("Cannot copy counter values to storage area\n");
 				return -EFAULT;
 			}
 		}
@@ -550,8 +548,7 @@ static long do_ioctl_stats_init(struct ioc_dpa_stats_params *prm)
 		 */
 		params.storage_area = phys_to_virt(prm->phys_stg_area);
 		if (!params.storage_area) {
-			log_err("Invalid physical memory address for storage "
-				"area\n");
+			log_err("Invalid physical memory address for storage area\n");
 			return -EINVAL;
 		}
 		wrp_dpa_stats.k_mem = NULL;
@@ -563,8 +560,7 @@ static long do_ioctl_stats_init(struct ioc_dpa_stats_params *prm)
 		params.storage_area = kzalloc(
 				prm->storage_area_len, GFP_KERNEL);
 		if (!params.storage_area) {
-			log_err("Cannot allocate memory for kernel storage "
-				"area\n");
+			log_err("Cannot allocate memory for kernel storage area\n");
 			return -ENOMEM;
 		}
 
@@ -584,8 +580,7 @@ static long do_ioctl_stats_init(struct ioc_dpa_stats_params *prm)
 	wrp_dpa_stats.async_req_group = kmalloc(DPA_STATS_MAX_NUM_OF_REQUESTS *
 				sizeof(struct list_head), GFP_KERNEL);
 	if (!wrp_dpa_stats.async_req_group) {
-		log_err("Cannot allocate memory for asynchronous requests "
-			"group\n");
+		log_err("Cannot allocate memory for asynchronous requests group\n");
 		return -ENOMEM;
 	}
 
@@ -607,8 +602,7 @@ static long do_ioctl_stats_init(struct ioc_dpa_stats_params *prm)
 				list_del(&async_req_ev->node);
 				kfree(async_req_ev);
 			}
-			log_err("Cannot allocate memory for asynchronous "
-				"request event\n");
+			log_err("Cannot allocate memory for asynchronous request event\n");
 			return -ENOMEM;
 		}
 
@@ -838,8 +832,7 @@ static int do_ioctl_stats_create_class_counter(void *args)
 		/* Allocate memory to store the sources array */
 		eth_src = kmalloc(sizeof(*eth_src) * cls_mbrs, GFP_KERNEL);
 		if (!eth_src) {
-			log_err("Cannot allocate memory for Ethernet sources "
-				"array\n");
+			log_err("Cannot allocate memory for Ethernet sources array\n");
 			return -ENOMEM;
 		}
 
@@ -900,8 +893,7 @@ static int do_ioctl_stats_create_class_counter(void *args)
 			tbl->keys = kzalloc(cls_mbrs *
 					    sizeof(**tbl->keys), GFP_KERNEL);
 			if (!tbl->keys) {
-				log_err("Cannot allocate kernel memory for "
-					"lookup keys array\n");
+				log_err("Cannot allocate kernel memory for lookup keys array\n");
 				return -ENOMEM;
 			}
 
@@ -923,8 +915,7 @@ static int do_ioctl_stats_create_class_counter(void *args)
 			tbl->pairs = kzalloc(cls_mbrs *
 					    sizeof(**tbl->pairs), GFP_KERNEL);
 			if (!tbl->pairs) {
-				log_err("Cannot allocate kernel memory for "
-					"lookup pairs array\n");
+				log_err("Cannot allocate kernel memory for lookup pairs array\n");
 				return -ENOMEM;
 			}
 
@@ -934,8 +925,7 @@ static int do_ioctl_stats_create_class_counter(void *args)
 				ret = copy_pair_descriptor(us_pairs[i],
 						&tbl->pairs[i]);
 				if (ret != 0) {
-					log_err("Could not copy the "
-					       "pair key descriptor\n");
+					log_err("Could not copy the pair key descriptor\n");
 					goto create_cls_counter_cleanup;
 				}
 			}
@@ -1330,8 +1320,7 @@ static int do_ioctl_stats_modify_class_counter(void *args)
 	}
 
 	if (copy_to_user(args, &prm, sizeof(prm))) {
-		log_err("Could not write "
-		       "dpa_stats_modify_class_counter result\n");
+		log_err("Could not write dpa_stats_modify_class_counter result\n");
 		ret = -EBUSY;
 	}
 
@@ -1374,8 +1363,7 @@ static int do_ioctl_stats_compat_modify_class_counter(void *args)
 
 		if (copy_from_user(&pair, compat_ptr(uprm.params.pair),
 				   (sizeof(pair)))) {
-			log_err("Cannot copy from user array of "
-				"lookup pairs\n");
+			log_err("Cannot copy from user array of lookup pairs\n");
 			return -EBUSY;
 		}
 
@@ -1449,8 +1437,7 @@ static int do_ioctl_stats_get_counters(void *args)
 	cnts_ids = kzalloc(prm.req_params.cnts_ids_len *
 			   sizeof(int), GFP_KERNEL);
 	if (!cnts_ids) {
-		log_err("Cannot allocate memory for requested counter ids "
-			"array\n");
+		log_err("Cannot allocate memory for requested counter ids array\n");
 		return -ENOMEM;
 	}
 
@@ -1458,8 +1445,7 @@ static int do_ioctl_stats_get_counters(void *args)
 	if (copy_from_user(cnts_ids,
 			   prm.req_params.cnts_ids,
 			   (prm.req_params.cnts_ids_len * sizeof(int)))) {
-		log_err("Cannot copy from user array of requested counter "
-			"ids\n");
+		log_err("Cannot copy from user array of requested counter ids\n");
 		kfree(prm.req_params.cnts_ids);
 		return -EINVAL;
 	}
@@ -1488,8 +1474,7 @@ static int do_ioctl_stats_get_counters(void *args)
 					  (wrp_dpa_stats.k_mem +
 					  prm.req_params.storage_area_offset),
 					  prm.cnts_len)) {
-				log_err("Cannot copy counter values to storage "
-					"area\n");
+				log_err("Cannot copy counter values to storage area\n");
 				return -EINVAL;
 			}
 
@@ -1530,8 +1515,7 @@ static int do_ioctl_stats_compat_get_counters(void *args)
 	kprm.req_params.cnts_ids = kzalloc(kprm.req_params.cnts_ids_len *
 					   sizeof(int), GFP_KERNEL);
 	if (!kprm.req_params.cnts_ids) {
-		log_err("Cannot allocate memory for requested counter ids "
-			"array\n");
+		log_err("Cannot allocate memory for requested counter ids array\n");
 		return -ENOMEM;
 	}
 
@@ -1539,8 +1523,7 @@ static int do_ioctl_stats_compat_get_counters(void *args)
 	if (copy_from_user(kprm.req_params.cnts_ids,
 			   (compat_ptr)(uprm.req_params.cnts_ids),
 			   (kprm.req_params.cnts_ids_len * sizeof(int)))) {
-		log_err("Cannot copy from user the array of requested counter "
-			"ids\n");
+		log_err("Cannot copy from user the array of requested counter ids\n");
 		kfree(kprm.req_params.cnts_ids);
 		return -EINVAL;
 	}
@@ -1572,8 +1555,7 @@ static int do_ioctl_stats_compat_get_counters(void *args)
 					(wrp_dpa_stats.k_mem +
 					kprm.req_params.storage_area_offset),
 					kprm.cnts_len)) {
-				log_err("Cannot copy counter values to storage "
-					"area\n");
+				log_err("Cannot copy counter values to storage area\n");
 				kfree(kprm.req_params.cnts_ids);
 				return -EINVAL;
 			}
@@ -1583,8 +1565,7 @@ static int do_ioctl_stats_compat_get_counters(void *args)
 		if (copy_to_user((compat_ptr)(uprm.req_params.cnts_ids),
 				kprm.req_params.cnts_ids,
 				(kprm.req_params.cnts_ids_len * sizeof(int)))) {
-			log_err("Cannot copy to user the array of requested "
-				"counter ids\n");
+			log_err("Cannot copy to user the array of requested counter ids\n");
 			kfree(kprm.req_params.cnts_ids);
 			return -EINVAL;
 		}
@@ -1624,8 +1605,7 @@ static int do_ioctl_stats_reset_counters(void *args)
 	if (copy_from_user(cnt_ids,
 			prm.cnts_ids,
 			(prm.cnts_ids_len * sizeof(int)))) {
-		log_err("Cannot copy from user array of requested counter "
-			"ids\n");
+		log_err("Cannot copy from user array of requested counter ids\n");
 		kfree(cnt_ids);
 		return -EINVAL;
 	}
@@ -1707,8 +1687,7 @@ static long wrp_dpa_stats_do_ioctl(struct file *filp,
 
 		/* Copy parameters from user-space */
 		if (copy_from_user(&kparam, (void *)args, sizeof(kparam))) {
-			log_err("Cannot copy from user dpa_stats_init "
-				"arguments\n");
+			log_err("Cannot copy from user dpa_stats_init arguments\n");
 			return -EBUSY;
 		}
 
@@ -1790,8 +1769,7 @@ static long wrp_dpa_stats_do_compat_ioctl(struct file *filp,
 
 		/* Copy parameters from user space */
 		if (copy_from_user(&uparam, (void *)args, sizeof(uparam))) {
-			log_err("Cannot copy from user dpa_stats_init "
-				"arguments\n");
+			log_err("Cannot copy from user dpa_stats_init arguments\n");
 			return -EBUSY;
 		}
 		dpa_stats_init_compatcpy(&kparam, &uparam);
@@ -1871,8 +1849,7 @@ static long store_get_cnts_async_params(
 
 	mutex_lock(&wrp_dpa_stats.async_req_lock);
 	if (list_empty(&wrp_dpa_stats.async_req_pool)) {
-		log_err("Reached maximum supported number of simultaneous "
-			"asynchronous requests\n");
+		log_err("Reached maximum supported number of simultaneous asynchronous requests\n");
 		kfree(kprm->req_params.cnts_ids);
 		mutex_unlock(&wrp_dpa_stats.async_req_lock);
 		return -EDOM;
@@ -1921,15 +1898,13 @@ static int copy_key_descriptor(struct dpa_offload_lookup_key *src,
 		/* Allocate memory to store the key byte array */
 		tmp->byte = kmalloc(src->size, GFP_KERNEL);
 		if (!tmp->byte) {
-			log_err("Cannot allocate memory for key "
-				"descriptor byte\n");
+			log_err("Cannot allocate memory for key descriptor byte\n");
 			kfree(tmp);
 			return -ENOMEM;
 		}
 
 		if (copy_from_user(tmp->byte, src->byte, src->size)) {
-			log_err("Cannot copy from user the key "
-				"descriptor byte\n");
+			log_err("Cannot copy from user the key descriptor byte\n");
 			kfree(tmp->byte);
 			kfree(tmp);
 			return -EBUSY;
@@ -1940,16 +1915,14 @@ static int copy_key_descriptor(struct dpa_offload_lookup_key *src,
 		/* Allocate memory to store the key mask array */
 		tmp->mask = kmalloc(src->size, GFP_KERNEL);
 		if (!tmp->mask) {
-			log_err("Cannot allocate memory for key "
-				"descriptor mask\n");
+			log_err("Cannot allocate memory for key descriptor mask\n");
 			kfree(tmp->byte);
 			kfree(tmp);
 			return -ENOMEM;
 		}
 
 		if (copy_from_user(tmp->mask, src->mask, src->size)) {
-			log_err("Cannot copy from user the "
-				"key descriptor mask\n");
+			log_err("Cannot copy from user the key descriptor mask\n");
 			kfree(tmp->byte);
 			kfree(tmp->mask);
 			kfree(tmp);
@@ -1978,7 +1951,7 @@ static int copy_pair_descriptor(struct dpa_offload_lookup_key_pair *src,
 	if (src->first_key) {
 		ret = copy_key_descriptor(src->first_key, &tmp->first_key);
 		if (ret != 0) {
-			log_err("Could not copy the first key descriptor\n");
+			log_err("Cannot copy the first key descriptor\n");
 			kfree(tmp);
 			return ret;
 		}
@@ -1987,7 +1960,7 @@ static int copy_pair_descriptor(struct dpa_offload_lookup_key_pair *src,
 	if (src->second_key) {
 		ret = copy_key_descriptor(src->second_key, &tmp->second_key);
 		if (ret != 0) {
-			log_err("Could not copy the second key descriptor\n");
+			log_err("Cannot copy the second key descriptor\n");
 			if (tmp->first_key) {
 				kfree(tmp->first_key->byte);
 				kfree(tmp->first_key->mask);
@@ -2024,16 +1997,14 @@ static int copy_key_descriptor_compatcpy(
 		/* Allocate memory to store the key byte array */
 		kparam->byte = kmalloc(key.size, GFP_KERNEL);
 		if (!kparam->byte) {
-			log_err("Cannot allocate memory for key descriptor "
-				"byte\n");
+			log_err("Cannot allocate memory for key descriptor byte\n");
 			kfree(kparam);
 			return -ENOMEM;
 		}
 
 		if (copy_from_user(kparam->byte,
 				   compat_ptr(key.byte), key.size)) {
-			log_err("Cannot copy from user the key descriptor "
-				"byte\n");
+			log_err("Cannot copy from user the key descriptor byte\n");
 			kfree(kparam->byte);
 			kfree(kparam);
 			return -EBUSY;
@@ -2044,8 +2015,7 @@ static int copy_key_descriptor_compatcpy(
 		/* Allocate memory to store the key mask array */
 		kparam->mask = kmalloc(key.size, GFP_KERNEL);
 		if (!kparam->mask) {
-			log_err("Cannot allocate memory for key descriptor "
-				"mask\n");
+			log_err("Cannot allocate memory for key descriptor mask\n");
 			kfree(kparam->byte);
 			kfree(kparam);
 			return -ENOMEM;
@@ -2053,8 +2023,7 @@ static int copy_key_descriptor_compatcpy(
 
 		if (copy_from_user(kparam->mask,
 				   compat_ptr(key.mask), key.size)) {
-			log_err("Cannot copy from user the key descriptor "
-				"mask\n");
+			log_err("Cannot copy from user the key descriptor mask\n");
 			kfree(kparam->byte);
 			kfree(kparam->mask);
 			kfree(kparam);
@@ -2200,8 +2169,7 @@ static long dpa_stats_eth_cls_compatcpy(struct dpa_stats_cls_cnt_eth *kprm,
 	/* Allocate memory to store the sources array */
 	kprm->src = kzalloc(size, GFP_KERNEL);
 	if (!kprm->src) {
-		log_err("Cannot allocate kernel memory for Ethernet sources "
-			"array\n");
+		log_err("Cannot allocate kernel memory for Ethernet sources array\n");
 		return -ENOMEM;
 	}
 
@@ -2223,8 +2191,7 @@ static long dpa_stats_reass_cls_compatcpy(struct dpa_stats_cls_cnt_reass *kprm,
 	/* Allocate memory to store the array of user-space reass objects */
 	reass = kzalloc(sizeof(compat_uptr_t) * cls_members, GFP_KERNEL);
 	if (!reass) {
-		log_err("Cannot allocate memory for Reassembly objects "
-			"array\n");
+		log_err("Cannot allocate memory for Reassembly objects array\n");
 		return -ENOMEM;
 	}
 
@@ -2238,8 +2205,7 @@ static long dpa_stats_reass_cls_compatcpy(struct dpa_stats_cls_cnt_reass *kprm,
 	/* Allocate memory to store the array of kernel space reass objects */
 	kprm->reass = kzalloc((sizeof(void *) * cls_members), GFP_KERNEL);
 	if (!kprm->reass) {
-		log_err("Cannot allocate kernel memory for Reassembly objects "
-			"array\n");
+		log_err("Cannot allocate kernel memory for Reassembly objects array\n");
 		kfree(reass);
 		return -ENOMEM;
 	}
@@ -2263,15 +2229,13 @@ static long dpa_stats_frag_cls_compatcpy(struct dpa_stats_cls_cnt_frag *kprm,
 	/* Allocate memory to store the array of user-space frag objects */
 	ufrag = kzalloc(sizeof(compat_uptr_t) * cls_members, GFP_KERNEL);
 	if (!ufrag) {
-		log_err("Cannot allocate memory for Fragmentation objects "
-			"array\n");
+		log_err("Cannot allocate memory for Fragmentation objects array\n");
 		return -ENOMEM;
 	}
 
 	if (copy_from_user(ufrag, compat_ptr(uprm->frag),
 			(sizeof(compat_uptr_t) * cls_members))) {
-		log_err("Cannot copy from user array of Fragmentation "
-			"objects\n");
+		log_err("Cannot copy from user array of Fragmentation objects\n");
 		kfree(ufrag);
 		return -EBUSY;
 	}
@@ -2279,8 +2243,7 @@ static long dpa_stats_frag_cls_compatcpy(struct dpa_stats_cls_cnt_frag *kprm,
 	/* Allocate memory to store the array of kernel space frag objects */
 	kprm->frag = kzalloc((sizeof(void *) * cls_members), GFP_KERNEL);
 	if (!kprm->frag) {
-		log_err("Cannot allocate kernel memory for Fragmentation "
-			"objects array\n");
+		log_err("Cannot allocate kernel memory for Fragmentation objects array\n");
 		kfree(ufrag);
 		return -ENOMEM;
 	}
@@ -2318,8 +2281,7 @@ static long dpa_stats_plcr_cls_compatcpy(struct dpa_stats_cls_cnt_plcr *kprm,
 	/* Allocate memory to store the array of kernel space policer objects */
 	kprm->plcr = kzalloc((sizeof(void *) * cls_members), GFP_KERNEL);
 	if (!kprm->plcr) {
-		log_err("Cannot allocate kernel memory for Policer objects "
-			"array\n");
+		log_err("Cannot allocate kernel memory for Policer objects array\n");
 		kfree(uplcr);
 		return -ENOMEM;
 	}
@@ -2357,8 +2319,7 @@ static long dpa_stats_tbl_cls_compatcpy(
 	if (kprm->key_type == DPA_STATS_CLASSIF_SINGLE_KEY) {
 		if (copy_from_user(us_keys, compat_ptr(uprm->keys),
 				  (sizeof(compat_uptr_t) * cls_members))) {
-			log_err("Cannot copy from user-space array of keys "
-				"descriptors\n");
+			log_err("Cannot copy from user-space array of keys descriptors\n");
 			kfree(us_keys);
 			return -EBUSY;
 		}
@@ -2367,8 +2328,7 @@ static long dpa_stats_tbl_cls_compatcpy(
 		kprm->keys = kzalloc((sizeof(*kprm->keys) * cls_members),
 				     GFP_KERNEL);
 		if (!kprm->keys) {
-			log_err("Cannot allocate kernel memory for lookup keys "
-				"array\n");
+			log_err("Cannot allocate kernel memory for lookup keys array\n");
 			kfree(us_keys);
 			return -ENOMEM;
 		}
@@ -2390,8 +2350,7 @@ static long dpa_stats_tbl_cls_compatcpy(
 	if (kprm->key_type == DPA_STATS_CLASSIF_PAIR_KEY) {
 		if (copy_from_user(us_keys, compat_ptr(uprm->pairs),
 				  (sizeof(compat_uptr_t) * cls_members))) {
-			log_err("Cannot copy from user-space array of pairs "
-				"descriptors\n");
+			log_err("Cannot copy from user-space array of pair descriptors\n");
 			kfree(us_keys);
 			return -EBUSY;
 		}
@@ -2400,8 +2359,7 @@ static long dpa_stats_tbl_cls_compatcpy(
 		kprm->pairs = kzalloc((sizeof(*kprm->pairs) * cls_members),
 				      GFP_KERNEL);
 		if (!kprm->pairs) {
-			log_err("Cannot allocate kernel memory for lookup pairs"
-				"array\n");
+			log_err("Cannot allocate kernel memory for lookup pairs array\n");
 			kfree(us_keys);
 			return -ENOMEM;
 		}
@@ -2414,8 +2372,7 @@ static long dpa_stats_tbl_cls_compatcpy(
 			kprm->pairs[i] = kzalloc(sizeof(*kprm->pairs[i]),
 						GFP_KERNEL);
 			if (!kprm->pairs[i]) {
-				log_err("Cannot allocate kernel memory for pair"
-					" descriptor\n");
+				log_err("Cannot allocate kernel memory for pair descriptor\n");
 				kfree(us_keys);
 				return -ENOMEM;
 			}
@@ -2477,8 +2434,7 @@ static long dpa_stats_ccnode_cls_compatcpy(
 
 	if (copy_from_user(us_keys, compat_ptr(uprm->keys),
 			  (sizeof(compat_uptr_t) * cls_members))) {
-		log_err("Cannot copy from user-space array of keys "
-			"descriptors\n");
+		log_err("Cannot copy from user-space array of keys descriptors\n");
 		kfree(us_keys);
 		return -EBUSY;
 	}
@@ -2486,8 +2442,7 @@ static long dpa_stats_ccnode_cls_compatcpy(
 	/* Allocate memory to store array of kernel-space keys descriptors */
 	kprm->keys = kzalloc((sizeof(*kprm->keys) * cls_members), GFP_KERNEL);
 	if (!kprm->keys) {
-		log_err("Cannot allocate kernel memory for lookup keys "
-			"array\n");
+		log_err("Cannot allocate kernel memory for lookup keys array\n");
 		kfree(us_keys);
 		return -ENOMEM;
 	}
