@@ -91,7 +91,7 @@ static int instantiate_rng(struct device *ctrldev)
 	struct caam_drv_private *ctrlpriv = dev_get_drvdata(ctrldev);
 	struct caam_full __iomem *topregs;
 	unsigned int timeout = 100000;
-	u32 *desc, deco_dbg_reg;
+	u32 *desc;
 	int i, ret = 0;
 
 	desc = kmalloc(CAAM_CMD_SZ * 7, GFP_KERNEL | GFP_DMA);
@@ -121,17 +121,9 @@ static int instantiate_rng(struct device *ctrldev)
 	wr_reg32(&topregs->deco.jr_ctl_hi, DECO_JQCR_WHL | DECO_JQCR_FOUR);
 
 	timeout = 10000000;
-	do {
-		deco_dbg_reg = rd_reg32(&topregs->deco.desc_dbg);
-		/*
-		 * If an error occured in the descriptor, then
-		 * the DECO status field will be set to 0x0D
-		 */
-		if ((deco_dbg_reg & DESC_DBG_DECO_STAT_MASK) ==
-		    DESC_DBG_DECO_STAT_HOST_ERR)
-			break;
+	while ((rd_reg32(&topregs->deco.desc_dbg) & DECO_DBG_VALID) &&
+								 --timeout)
 		cpu_relax();
-	} while ((deco_dbg_reg & DESC_DBG_DECO_STAT_VALID) && --timeout);
 
 	if (!timeout) {
 		dev_err(ctrldev, "failed to instantiate RNG\n");
@@ -145,12 +137,10 @@ out:
 }
 
 /*
- * kick_trng - sets the various parameters for enabling the initialization
- *	       of the RNG4 block in CAAM
- * @pdev - pointer to the platform device
- * @ent_delay - Defines the length (in system clocks) of each entropy sample.
+ * By default, the TRNG runs for 200 clocks per sample;
+ * 1600 clocks per sample generates better entropy.
  */
-static void kick_trng(struct platform_device *pdev, int ent_delay)
+static void kick_trng(struct platform_device *pdev)
 {
 	struct device *ctrldev = &pdev->dev;
 	struct caam_drv_private *ctrlpriv = dev_get_drvdata(ctrldev);
@@ -163,31 +153,14 @@ static void kick_trng(struct platform_device *pdev, int ent_delay)
 
 	/* put RNG4 into program mode */
 	setbits32(&r4tst->rtmctl, RTMCTL_PRGM);
-
-	/*
-	 * Performance-wise, it does not make sense to
-	 * set the delay to a value that is lower
-	 * than the last one that worked (i.e. the state handles
-	 * were instantiated properly. Thus, instead of wasting
-	 * time trying to set the values controlling the sample
-	 * frequency, the function simply returns.
-	 */
-	val = (rd_reg32(&r4tst->rtsdctl) & RTSDCTL_ENT_DLY_MASK)
-	      >> RTSDCTL_ENT_DLY_SHIFT;
-	if (ent_delay <= val) {
-		/* put RNG4 into run mode */
-		clrbits32(&r4tst->rtmctl, RTMCTL_PRGM);
-		return;
-	}
-
+	/* 1600 clocks per sample */
 	val = rd_reg32(&r4tst->rtsdctl);
-	val = (val & ~RTSDCTL_ENT_DLY_MASK) |
-	      (ent_delay << RTSDCTL_ENT_DLY_SHIFT);
+	val = (val & ~RTSDCTL_ENT_DLY_MASK) | (1600 << RTSDCTL_ENT_DLY_SHIFT);
 	wr_reg32(&r4tst->rtsdctl, val);
-	/* min. freq. count, equal to 1/4 of the entropy sample length */
-	wr_reg32(&r4tst->rtfrqmin, ent_delay >> 2);
-	/* max. freq. count, equal to 8 times the entropy sample length */
-	wr_reg32(&r4tst->rtfrqmax, ent_delay << 3);
+	/* min. freq. count */
+	wr_reg32(&r4tst->rtfrqmin, 400);
+	/* max. freq. count */
+	wr_reg32(&r4tst->rtfrqmax, 6400);
 	/* put RNG4 into run mode */
 	clrbits32(&r4tst->rtmctl, RTMCTL_PRGM);
 }
@@ -228,7 +201,7 @@ EXPORT_SYMBOL(caam_get_era);
 /* Probe routine for CAAM top (controller) level */
 static int caam_probe(struct platform_device *pdev)
 {
-	int ret, ring, rspec, ent_delay = RTSDCTL_ENT_DLY_MIN;
+	int ret, ring, rspec;
 	u64 caam_id;
 	struct device *dev;
 	struct device_node *nprop, *np;
@@ -344,17 +317,13 @@ static int caam_probe(struct platform_device *pdev)
 
 	/*
 	 * If SEC has RNG version >= 4 and RNG state handle has not been
-	 * already instantiated, do RNG instantiation
+	 * already instantiated ,do RNG instantiation
 	 */
 	if ((cha_vid & CHA_ID_RNG_MASK) >> CHA_ID_RNG_SHIFT >= 4 &&
 	    !(rd_reg32(&topregs->ctrl.r4tst[0].rdsta) & RDSTA_IF0)) {
-		do {
-			kick_trng(pdev, ent_delay);
-			ret = instantiate_rng(dev);
-			ent_delay += 400;
-		} while ((ret == -EIO) && (ent_delay < RTSDCTL_ENT_DLY_MAX));
+		kick_trng(pdev);
+		ret = instantiate_rng(dev);
 		if (ret) {
-			dev_err(dev, "failed to instantiate RNG");
 			caam_remove(pdev);
 			return ret;
 		}
