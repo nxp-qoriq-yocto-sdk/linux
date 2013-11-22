@@ -3129,6 +3129,17 @@ static int put_sa(struct dpa_ipsec_sa *sa)
 		return -EDOM;
 	}
 
+	/* Release the flow ID - only for inbound SAs */
+	if (sa_is_inbound(sa) && !ignore_post_ipsec_action(dpa_ipsec) &&
+	    sa->inbound_flowid != INVALID_INB_FLOW_ID) {
+		err = put_inbound_flowid(dpa_ipsec, sa->inbound_flowid);
+		if (err < 0) {
+			log_err("Could not put flow id in circular queue.\n");
+			return err;
+		}
+		sa->inbound_flowid = INVALID_INB_FLOW_ID;
+	}
+
 	/* Mark as free index in used SA IDs vector of this DPA IPSEC instance*/
 	dpa_ipsec->used_sa_ids[sa->used_sa_index] = DPA_OFFLD_INVALID_OBJECT_ID;
 	dpa_ipsec->num_used_sas--;
@@ -3189,18 +3200,7 @@ remove_fq_pair:
 		return err_rb;
 	}
 
-	/* Free the SA id and FlowID (for inbound SAs only).*/
-	if (sa_is_inbound(sa) &&
-	    !ignore_post_ipsec_action(dpa_ipsec) &&
-	    sa->inbound_flowid != INVALID_INB_FLOW_ID) {
-		err_rb = put_inbound_flowid(dpa_ipsec, sa->inbound_flowid);
-		if (err_rb < 0) {
-			log_err("Could not put flow id in circular queue.\n");
-			return err_rb;
-		}
-		sa->inbound_flowid = INVALID_INB_FLOW_ID;
-	}
-
+	/* Release the SA */
 	err_rb = put_sa(sa);
 
 	return err_rb;
