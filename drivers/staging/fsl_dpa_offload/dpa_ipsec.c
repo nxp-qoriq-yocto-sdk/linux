@@ -3945,14 +3945,12 @@ int dpa_ipsec_sa_add_policy(int sa_id,
 		if (ret < 0) {
 			remove_policy_from_sa_policy_list(sa, policy_entry);
 			log_err("Could not add the inbound policy\n");
-			kfree(policy_entry);
 		}
 	} else {  /* DPA_IPSEC_OUTBOUND */
 		ret = update_outbound_policy(sa, policy_entry, MNG_OP_ADD);
 		if (ret < 0) {
 			remove_policy_from_sa_policy_list(sa, policy_entry);
 			log_err("Could not add the outbound policy\n");
-			kfree(policy_entry);
 		}
 	}
 
