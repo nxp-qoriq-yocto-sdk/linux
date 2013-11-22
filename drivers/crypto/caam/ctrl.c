@@ -287,6 +287,11 @@ static int caam_remove(struct platform_device *pdev)
 		irq_dispose_mapping(jrpriv->irq);
 	}
 
+#ifdef CONFIG_FSL_QMAN
+	if (ctrlpriv->qidev)
+		caam_qi_shutdown(ctrlpriv->qidev);
+#endif
+
 	/* De-initialize RNG state handles initialized by this driver. */
 	if (ctrlpriv->rng4_sh_init)
 		deinstantiate_rng(ctrldev, ctrlpriv->rng4_sh_init);
