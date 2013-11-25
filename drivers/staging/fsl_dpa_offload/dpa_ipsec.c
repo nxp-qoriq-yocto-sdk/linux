@@ -3131,14 +3131,17 @@ static int put_sa(struct dpa_ipsec_sa *sa)
 
 	/* Release the flow ID - only for inbound SAs */
 	if (sa_is_inbound(sa) && !ignore_post_ipsec_action(dpa_ipsec) &&
-	    sa->inbound_flowid != INVALID_INB_FLOW_ID) {
+	    sa->inbound_flowid != INVALID_INB_FLOW_ID && !sa_is_parent(sa)) {
 		err = put_inbound_flowid(dpa_ipsec, sa->inbound_flowid);
 		if (err < 0) {
 			log_err("Could not put flow id in circular queue.\n");
+			mutex_unlock(&dpa_ipsec->lock);
 			return err;
 		}
 		sa->inbound_flowid = INVALID_INB_FLOW_ID;
 	}
+
+	sa->child_sa = NULL;
 
 	/* Mark as free index in used SA IDs vector of this DPA IPSEC instance*/
 	dpa_ipsec->used_sa_ids[sa->used_sa_index] = DPA_OFFLD_INVALID_OBJECT_ID;
@@ -3579,7 +3582,6 @@ static int remove_inbound_sa(struct dpa_ipsec_sa *sa)
 		mutex_lock(&sa->dpa_ipsec->sa_mng.sa_rekeying_headlist_lock);
 
 		child_sa->parent_sa = NULL;
-		sa->child_sa = NULL;
 
 		/* Remove the child SA from rekeying list */
 		if (child_sa->sa_rekeying_node.next != LIST_POISON1 &&
