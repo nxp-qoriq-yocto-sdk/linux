@@ -1798,7 +1798,8 @@ set_manipulation:
 			pol_hmd = sa->ipsec_hmd;
 
 		memset(&action, 0, sizeof(action));
-		fill_cls_action_enq(&action, FALSE,
+		fill_cls_action_enq(&action,
+				    (sa->enable_extended_stats)? TRUE: FALSE,
 				    qman_fq_fqid((sa->to_sec_fq)), pol_hmd);
 
 		memset(&params, 0, sizeof(params));
