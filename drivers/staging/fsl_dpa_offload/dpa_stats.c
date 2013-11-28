@@ -1177,23 +1177,44 @@ static int copy_key_descriptor(const struct dpa_offload_lookup_key *src,
 
 static t_Handle get_fman_mac_handle(struct device_node *parent_dev_node,
 				    int port_id,
-				    char *mac_name)
+				    char *mac_name,
+				    bool xg_port)
 {
 	struct device_node *dev_node, *tmp_node = NULL;
-	struct mac_device  *mac_dev = NULL;
-	const uint32_t	*cell_index;
+	struct mac_device *mac_dev = NULL;
+	const uint32_t *cell_index;
+	const char *phy_connection;
+	struct platform_device *device;
 	int lenp;
 
 	while ((dev_node = of_find_compatible_node(tmp_node, NULL,
 			mac_name)) != NULL) {
-		if (parent_dev_node == of_get_parent(dev_node)) {
-			cell_index = of_get_property(
-					dev_node, "cell-index", &lenp);
-			if (*cell_index == port_id) {
-				mac_dev = dev_get_drvdata(&
-					of_find_device_by_node(dev_node)->dev);
-				return mac_dev->get_mac_handle(mac_dev);
-			}
+
+		if (parent_dev_node != of_get_parent(dev_node)) {
+			tmp_node = dev_node;
+			continue;
+		}
+
+		cell_index = of_get_property(dev_node, "cell-index", &lenp);
+		if (*cell_index != port_id) {
+			tmp_node = dev_node;
+			continue;
+		}
+
+		phy_connection = of_get_property(dev_node,
+						"phy-connection-type",
+						&lenp);
+		if (((xg_port) && (strcmp(phy_connection, "xgmii") == 0)) ||
+			((!xg_port) && (strcmp(phy_connection, "xgmii") != 0))) {
+
+			device = of_find_device_by_node(dev_node);
+			if (!device)
+				return NULL;
+			mac_dev = dev_get_drvdata(&device->dev);
+			if (!mac_dev)
+				return NULL;
+
+			return mac_dev->get_mac_handle(mac_dev);
 		}
 
 		tmp_node = dev_node;
@@ -1238,12 +1259,15 @@ static int get_fm_mac(struct dpa_stats_cnt_eth_src src, void **mac)
 		mac_name = "fsl,fman-10g-mac";
 		src.eth_id -= DPA_STATS_ETH_10G_PORT0;
 
-		fm_mac = get_fman_mac_handle(dev_node, src.eth_id, mac_name);
+		fm_mac = get_fman_mac_handle(dev_node,
+					src.eth_id,
+					mac_name,
+					true);
 		if (!fm_mac) {
 			/* Get Ethernet device node for MEMAC case 10G port */
 			mac_name = "fsl,fman-memac";
 			fm_mac = get_fman_mac_handle(
-					dev_node, src.eth_id, mac_name);
+					dev_node, src.eth_id, mac_name, true);
 			if (!fm_mac) {
 				log_err("Cannot find Ethernet device node\n");
 				return -EINVAL;
@@ -1253,12 +1277,15 @@ static int get_fm_mac(struct dpa_stats_cnt_eth_src src, void **mac)
 		/* Get Ethernet device node first for DTSEC case 1G port*/
 		mac_name = "fsl,fman-1g-mac";
 
-		fm_mac = get_fman_mac_handle(dev_node, src.eth_id, mac_name);
+		fm_mac = get_fman_mac_handle(dev_node,
+					src.eth_id,
+					mac_name,
+					false);
 		if (!fm_mac) {
 			/* Get Ethernet device node for MEMAC case 1G port*/
 			mac_name = "fsl,fman-memac";
 			fm_mac = get_fman_mac_handle(
-					dev_node, src.eth_id, mac_name);
+					dev_node, src.eth_id, mac_name, false);
 			if (!fm_mac) {
 				log_err("Cannot find Ethernet device node\n");
 				return -EINVAL;
