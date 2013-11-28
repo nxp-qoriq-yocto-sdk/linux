@@ -293,6 +293,13 @@ static void setup_pci_atmu(struct pci_controller *hose)
 	/* setup PCSRBAR/PEXCSRBAR */
 	early_write_config_dword(hose, 0, 0, PCI_BASE_ADDRESS_0, 0xffffffff);
 	early_read_config_dword(hose, 0, 0, PCI_BASE_ADDRESS_0, &pcicsrbar_sz);
+	/*
+	 * Always treat this as memory space (PCI_BASE_ADDRESS_SPACE_MEMORY).
+	 * Ideally we should mask out lower bits based on IO/MEM space (bit-0
+	 * of BAR0) but that seems to broken on some SOCs(T4240-rev2 etc)
+	 * where bit-0 is found to be wrongly set.
+	 */
+	pcicsrbar_sz &= PCI_BASE_ADDRESS_MEM_MASK;
 	pcicsrbar_sz = ~pcicsrbar_sz + 1;
 
 	if (paddr_hi < (0x100000000ull - pcicsrbar_sz) ||
@@ -932,6 +939,8 @@ u64 fsl_pci_immrbar_base(struct pci_controller *hose)
 
 		pci_bus_read_config_dword(hose->bus,
 			PCI_DEVFN(0, 0), PCI_BASE_ADDRESS_0, &base);
+		/* Always treat this as memory space */
+		base &= PCI_BASE_ADDRESS_MEM_MASK;
 		return base;
 	}
 #endif
