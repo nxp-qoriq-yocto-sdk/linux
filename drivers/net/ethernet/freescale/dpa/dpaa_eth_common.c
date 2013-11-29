@@ -1224,7 +1224,10 @@ int dpa_fq_init(struct dpa_fq *dpa_fq, bool td_enable)
 		/* Try to reduce the number of portal interrupts for
 		 * Tx Confirmation FQs.
 		 */
-		if (dpa_fq->fq_type == FQ_TYPE_TX_CONFIRM)
+		if (dpa_fq->fq_type == FQ_TYPE_TX_CONF_MQ)
+			/* This is messy, because HOLDACTIVE invalidates the
+			 * AVOIDBLOCK bit set below for every ingress FQ.
+			 */
 			initfq.fqd.fq_ctrl |= QM_FQCTRL_HOLDACTIVE;
 
 		/* FQ placement */
