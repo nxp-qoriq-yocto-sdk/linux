@@ -42,41 +42,41 @@ dma2: dma@102300 {
 	dma-channel@0 {
 		compatible = "fsl,eloplus-dma-channel";
 		reg = <0x0 0x80>;
-		interrupts = <256 2 0 0>;
+		interrupts = <464 2 0 0>;
 	};
 	dma-channel@80 {
 		compatible = "fsl,eloplus-dma-channel";
 		reg = <0x80 0x80>;
-		interrupts = <257 2 0 0>;
+		interrupts = <465 2 0 0>;
 	};
 	dma-channel@100 {
 		compatible = "fsl,eloplus-dma-channel";
 		reg = <0x100 0x80>;
-		interrupts = <258 2 0 0>;
+		interrupts = <466 2 0 0>;
 	};
 	dma-channel@180 {
 		compatible = "fsl,eloplus-dma-channel";
 		reg = <0x180 0x80>;
-		interrupts = <259 2 0 0>;
+		interrupts = <467 2 0 0>;
 	};
 	dma-channel@300 {
 		compatible = "fsl,eloplus-dma-channel";
 		reg = <0x300 0x80>;
-		interrupts = <260 2 0 0>;
+		interrupts = <468 2 0 0>;
 	};
 	dma-channel@380 {
 		compatible = "fsl,eloplus-dma-channel";
 		reg = <0x380 0x80>;
-		interrupts = <261 2 0 0>;
+		interrupts = <469 2 0 0>;
 	};
 	dma-channel@400 {
 		compatible = "fsl,eloplus-dma-channel";
 		reg = <0x400 0x80>;
-		interrupts = <262 2 0 0>;
+		interrupts = <470 2 0 0>;
 	};
 	dma-channel@480 {
 		compatible = "fsl,eloplus-dma-channel";
 		reg = <0x480 0x80>;
-		interrupts = <263 2 0 0>;
+		interrupts = <471 2 0 0>;
 	};
 };
