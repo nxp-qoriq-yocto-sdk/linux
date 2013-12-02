@@ -9,6 +9,8 @@
  * (at your option) any later version.
  */
 
+#include <linux/suspend.h>
+
 #ifndef __ASM_PPC_MPC85XX_H
 #define __ASM_PPC_MPC85XX_H
 
@@ -88,5 +90,10 @@
 #define SVR_9232	0x861400
 
 #define SVR_Unknown	0xFFFFFF
+
+#ifndef __ASSEMBLY__
+extern void set_pm_suspend_state(suspend_state_t state);
+extern suspend_state_t pm_suspend_state(void);
+#endif
 
 #endif
