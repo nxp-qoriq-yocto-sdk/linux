@@ -1965,7 +1965,8 @@ t_Handle FM_PORT_Config(t_FmPortParams *p_FmPortParams)
 #else
     p_FmPort->p_FmPortDriverParam->dfltCfg.errata_A006675 = FALSE;
 #endif
-    if ((p_FmPort->fmRevInfo.majorRev == 6) && (p_FmPort->fmRevInfo.minorRev == 0))
+    if ((p_FmPort->fmRevInfo.majorRev == 6) &&
+        ((p_FmPort->fmRevInfo.minorRev == 0) || (p_FmPort->fmRevInfo.minorRev == 3)))
         p_FmPort->p_FmPortDriverParam->dfltCfg.errata_A006320 = TRUE;
     else
         p_FmPort->p_FmPortDriverParam->dfltCfg.errata_A006320 = FALSE;

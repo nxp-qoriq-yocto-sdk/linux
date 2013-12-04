@@ -873,7 +873,8 @@ static t_Error MemacInit(t_Handle h_Memac)
     	FM_GetRevision(p_Memac->fmMacControllerDriver.h_Fm, &p_Memac->fmMacControllerDriver.fmRevInfo);
         /* check the FMAN version - the bug exists only in rev1 */
         if ((p_Memac->fmMacControllerDriver.fmRevInfo.majorRev == 6) &&
-        	(p_Memac->fmMacControllerDriver.fmRevInfo.minorRev == 0))
+            ((p_Memac->fmMacControllerDriver.fmRevInfo.minorRev == 0) ||
+             (p_Memac->fmMacControllerDriver.fmRevInfo.minorRev == 3)))
         {
         	/* MAC strips CRC from received frames - this workaround should
         	   decrease the likelihood of bug appearance
