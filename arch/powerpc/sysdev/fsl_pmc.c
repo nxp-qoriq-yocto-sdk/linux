@@ -16,6 +16,7 @@
 #include <linux/types.h>
 #include <linux/errno.h>
 #include <linux/export.h>
+#include <linux/fsl_devices.h>
 #include <linux/suspend.h>
 #include <linux/delay.h>
 #include <linux/device.h>
@@ -24,7 +25,6 @@
 
 #include <asm/switch_to.h>
 #include <asm/cacheflush.h>
-#include <asm/mpc85xx.h>
 
 #include <sysdev/fsl_soc.h>
 

@@ -10,6 +10,7 @@
  */
 #include <linux/types.h>
 #include <linux/errno.h>
+#include <linux/fsl_devices.h>
 #include <linux/suspend.h>
 #include <linux/device.h>
 #include <linux/delay.h>
@@ -19,7 +20,6 @@
 #include <asm/io.h>
 #include <asm/cacheflush.h>
 #include <asm/fsl_guts.h>
-#include <asm/mpc85xx.h>
 
 struct ccsr_rcpm __iomem *rcpm1_regs;
 struct ccsr_rcpm_v2 __iomem *rcpm2_regs;
