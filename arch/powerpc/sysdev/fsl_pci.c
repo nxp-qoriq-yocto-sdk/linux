@@ -1193,69 +1193,15 @@ static int fsl_pci_pme_probe(struct platform_device *pdev)
 
 static int pcie_slot_flag;
 
-#define PX_RST		0x4
-#define PX_RST_PCIE	0x8
-#define CCSR_GUTS_PMUXCR_PX_MASK	0x8fffffff
+/* Workaround: p1022ds need reset slot when the system wakeup from deep sleep */
+#ifdef CONFIG_P1022_DS
+extern void p1022ds_reset_pcie_slot(void);
+#endif
 static int reset_pcie_slot(void)
 {
-	struct device_node *pixis_node;
-	struct device_node *guts_node;
-
-	void __iomem *pixis = NULL;
-	struct ccsr_guts __iomem *guts;
-	u32 value, fpga_value;
-
-	/* Map the global utilities registers. */
-	guts_node = of_find_compatible_node(NULL, NULL, "fsl,p1022-guts");
-	if (!guts_node) {
-		pr_err("p1022ds: missing global utilities device node\n");
-		return -ENODEV;
-	}
-
-	guts = of_iomap(guts_node, 0);
-	of_node_put(guts_node);
-	if (!guts) {
-		pr_err("p1022ds: could not map global utilities device\n");
-		goto out;
-	}
-
-	/* Map the pixis registers. */
-	pixis_node =
-		of_find_compatible_node(NULL, NULL, "fsl,p1022ds-fpga");
-	if (!pixis_node) {
-		pr_err("p1022ds: missing pixis node\n");
-		goto out;
-	}
-
-	pixis = of_iomap(pixis_node, 0);
-	of_node_put(pixis_node);
-	if (!pixis) {
-		pr_err("p1022ds: could not map pixis registers\n");
-		goto out;
-	}
-
-	/* Set Signal to FPGA */
-	value = in_be32(&guts->pmuxcr);
-	fpga_value = value & CCSR_GUTS_PMUXCR_PX_MASK;
-	out_be32(&guts->pmuxcr, fpga_value);
-
-	/* Rset PCIE slot */
-	/* power down pcie slot */
-	clrbits8(pixis + PX_RST, PX_RST_PCIE);
-
-	/* power up pcie slot */
-	setbits8(pixis + PX_RST, PX_RST_PCIE);
-
-	/* Restore PMUXCR */
-	out_be32(&guts->pmuxcr, value);
-	value = in_be32(&guts->pmuxcr);
-
-out:
-	if (pixis)
-		iounmap(pixis);
-
-	if (guts)
-		iounmap(guts);
+#ifdef CONFIG_P1022_DS
+	p1022ds_reset_pcie_slot();
+#endif
 
 	return 0;
 }
