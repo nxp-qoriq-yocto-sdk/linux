@@ -309,7 +309,10 @@ int fm_precalculate_fifosizes(t_LnxWrpFmDev *p_LnxWrpFmDev, int muram_fifo_size)
 	int min_rx_bufs = 0; /* minimum RX buffers required (see refman.) */
 
 	/* Buffer sizes calculus */
-	int max_frame_size = fm_get_max_frm();
+	/* Max frame size should also take into account the maximum possible
+	 * FD offset
+	*/
+	int max_frame_size = fm_get_max_frm() + 512;
 	int remaining_bufs = 0;
 	int rx_1g_bufs_ceil = 0, rx_2g5_bufs_ceil = 0, rx_10g_bufs_ceil = 0;
 	int rx_2g5_max_bufs = 0, rx_10g_max_bufs = 0;
