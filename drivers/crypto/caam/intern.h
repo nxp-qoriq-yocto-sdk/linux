@@ -91,6 +91,8 @@ struct caam_drv_private {
 	u8 qi_present;		/* Nonzero if QI present in device */
 	int secvio_irq;		/* Security violation interrupt number */
 
+	int era;		/* SEC Era */
+
 	/* which jr allocated to scatterlist crypto */
 	atomic_t tfm_count ____cacheline_aligned;
 	/* list of registered crypto algorithms (mk generic context handle?) */

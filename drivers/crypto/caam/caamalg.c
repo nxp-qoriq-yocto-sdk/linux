@@ -2308,6 +2308,7 @@ struct caam_alg_template {
 	u32 class1_alg_type;
 	u32 class2_alg_type;
 	u32 alg_op;
+	int min_era;
 };
 
 static struct caam_alg_template driver_algs[] = {
@@ -2330,6 +2331,7 @@ static struct caam_alg_template driver_algs[] = {
 		.class1_alg_type = OP_ALG_ALGSEL_AES | OP_ALG_AAI_CBC,
 		.class2_alg_type = OP_ALG_ALGSEL_MD5 | OP_ALG_AAI_HMAC_PRECOMP,
 		.alg_op = OP_ALG_ALGSEL_MD5 | OP_ALG_AAI_HMAC,
+		.min_era = 2,
 	},
 	{
 		.name = "authenc(hmac(sha1),cbc(aes))",
@@ -2349,6 +2351,7 @@ static struct caam_alg_template driver_algs[] = {
 		.class1_alg_type = OP_ALG_ALGSEL_AES | OP_ALG_AAI_CBC,
 		.class2_alg_type = OP_ALG_ALGSEL_SHA1 | OP_ALG_AAI_HMAC_PRECOMP,
 		.alg_op = OP_ALG_ALGSEL_SHA1 | OP_ALG_AAI_HMAC,
+		.min_era = 2,
 	},
 	{
 		.name = "authenc(hmac(sha224),cbc(aes))",
@@ -2369,6 +2372,7 @@ static struct caam_alg_template driver_algs[] = {
 		.class2_alg_type = OP_ALG_ALGSEL_SHA224 |
 				   OP_ALG_AAI_HMAC_PRECOMP,
 		.alg_op = OP_ALG_ALGSEL_SHA224 | OP_ALG_AAI_HMAC,
+		.min_era = 2,
 	},
 	{
 		.name = "authenc(hmac(sha256),cbc(aes))",
@@ -2389,6 +2393,7 @@ static struct caam_alg_template driver_algs[] = {
 		.class2_alg_type = OP_ALG_ALGSEL_SHA256 |
 				   OP_ALG_AAI_HMAC_PRECOMP,
 		.alg_op = OP_ALG_ALGSEL_SHA256 | OP_ALG_AAI_HMAC,
+		.min_era = 2,
 	},
 	{
 		.name = "authenc(hmac(sha384),cbc(aes))",
@@ -2409,6 +2414,7 @@ static struct caam_alg_template driver_algs[] = {
 		.class2_alg_type = OP_ALG_ALGSEL_SHA384 |
 				   OP_ALG_AAI_HMAC_PRECOMP,
 		.alg_op = OP_ALG_ALGSEL_SHA384 | OP_ALG_AAI_HMAC,
+		.min_era = 2,
 	},
 
 	{
@@ -2430,6 +2436,7 @@ static struct caam_alg_template driver_algs[] = {
 		.class2_alg_type = OP_ALG_ALGSEL_SHA512 |
 				   OP_ALG_AAI_HMAC_PRECOMP,
 		.alg_op = OP_ALG_ALGSEL_SHA512 | OP_ALG_AAI_HMAC,
+		.min_era = 2,
 	},
 	{
 		.name = "authenc(hmac(md5),cbc(des3_ede))",
@@ -2449,6 +2456,7 @@ static struct caam_alg_template driver_algs[] = {
 		.class1_alg_type = OP_ALG_ALGSEL_3DES | OP_ALG_AAI_CBC,
 		.class2_alg_type = OP_ALG_ALGSEL_MD5 | OP_ALG_AAI_HMAC_PRECOMP,
 		.alg_op = OP_ALG_ALGSEL_MD5 | OP_ALG_AAI_HMAC,
+		.min_era = 2,
 	},
 	{
 		.name = "authenc(hmac(sha1),cbc(des3_ede))",
@@ -2468,6 +2476,7 @@ static struct caam_alg_template driver_algs[] = {
 		.class1_alg_type = OP_ALG_ALGSEL_3DES | OP_ALG_AAI_CBC,
 		.class2_alg_type = OP_ALG_ALGSEL_SHA1 | OP_ALG_AAI_HMAC_PRECOMP,
 		.alg_op = OP_ALG_ALGSEL_SHA1 | OP_ALG_AAI_HMAC,
+		.min_era = 2,
 	},
 	{
 		.name = "authenc(hmac(sha224),cbc(des3_ede))",
@@ -2488,6 +2497,7 @@ static struct caam_alg_template driver_algs[] = {
 		.class2_alg_type = OP_ALG_ALGSEL_SHA224 |
 				   OP_ALG_AAI_HMAC_PRECOMP,
 		.alg_op = OP_ALG_ALGSEL_SHA224 | OP_ALG_AAI_HMAC,
+		.min_era = 2,
 	},
 	{
 		.name = "authenc(hmac(sha256),cbc(des3_ede))",
@@ -2508,6 +2518,7 @@ static struct caam_alg_template driver_algs[] = {
 		.class2_alg_type = OP_ALG_ALGSEL_SHA256 |
 				   OP_ALG_AAI_HMAC_PRECOMP,
 		.alg_op = OP_ALG_ALGSEL_SHA256 | OP_ALG_AAI_HMAC,
+		.min_era = 2,
 	},
 	{
 		.name = "authenc(hmac(sha384),cbc(des3_ede))",
@@ -2528,6 +2539,7 @@ static struct caam_alg_template driver_algs[] = {
 		.class2_alg_type = OP_ALG_ALGSEL_SHA384 |
 				   OP_ALG_AAI_HMAC_PRECOMP,
 		.alg_op = OP_ALG_ALGSEL_SHA384 | OP_ALG_AAI_HMAC,
+		.min_era = 2,
 	},
 	{
 		.name = "authenc(hmac(sha512),cbc(des3_ede))",
@@ -2548,6 +2560,7 @@ static struct caam_alg_template driver_algs[] = {
 		.class2_alg_type = OP_ALG_ALGSEL_SHA512 |
 				   OP_ALG_AAI_HMAC_PRECOMP,
 		.alg_op = OP_ALG_ALGSEL_SHA512 | OP_ALG_AAI_HMAC,
+		.min_era = 2,
 	},
 	{
 		.name = "authenc(hmac(md5),cbc(des))",
@@ -2567,6 +2580,7 @@ static struct caam_alg_template driver_algs[] = {
 		.class1_alg_type = OP_ALG_ALGSEL_DES | OP_ALG_AAI_CBC,
 		.class2_alg_type = OP_ALG_ALGSEL_MD5 | OP_ALG_AAI_HMAC_PRECOMP,
 		.alg_op = OP_ALG_ALGSEL_MD5 | OP_ALG_AAI_HMAC,
+		.min_era = 2,
 	},
 	{
 		.name = "authenc(hmac(sha1),cbc(des))",
@@ -2586,6 +2600,7 @@ static struct caam_alg_template driver_algs[] = {
 		.class1_alg_type = OP_ALG_ALGSEL_DES | OP_ALG_AAI_CBC,
 		.class2_alg_type = OP_ALG_ALGSEL_SHA1 | OP_ALG_AAI_HMAC_PRECOMP,
 		.alg_op = OP_ALG_ALGSEL_SHA1 | OP_ALG_AAI_HMAC,
+		.min_era = 2,
 	},
 	{
 		.name = "authenc(hmac(sha224),cbc(des))",
@@ -2606,6 +2621,7 @@ static struct caam_alg_template driver_algs[] = {
 		.class2_alg_type = OP_ALG_ALGSEL_SHA224 |
 				   OP_ALG_AAI_HMAC_PRECOMP,
 		.alg_op = OP_ALG_ALGSEL_SHA224 | OP_ALG_AAI_HMAC,
+		.min_era = 2,
 	},
 	{
 		.name = "authenc(hmac(sha256),cbc(des))",
@@ -2626,6 +2642,7 @@ static struct caam_alg_template driver_algs[] = {
 		.class2_alg_type = OP_ALG_ALGSEL_SHA256 |
 				   OP_ALG_AAI_HMAC_PRECOMP,
 		.alg_op = OP_ALG_ALGSEL_SHA256 | OP_ALG_AAI_HMAC,
+		.min_era = 2,
 	},
 	{
 		.name = "authenc(hmac(sha384),cbc(des))",
@@ -2646,6 +2663,7 @@ static struct caam_alg_template driver_algs[] = {
 		.class2_alg_type = OP_ALG_ALGSEL_SHA384 |
 				   OP_ALG_AAI_HMAC_PRECOMP,
 		.alg_op = OP_ALG_ALGSEL_SHA384 | OP_ALG_AAI_HMAC,
+		.min_era = 2,
 	},
 	{
 		.name = "authenc(hmac(sha512),cbc(des))",
@@ -2666,6 +2684,7 @@ static struct caam_alg_template driver_algs[] = {
 		.class2_alg_type = OP_ALG_ALGSEL_SHA512 |
 				   OP_ALG_AAI_HMAC_PRECOMP,
 		.alg_op = OP_ALG_ALGSEL_SHA512 | OP_ALG_AAI_HMAC,
+		.min_era = 2,
 	},
 	/* TLS record descriptors */
 	{
@@ -2686,6 +2705,7 @@ static struct caam_alg_template driver_algs[] = {
 		.class1_alg_type = OP_ALG_ALGSEL_AES | OP_ALG_AAI_CBC,
 		.class2_alg_type = OP_ALG_ALGSEL_SHA1 | OP_ALG_AAI_HMAC_PRECOMP,
 		.alg_op = OP_ALG_ALGSEL_SHA1 | OP_ALG_AAI_HMAC,
+		.min_era = 4,
 	},
 	/* ablkcipher descriptor */
 	{
@@ -2703,6 +2723,7 @@ static struct caam_alg_template driver_algs[] = {
 			.ivsize = AES_BLOCK_SIZE,
 			},
 		.class1_alg_type = OP_ALG_ALGSEL_AES | OP_ALG_AAI_CBC,
+		.min_era = 2,
 	},
 	{
 		.name = "cbc(des3_ede)",
@@ -2719,6 +2740,7 @@ static struct caam_alg_template driver_algs[] = {
 			.ivsize = DES3_EDE_BLOCK_SIZE,
 			},
 		.class1_alg_type = OP_ALG_ALGSEL_3DES | OP_ALG_AAI_CBC,
+		.min_era = 2,
 	},
 	{
 		.name = "cbc(des)",
@@ -2735,6 +2757,7 @@ static struct caam_alg_template driver_algs[] = {
 			.ivsize = DES_BLOCK_SIZE,
 			},
 		.class1_alg_type = OP_ALG_ALGSEL_DES | OP_ALG_AAI_CBC,
+		.min_era = 2,
 	}
 };
 
@@ -2927,8 +2950,15 @@ static int __init caam_algapi_init(void)
 
 	/* register crypto algorithms the device supports */
 	for (i = 0; i < ARRAY_SIZE(driver_algs); i++) {
-		/* TODO: check if h/w supports alg */
 		struct caam_crypto_alg *t_alg;
+
+		/* check if h/w supports alg */
+		if (priv->era > 0 && priv->era < driver_algs[i].min_era) {
+			dev_warn(ctrldev, "%s needs Era %d or higher but SEC is Era %d, skipping it\n",
+				 driver_algs[i].driver_name,
+				 driver_algs[i].min_era, priv->era);
+			continue;
+		}
 
 		t_alg = caam_alg_alloc(ctrldev, &driver_algs[i]);
 		if (IS_ERR(t_alg)) {
