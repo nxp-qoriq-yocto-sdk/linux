@@ -1047,12 +1047,6 @@ static int do_operation(void)
 			fsl_dce_map(def_process_req->dce_cf));
 		list_add_tail(&def_process_req->node, &test_data->request_list);
 	}
-#if DEBUG
-	print_dce_fd(def_process_req->input_fd);
-	print_dce_sg(def_process_req->dce_cf[0]);
-	print_dce_sg(def_process_req->dce_cf[1]);
-	print_dce_sg(def_process_req->dce_cf[2]);
-#endif
 	pr_info("About to send requests...\n");
 	start_time = mfatb();
 	i = 0;
