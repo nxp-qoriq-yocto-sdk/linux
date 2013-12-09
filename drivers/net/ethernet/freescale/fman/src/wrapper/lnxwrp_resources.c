@@ -240,15 +240,8 @@ int fm_set_active_fman_ports(struct platform_device *of_dev,
 /* BPOOL size is constant and equal w/ DPA_BP_SIZE */
 static uint32_t get_largest_buf_size(uint32_t max_rx_frame_size, uint32_t buf_size)
 {
-	uint32_t priv_data_size = 16;		/* DPA_PRIV_DATA_SIZE */
-	uint32_t hash_results_size = 16;	/* DPA_HASH_RESULTS_SIZE */
-	uint32_t parse_results_size =
-		sizeof(t_FmPrsResult);		/* DPA_PARSE_RESULTS_SIZE */
-	uint32_t bp_head = priv_data_size + hash_results_size +
-			   parse_results_size +
-			   fm_get_rx_extra_headroom(); /* DPA_BP_HEAD */
-	uint32_t bp_size = bp_head + max_rx_frame_size
-		+ NET_IP_ALIGN;			/* DPA_BP_SIZE */
+	uint32_t bp_head = 512;	/* Max value for FD offset is 511B */
+	uint32_t bp_size = bp_head + max_rx_frame_size;
 
 	return CEIL_DIV(bp_size, buf_size);
 }
@@ -309,10 +302,7 @@ int fm_precalculate_fifosizes(t_LnxWrpFmDev *p_LnxWrpFmDev, int muram_fifo_size)
 	int min_rx_bufs = 0; /* minimum RX buffers required (see refman.) */
 
 	/* Buffer sizes calculus */
-	/* Max frame size should also take into account
-	 * a reasonable FD offset
-	 */
-	int max_frame_size = fm_get_max_frm() + 256;
+	int max_frame_size = fm_get_max_frm();
 	int remaining_bufs = 0;
 	int rx_1g_bufs_ceil = 0, rx_2g5_bufs_ceil = 0, rx_10g_bufs_ceil = 0;
 	int rx_2g5_max_bufs = 0, rx_10g_max_bufs = 0;
