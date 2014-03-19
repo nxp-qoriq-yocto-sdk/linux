@@ -297,12 +297,18 @@ static inline void qm_eqcr_finish(struct qm_portal *portal)
 	u8 pi, ci;
 	u32 cfg;
 
-	/* Disable EQCI stashing because the QMan only
-	   presents the value it previously stashed to
-	   maintain coherency.  Setting the stash threshold
-	   to 0 ensures we read the real value */
-	cfg = (qm_in(CFG) & 0x00ffffff) |
-		(0 << 28); /* QCSP_CFG: EST */
+	/*
+	 * Disable EQCI stashing because the QMan only
+	 * presents the value it previously stashed to
+	 * maintain coherency.  Setting the stash threshold
+	 * to 1 then 0 ensures that QMan has resyncronized
+	 * its internal copy so that the portal is clean
+	 * when it is reinitialized in the future
+	 */
+	cfg = (qm_in(CFG) & 0x0fffffff) |
+		(1 << 28); /* QCSP_CFG: EST */
+	qm_out(CFG, cfg);
+	cfg &= 0x0fffffff; /* stash threshold = 0 */
 	qm_out(CFG, cfg);
 
 	pi = qm_in(EQCR_PI_CINH) & (QM_EQCR_SIZE - 1);
