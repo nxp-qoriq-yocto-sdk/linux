@@ -56,6 +56,7 @@ struct mem_fragment {
 	/* if mapped, flags+name captured at creation time */
 	u32 flags;
 	char name[USDPAA_DMA_NAME_MAX];
+	u64 map_len;
 	/* support multi-process locks per-memory-fragment. */
 	int has_locking;
 	wait_queue_head_t wq;
@@ -941,15 +942,16 @@ static long ioctl_dma_map(struct file *fp, struct ctx *ctx,
 						tmp->refs++;
 						kfree(map);
 						i->did_create = 0;
-						i->len = frag->len;
+						i->len = tmp->total_size;
 						i->phys_addr = frag->base;
 						i->ptr = tmp->virt_addr;
 						spin_unlock(&mem_lock);
 						return 0;
 					}
+				/* Matching entry - just need to map */
 				i->has_locking = frag->has_locking;
 				i->did_create = 0;
-				i->len = frag->len;
+				i->len = frag->map_len;
 				start_frag = frag;
 				goto do_map;
 			}
@@ -1042,11 +1044,14 @@ do_map:
 				       struct mem_fragment, list);
 	}
 
-	start_frag->flags = i->flags;
-	strncpy(start_frag->name, i->name, USDPAA_DMA_NAME_MAX);
-	start_frag->has_locking = i->has_locking;
-	init_waitqueue_head(&start_frag->wq);
-	start_frag->owner = NULL;
+	if (i->did_create) {
+		start_frag->flags = i->flags;
+		strncpy(start_frag->name, i->name, USDPAA_DMA_NAME_MAX);
+		start_frag->map_len = i->len;
+		start_frag->has_locking = i->has_locking;
+		init_waitqueue_head(&start_frag->wq);
+		start_frag->owner = NULL;
+	}
 
 	/* Setup the map entry */
 	map->root_frag = start_frag;
@@ -1069,9 +1074,9 @@ out:
 					MAP_SHARED,
 					start_frag->pfn_base);
 		up_write(&current->mm->mmap_sem);
-		if (longret & ~PAGE_MASK)
+		if (longret & ~PAGE_MASK) {
 			ret = (int)longret;
-		else {
+		} else {
 			i->ptr = (void *)longret;
 			map->virt_addr = i->ptr;
 		}
