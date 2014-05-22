@@ -322,6 +322,7 @@ static __inline__ bool TRY_LOCK(t_Handle h_Spinlock, volatile bool *p_Flag)
 #define UPDATE_KG_NIA_CC_WA                     0x10000000
 #define UPDATE_KG_OPT_MODE                      0x08000000
 #define UPDATE_KG_NIA                           0x04000000
+#define UPDATE_CC_SHADOW_CLEAR					0x02000000
 /* @} */
 
 #define FM_MAX_NUM_OF_PORTS     (FM_MAX_NUM_OF_OH_PORTS +     \
