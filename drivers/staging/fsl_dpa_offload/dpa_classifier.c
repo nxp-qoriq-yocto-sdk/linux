@@ -2976,15 +2976,15 @@ static int action_to_next_engine_params(const struct dpa_cls_tbl_action *action,
 				return -EINVAL;
 			}
 			next_engine_params->h_Manip = (t_Handle)
-			dpa_classif_hm_lock_chain(action->enq_params.hmd);
+			dpa_classif_hm_lock_chain(action->mcast_params.hmd);
 			if (!next_engine_params->h_Manip) {
 				log_err("Failed to attach HM op hmd=%d to "
 					"classification entry.\n",
-					action->enq_params.hmd);
+					action->mcast_params.hmd);
 				return -EINVAL;
 			}
 
-			*hmd = action->enq_params.hmd;
+			*hmd = action->mcast_params.hmd;
 		} else
 			next_engine_params->h_Manip = NULL;
 		next_engine_params->nextEngine = e_FM_PCD_FR;
