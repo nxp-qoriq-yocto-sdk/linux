@@ -7845,6 +7845,7 @@ dpa_classif_mcast_create_group_error:
 		}
 		kfree(pgroup);
 	}
+	kfree(replic_grp_params);
 
 	*grpd = DPA_OFFLD_DESC_NONE;
 
