@@ -1504,6 +1504,7 @@ static int do_ioctl_stats_get_counters(void *args)
 					  prm.req_params.storage_area_offset),
 					  prm.cnts_len)) {
 				log_err("Cannot copy counter values to storage area\n");
+				kfree(prm.req_params.cnts_ids);
 				return -EINVAL;
 			}
 
@@ -2402,7 +2403,6 @@ static long dpa_stats_tbl_cls_compatcpy(
 				return ret;
 			}
 		}
-		kfree(us_keys);
 	}
 
 	if (kprm->key_type == DPA_STATS_CLASSIF_PAIR_KEY) {
@@ -2467,6 +2467,9 @@ static long dpa_stats_tbl_cls_compatcpy(
 			}
 		}
 	}
+
+	kfree(us_keys);
+
 	return 0;
 }
 
