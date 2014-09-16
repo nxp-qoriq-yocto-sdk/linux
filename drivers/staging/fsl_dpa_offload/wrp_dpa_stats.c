@@ -907,7 +907,7 @@ static int do_ioctl_stats_create_class_counter(void *args)
 
 			/* Override user-space pointers with kernel memory */
 			tbl->keys = kzalloc(cls_mbrs *
-					    sizeof(**tbl->keys), GFP_KERNEL);
+					    sizeof(*tbl->keys), GFP_KERNEL);
 			if (!tbl->keys) {
 				log_err("Cannot allocate kernel memory for lookup keys array\n");
 				return -ENOMEM;
@@ -929,7 +929,7 @@ static int do_ioctl_stats_create_class_counter(void *args)
 
 			/* Override user-space pointers with kernel memory */
 			tbl->pairs = kzalloc(cls_mbrs *
-					    sizeof(**tbl->pairs), GFP_KERNEL);
+					    sizeof(*tbl->pairs), GFP_KERNEL);
 			if (!tbl->pairs) {
 				log_err("Cannot allocate kernel memory for lookup pairs array\n");
 				return -ENOMEM;
@@ -959,7 +959,7 @@ static int do_ioctl_stats_create_class_counter(void *args)
 
 		/* Override user-space pointers with kernel memory */
 		cnode->keys = kzalloc(cls_mbrs *
-				    sizeof(**cnode->keys), GFP_KERNEL);
+				    sizeof(*cnode->keys), GFP_KERNEL);
 		if (!cnode->keys) {
 			log_err("No more memory to store array of keys\n");
 			return -ENOMEM;
