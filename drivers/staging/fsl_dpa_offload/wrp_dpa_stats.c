@@ -1502,8 +1502,10 @@ static int do_ioctl_stats_get_counters(void *args)
 	/* If counters request is asynchronous */
 	if (prm.request_done) {
 		ret = store_get_cnts_async_params(&prm, cnts_ids);
-		if (ret < 0)
+		if (ret < 0) {
+			kfree(prm.req_params.cnts_ids);
 			return ret;
+		}
 	}
 
 	ret = dpa_stats_get_counters(prm.req_params,
@@ -1522,6 +1524,7 @@ static int do_ioctl_stats_get_counters(void *args)
 					  prm.req_params.storage_area_offset),
 					  prm.cnts_len)) {
 				log_err("Cannot copy counter values to storage area\n");
+				kfree(prm.req_params.cnts_ids);
 				return -EINVAL;
 			}
 
@@ -1586,8 +1589,10 @@ static int do_ioctl_stats_compat_get_counters(void *args)
 	if (kprm.request_done) {
 		ret = store_get_cnts_async_params(&kprm,
 				(compat_ptr)(uprm.req_params.cnts_ids));
-		if (ret < 0)
+		if (ret < 0) {
+			kfree(kprm.req_params.cnts_ids);
 			return ret;
+		}
 	}
 
 	ret = dpa_stats_get_counters(kprm.req_params,
@@ -1913,7 +1918,6 @@ static long store_get_cnts_async_params(
 	mutex_lock(&wrp_dpa_stats.async_req_lock);
 	if (list_empty(&wrp_dpa_stats.async_req_pool)) {
 		log_err("Reached maximum supported number of simultaneous asynchronous requests\n");
-		kfree(kprm->req_params.cnts_ids);
 		mutex_unlock(&wrp_dpa_stats.async_req_lock);
 		return -EDOM;
 	}
@@ -2414,7 +2418,6 @@ static long dpa_stats_tbl_cls_compatcpy(
 				return ret;
 			}
 		}
-		kfree(us_keys);
 	}
 
 	if (kprm->key_type == DPA_STATS_CLASSIF_PAIR_KEY) {
@@ -2479,6 +2482,9 @@ static long dpa_stats_tbl_cls_compatcpy(
 			}
 		}
 	}
+
+	kfree(us_keys);
+
 	return 0;
 }
 
