@@ -537,6 +537,15 @@ static long do_ioctl_stats_init(struct ioc_dpa_stats_params *prm)
 	long ret = 0;
 	uint16_t i;
 
+	/* Check user-provided storage area length */
+	if (prm->storage_area_len < DPA_STATS_CNT_SEL_LEN ||
+	    prm->storage_area_len > DPA_STATS_MAX_STORAGE_AREA_SIZE) {
+		log_err("Parameter storage_area_len %d must be in range (%d - %d)\n",
+			prm->storage_area_len,
+			DPA_STATS_CNT_SEL_LEN, DPA_STATS_MAX_STORAGE_AREA_SIZE);
+		return -EINVAL;
+	}
+
 	/* Save user-provided parameters */
 	params.max_counters = prm->max_counters;
 	params.storage_area_len = prm->storage_area_len;
@@ -823,6 +832,13 @@ static int do_ioctl_stats_create_class_counter(void *args)
 		return -EINVAL;
 	}
 
+	if (prm.cnt_params.class_members > DPA_STATS_MAX_NUM_OF_CLASS_MEMBERS) {
+		log_err("Parameter class_members %d exceeds maximum number of class members: %d\n",
+			prm.cnt_params.class_members,
+			DPA_STATS_MAX_NUM_OF_CLASS_MEMBERS);
+		return -EINVAL;
+	}
+
 	cls_mbrs = prm.cnt_params.class_members;
 
 	switch (prm.cnt_params.type) {
@@ -1081,6 +1097,13 @@ static int do_ioctl_stats_compat_create_class_counter(void *args)
 
 	if (copy_from_user(&uprm, args, sizeof(uprm))) {
 		log_err("Cannot copy from user the class counter parameters\n");
+		return -EINVAL;
+	}
+
+	if (uprm_cls->class_members > DPA_STATS_MAX_NUM_OF_CLASS_MEMBERS) {
+		log_err("Parameter class_members %d exceeds maximum number of class members: %d\n",
+			uprm_cls->class_members,
+			DPA_STATS_MAX_NUM_OF_CLASS_MEMBERS);
 		return -EINVAL;
 	}
 
@@ -1433,6 +1456,14 @@ static int do_ioctl_stats_get_counters(void *args)
 		return -EINVAL;
 	}
 
+	if (prm.req_params.cnts_ids_len == 0 ||
+	    prm.req_params.cnts_ids_len > DPA_STATS_REQ_CNTS_IDS_LEN) {
+		log_err("Number of requested counter ids (%d) must be in range (1 - %d)\n",
+			prm.req_params.cnts_ids_len,
+			DPA_STATS_REQ_CNTS_IDS_LEN);
+		return -EINVAL;
+	}
+
 	/* Allocate kernel-space memory area to copy the counters ids */
 	cnts_ids = kzalloc(prm.req_params.cnts_ids_len *
 			   sizeof(int), GFP_KERNEL);
@@ -1502,8 +1533,15 @@ static int do_ioctl_stats_compat_get_counters(void *args)
 		return -EINVAL;
 	}
 
+	if (uprm.req_params.cnts_ids_len == 0 ||
+	    uprm.req_params.cnts_ids_len > DPA_STATS_REQ_CNTS_IDS_LEN) {
+		log_err("Number of requested counter ids (%d) must be in range (1 - %d)\n",
+			uprm.req_params.cnts_ids_len,
+			DPA_STATS_REQ_CNTS_IDS_LEN);
+		return -EINVAL;
+	}
+
 	memset(&kprm, 0, sizeof(struct ioc_dpa_stats_cnt_request_params));
-	kprm.cnts_len = uprm.cnts_len;
 	kprm.request_done = (dpa_stats_request_cb)
 			((compat_ptr)(uprm.request_done));
 	kprm.req_params.cnts_ids_len = uprm.req_params.cnts_ids_len;
@@ -1594,6 +1632,13 @@ static int do_ioctl_stats_reset_counters(void *args)
 		return -EINVAL;
 	}
 
+	if (prm.cnts_ids_len == 0 ||
+	    prm.cnts_ids_len > DPA_STATS_REQ_CNTS_IDS_LEN) {
+		log_err("Number of counters to reset %d must be in range (1 - %d)\n",
+			prm.cnts_ids_len, DPA_STATS_REQ_CNTS_IDS_LEN);
+		return -EINVAL;
+	}
+
 	/* Allocate kernel-space memory area to copy the counters ids */
 	cnt_ids = kcalloc(prm.cnts_ids_len, sizeof(int), GFP_KERNEL);
 	if (!cnt_ids) {
@@ -1636,6 +1681,13 @@ static int do_ioctl_stats_compat_reset_counters(void *args)
 
 	if (copy_from_user(&uprm, args, sizeof(uprm))) {
 		log_err("Cannot copy from user counter reset parameters\n");
+		return -EINVAL;
+	}
+
+	if (uprm.cnts_ids_len == 0 ||
+	    uprm.cnts_ids_len > DPA_STATS_REQ_CNTS_IDS_LEN) {
+		log_err("Number of counters to reset %d must be in range (1 - %d)\n",
+			uprm.cnts_ids_len, DPA_STATS_REQ_CNTS_IDS_LEN);
 		return -EINVAL;
 	}
 
@@ -1991,6 +2043,14 @@ static int copy_key_descriptor_compatcpy(
 	if (!kparam) {
 		log_err("Cannot allocate kernel memory for key descriptor\n");
 		return -ENOMEM;
+	}
+
+	if ((compat_ptr(key.byte) || compat_ptr(key.mask))) {
+		if (key.size == 0 || key.size > DPA_OFFLD_MAXENTRYKEYSIZE) {
+			log_err("Key size should be between %d and %d.\n", 1,
+				DPA_OFFLD_MAXENTRYKEYSIZE);
+			return -EINVAL;
+		}
 	}
 
 	if (compat_ptr(key.byte)) {
