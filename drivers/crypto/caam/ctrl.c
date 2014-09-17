@@ -163,12 +163,10 @@ static int instantiate_rng(struct device *ctrldev, int state_handle_mask,
 {
 	struct caam_drv_private *ctrlpriv = dev_get_drvdata(ctrldev);
 	struct caam_full __iomem *topregs;
-	struct rng4tst __iomem *r4tst;
 	u32 *desc, status, rdsta_val;
 	int ret = 0, sh_idx;
 
 	topregs = (struct caam_full __iomem *)ctrlpriv->ctrl;
-	r4tst = &topregs->ctrl.r4tst[0];
 
 	desc = kmalloc(CAAM_CMD_SZ * 7, GFP_KERNEL);
 	if (!desc)
