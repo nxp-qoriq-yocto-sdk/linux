@@ -51,7 +51,7 @@ static void report_ccb_status(u32 status, char *outstr)
 		"ZUCE",
 		"ZUCA",
 	};
-	char *err_id_list[] = {
+	char *err_id_list[16] = {
 		"No error.",
 		"Mode error.",
 		"Data size error.",
@@ -101,12 +101,9 @@ static void report_ccb_status(u32 status, char *outstr)
 		/* RNG-only error */
 		SPRINTFCAT(outstr, "%s", rng_err_id_list[err_id],
 			   strlen(rng_err_id_list[err_id]));
-	} else if (err_id < ARRAY_SIZE(err_id_list)) {
+	} else {
 		SPRINTFCAT(outstr, "%s", err_id_list[err_id],
 			   strlen(err_id_list[err_id]));
-	} else {
-		SPRINTFCAT(outstr, "unidentified err_id value 0x%02x",
-			   err_id, sizeof("ff"));
 	}
 }
 
