@@ -173,7 +173,7 @@ static int aead_set_sh_desc(struct crypto_aead *aead)
 	u32 *desc;
 
 	if (!ctx->enckeylen || !ctx->authsize)
-		return 0;
+		return -EINVAL;
 
 	/*
 	 * Job Descriptor and Shared Descriptors
@@ -399,7 +399,7 @@ static int tls_set_sh_desc(struct crypto_aead *aead)
 	unsigned int assoclen = 13;
 
 	if (!ctx->enckeylen || !ctx->authsize)
-		return 0;
+		return -EINVAL;
 
 	/*
 	 * TLS 1.0 encrypt shared descriptor
