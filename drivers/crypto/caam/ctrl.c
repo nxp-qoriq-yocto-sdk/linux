@@ -76,6 +76,7 @@ static void build_deinstantiation_desc(u32 *desc, int handle)
  * Return: - 0 if no error occurred
  *	   - -ENODEV if the DECO couldn't be acquired
  *	   - -EAGAIN if an error occurred while executing the descriptor
+ *	   - -EINVAL if the descriptor length is incorrect
  */
 static inline int run_descriptor_deco0(struct device *ctrldev, u32 *desc,
 					u32 *status)
@@ -84,7 +85,7 @@ static inline int run_descriptor_deco0(struct device *ctrldev, u32 *desc,
 	struct caam_full __iomem *topregs;
 	unsigned int timeout = 100000;
 	u32 deco_dbg_reg, flags;
-	int i, ret;
+	int i, ret, dlen;
 
 	/* Set the bit to request direct access to DECO0 */
 	topregs = (struct caam_full __iomem *)ctrlpriv->ctrl;
@@ -100,7 +101,14 @@ static inline int run_descriptor_deco0(struct device *ctrldev, u32 *desc,
 		goto out_err;
 	}
 
-	for (i = 0; i < desc_len(desc); i++)
+	dlen = desc_len(desc);
+	if (dlen > MAX_CAAM_DESCSIZE) {
+		dev_err(ctrldev, "invalid descriptor length\n");
+		ret = -EINVAL;
+		goto out_err;
+	}
+
+	for (i = 0; i < dlen; i++)
 		wr_reg32(&topregs->deco.descbuf[i], *(desc + i));
 
 	flags = DECO_JQCR_WHL;
@@ -108,7 +116,7 @@ static inline int run_descriptor_deco0(struct device *ctrldev, u32 *desc,
 	 * If the descriptor length is longer than 4 words, then the
 	 * FOUR bit in JRCTRL register must be set.
 	 */
-	if (desc_len(desc) >= 4)
+	if (dlen >= 4)
 		flags |= DECO_JQCR_FOUR;
 
 	/* Instruct the DECO to execute it */
@@ -156,6 +164,7 @@ out_err:
  *	   - -EAGAIN if an error occurred when executing the descriptor
  *	      f.i. there was a RNG hardware error due to not "good enough"
  *	      entropy being aquired.
+ *	   - -EINVAL if the descriptor length is incorrect
  */
 static int instantiate_rng(struct device *ctrldev, int state_handle_mask,
 			   int gen_sk)
@@ -184,7 +193,8 @@ static int instantiate_rng(struct device *ctrldev, int state_handle_mask,
 
 		/* Try to run it through DECO0 */
 		ret = run_descriptor_deco0(ctrldev, desc, &status);
-
+		if (ret)
+			break;
 		/*
 		 * If ret is not 0, or descriptor status is not 0, then
 		 * something went wrong. No need to try the next state
@@ -223,6 +233,7 @@ static int instantiate_rng(struct device *ctrldev, int state_handle_mask,
  *	   - -ENOMEM if there isn't enough memory to allocate the descriptor
  *	   - -ENODEV if DECO0 couldn't be acquired
  *	   - -EAGAIN if an error occurred when executing the descriptor
+ *	   - -EINVAL if the descriptor length is incorrect
  */
 static int deinstantiate_rng(struct device *ctrldev, int state_handle_mask)
 {
