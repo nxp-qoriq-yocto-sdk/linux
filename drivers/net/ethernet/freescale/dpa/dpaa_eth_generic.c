@@ -89,7 +89,7 @@ static void dpa_generic_ern(struct qman_portal *portal,
 			    const struct qm_mr_entry *msg);
 static int __hot dpa_generic_tx(struct sk_buff *skb,
 				struct net_device *netdev);
-static void dpa_generic_drain_bp(struct dpa_bp *bp);
+static void dpa_generic_drain_bp(struct dpa_bp *bp, u8 nbuf);
 
 static const struct net_device_ops dpa_generic_ops = {
 	.ndo_open = dpa_generic_start,
@@ -104,6 +104,17 @@ static const struct net_device_ops dpa_generic_ops = {
 	.ndo_init = dpa_ndo_init,
 	.ndo_change_mtu = dpa_change_mtu,
 };
+
+void dpa_generic_draining_timer(unsigned long arg)
+{
+	struct dpa_generic_priv_s *priv = (struct dpa_generic_priv_s *)arg;
+
+	/* drain in pairs of 4 buffers */
+	dpa_generic_drain_bp(priv->draining_tx_bp, 4);
+
+	if (atomic_read(&priv->ifup))
+		mod_timer(&(priv->timer), jiffies + 1);
+}
 
 struct rtnl_link_stats64 *__cold
 dpa_generic_get_stats64(struct net_device *netdev,
@@ -260,6 +271,9 @@ static int __cold dpa_generic_start(struct net_device *netdev)
 	dpaa_generic_napi_enable(priv);
 	netif_tx_start_all_queues(netdev);
 
+	mod_timer(&priv->timer, jiffies + 100);
+	atomic_dec(&priv->ifup);
+
 	return 0;
 }
 
@@ -269,6 +283,8 @@ static int __cold dpa_generic_stop(struct net_device *netdev)
 
 	netif_tx_stop_all_queues(netdev);
 	dpaa_generic_napi_disable(priv);
+
+	atomic_inc_not_zero(&priv->ifup);
 
 	return 0;
 }
@@ -365,7 +381,7 @@ dpa_generic_rx_dqrr(struct qman_portal *portal,
 	/* This is needed for TCP traffic as draining only on TX is not
 	 * enough
 	 */
-	dpa_generic_drain_bp(priv->draining_tx_bp);
+	dpa_generic_drain_bp(priv->draining_tx_bp, 1);
 
 	if (unlikely(dpaa_eth_napi_schedule(percpu_priv, portal)))
 		return qman_cb_dqrr_stop;
@@ -417,7 +433,8 @@ dpa_generic_rx_dqrr(struct qman_portal *portal,
 	/* The skb is currently pointed at head + headroom. The packet
 	 * starts at skb->head + pad + fd offset.
 	 */
-	data_start = pad + dpa_fd_offset(fd) - skb_headroom(skb);
+	data_start = (unsigned int)(pad + dpa_fd_offset(fd) -
+				    skb_headroom(skb));
 	skb_put(skb, dpa_fd_length(fd) + data_start);
 	skb_pull(skb, data_start);
 	skb->protocol = eth_type_trans(skb, netdev);
@@ -444,25 +461,27 @@ qman_consume:
 	return qman_cb_dqrr_consume;
 }
 
-static void dpa_generic_drain_bp(struct dpa_bp *bp)
+static void dpa_generic_drain_bp(struct dpa_bp *bp, u8 nbuf)
 {
-	int ret;
-	struct bm_buffer bmb;
+	int ret, i;
+	struct bm_buffer bmb[8];
 	dma_addr_t addr;
 	int *countptr = __this_cpu_ptr(bp->percpu_count);
 	int count = *countptr;
 	struct sk_buff **skbh;
 
 	do {
-		/* most likely, the bpool has only one buffer in it */
-		ret = bman_acquire(bp->pool, &bmb, 1, 0);
+		/* bman_acquire will fail if nbuf > 8 */
+		ret = bman_acquire(bp->pool, bmb, nbuf, 0);
 		if (ret > 0) {
-			addr = bm_buf_addr(&bmb);
-			skbh = (struct sk_buff **)phys_to_virt(addr);
-			dma_unmap_single(bp->dev, addr, bp->size,
-					DMA_TO_DEVICE);
-			dev_kfree_skb_any(*skbh);
-			count--;
+			for (i = 0; i < nbuf; i++) {
+				addr = bm_buf_addr(&bmb[i]);
+				skbh = (struct sk_buff **)phys_to_virt(addr);
+				dma_unmap_single(bp->dev, addr, bp->size,
+						DMA_TO_DEVICE);
+				dev_kfree_skb_any(*skbh);
+			}
+			count -= i;
 		}
 	} while (ret > 0);
 
@@ -558,8 +577,8 @@ int dpa_generic_tx_csum(struct dpa_generic_priv_s *priv,
 	}
 
 	/* At index 0 is IPOffset_1 as defined in the Parse Results */
-	parse_result->ip_off[0] = skb_network_offset(skb);
-	parse_result->l4_off = skb_transport_offset(skb);
+	parse_result->ip_off[0] = (uint8_t)skb_network_offset(skb);
+	parse_result->l4_off = (uint8_t)skb_transport_offset(skb);
 
 	/* Enable L3 (and L4, if TCP or UDP) HW checksum. */
 	fd->cmd |= FM_FD_CMD_RPD | FM_FD_CMD_DTC;
@@ -634,17 +653,12 @@ static int __hot dpa_generic_tx(struct sk_buff *skb, struct net_device *netdev)
 	fd.format = qm_fd_contig;
 	fd.length20 = skb->len;
 	fd.offset = priv->tx_headroom;
-	fd.addr_hi = upper_32_bits(addr);
+	fd.addr_hi = (uint8_t)upper_32_bits(addr);
 	fd.addr_lo = lower_32_bits(addr);
 	/* fd.cmd |= FM_FD_CMD_FCO; */
 	fd.bpid = bp->bpid;
 
-	/* (Partially) drain the Draining Buffer Pool pool; each core
-	 * acquires at most the number of buffers it put there; since
-	 * BMan allows for up to 8 buffers to be acquired at one time,
-	 * work in batches of 8 for efficiency reasons
-	 */
-	dpa_generic_drain_bp(bp);
+	dpa_generic_drain_bp(bp, 1);
 
 	queue_mapping = dpa_get_queue_mapping(skb);
 	egress_fq = priv->egress_fqs[queue_mapping];
@@ -946,7 +960,7 @@ static int dpa_generic_rx_bp_probe(struct platform_device *_of_dev,
 			goto _return_of_node_put;
 		}
 
-		bp[i].bpid = *bpid;
+		bp[i].bpid = (uint8_t)*bpid;
 
 		bpool_cfg = of_get_property(dev_node, "fsl,bpool-ethernet-cfg",
 				&lenp);
@@ -1262,16 +1276,16 @@ static int dpa_generic_fq_create(struct net_device *netdev,
 	struct dpa_fq *fqs = NULL, *tmp = NULL;
 	struct task_struct *kth;
 	int err = 0;
+	int channel;
 
 	INIT_LIST_HEAD(&priv->dpa_fq_list);
 
 	list_replace_init(dpa_fq_list, &priv->dpa_fq_list);
 
-	priv->channel = dpa_get_channel();
-	if (priv->channel < 0) {
-		err = priv->channel;
-		return err;
-	}
+	channel = dpa_get_channel();
+	if (channel < 0)
+		return channel;
+	priv->channel = (uint16_t)channel;
 
 	/* Start a thread that will walk the cpus with affine portals
 	 * and add this pool channel to each's dequeue mask.
@@ -1427,6 +1441,11 @@ static int dpa_generic_eth_probe(struct platform_device *_of_dev)
 	sprintf(priv->if_type, "generic%d", generic_idx++);
 	priv->msg_enable = netif_msg_init(debug, -1);
 	priv->tx_headroom = DPA_DEFAULT_TX_HEADROOM;
+
+	init_timer(&priv->timer);
+	atomic_set(&priv->ifup, 0);
+	priv->timer.data = (unsigned long)priv;
+	priv->timer.function = dpa_generic_draining_timer;
 
 	err = dpa_generic_bp_create(netdev, rx_bp_count, rx_bp, rx_buf_layout,
 			draining_tx_bp, tx_buf_layout);

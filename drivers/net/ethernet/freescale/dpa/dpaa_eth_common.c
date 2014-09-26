@@ -765,6 +765,7 @@ void dpa_bp_drain(struct dpa_bp *bp)
 				 * drain them one by one
 				 */
 				num = 1;
+				ret = 1;
 				continue;
 			} else {
 				/* Pool is fully drained */
@@ -1256,7 +1257,7 @@ int dpa_fq_init(struct dpa_fq *dpa_fq, bool td_enable)
 				dpa_fq->fq_type == FQ_TYPE_TX_CONF_MQ) {
 			initfq.we_mask |= QM_INITFQ_WE_CGID;
 			initfq.fqd.fq_ctrl |= QM_FQCTRL_CGE;
-			initfq.fqd.cgid = priv->cgr_data.cgr.cgrid;
+			initfq.fqd.cgid = (uint8_t)priv->cgr_data.cgr.cgrid;
 			/* Set a fixed overhead accounting, in an attempt to
 			 * reduce the impact of fixed-size skb shells and the
 			 * driver's needed headroom on system memory. This is
@@ -1322,7 +1323,7 @@ int dpa_fq_init(struct dpa_fq *dpa_fq, bool td_enable)
 				 dpa_fq->fq_type == FQ_TYPE_RX_PCD)) {
 			initfq.we_mask |= QM_INITFQ_WE_CGID;
 			initfq.fqd.fq_ctrl |= QM_FQCTRL_CGE;
-			initfq.fqd.cgid = priv->ingress_cgr.cgrid;
+			initfq.fqd.cgid = (uint8_t)priv->ingress_cgr.cgrid;
 			/* Set a fixed overhead accounting, just like for the
 			 * egress CGR.
 			 */
