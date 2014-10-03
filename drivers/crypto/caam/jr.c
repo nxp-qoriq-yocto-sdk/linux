@@ -480,6 +480,10 @@ int caam_jr_probe(struct platform_device *pdev, struct device_node *np,
 	 * like this long-term, but it'll run
 	 */
 	jroffset = (u32 *)of_get_property(np, "reg", NULL);
+	if (jroffset == NULL) {
+		kfree(jrpriv);
+		return -EINVAL;
+	}
 	jrpriv->rregs = (struct caam_job_ring __iomem *)((void *)ctrlpriv->ctrl
 							 + *jroffset);
 
