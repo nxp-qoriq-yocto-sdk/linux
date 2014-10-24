@@ -20,6 +20,7 @@
 #include <linux/memblock.h>
 #include <linux/slab.h>
 #include <linux/mman.h>
+#include <linux/version.h>
 
 /* Physical address range of the memory reservation, exported for mm/mem.c */
 static u64 phys_start;
@@ -1796,6 +1797,7 @@ early_param("usdpaa_mem", usdpaa_mem);
 
 __init void fsl_usdpaa_init_early(void)
 {
+	u64 overage;
 	if (!phys_size) {
 		pr_info("No USDPAA memory, no 'usdpaa_mem' bootarg\n");
 		return;
@@ -1819,6 +1821,22 @@ __init void fsl_usdpaa_init_early(void)
 	tlbcam_index += num_tlb;
 	pr_info("USDPAA region at %llx:%llx(%lx:%lx), %d TLB1 entries)\n",
 		phys_start, phys_size, pfn_start, pfn_size, num_tlb);
+
+
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(3, 14, 0))
+	/* memblock_alloc() silently rounds up the amount of memory
+	   used to avoid fragmentation. However, the USDPAA DMA
+	   region can be quite large and this may waste a lot of
+	   memory.  This code calculates and frees the overallocation
+	*/
+	overage = round_up(phys_size,
+			   largest_page_size(phys_size)) - phys_size;
+	if (overage) {
+		/* Free overallocation */
+		pr_info("USDPAA release overallocation of %lld bytes", overage);
+		memblock_free(phys_start + phys_size, overage);
+	}
+#endif
 }
 
 static int __init usdpaa_init(void)
