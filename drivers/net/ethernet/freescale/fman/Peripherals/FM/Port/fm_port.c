@@ -87,7 +87,7 @@ static t_Error CheckInitParameters(t_FmPort *p_FmPort)
             if (p_Params->intContext.size && (p_Params->intContext.size + p_Params->intContext.extBufOffset > p_Params->bufMargins.startMargins))
                 RETURN_ERROR(MAJOR, E_INVALID_VALUE, ("intContext.size is larger than start margins"));
 
-            if ((p_Params->liodnOffset != DPAA_LIODN_DONT_OVERRIDE) &&
+            if ((p_Params->liodnOffset != (uint16_t)DPAA_LIODN_DONT_OVERRIDE) &&
                 (p_Params->liodnOffset & ~FM_LIODN_OFFSET_MASK))
                 RETURN_ERROR(MAJOR, E_INVALID_VALUE, ("liodnOffset is larger than %d", FM_LIODN_OFFSET_MASK+1));
 
@@ -751,6 +751,7 @@ static t_Error BmiPortCheckAndGetCounterType(t_FmPort                      *p_Fm
         case(e_FM_PORT_COUNTERS_FIFO_UTIL):
         case(e_FM_PORT_COUNTERS_RX_PAUSE_ACTIVATION):
             /* performance counters - may be read when disabled */
+            *p_IsStats = FALSE;
             break;
         case(e_FM_PORT_COUNTERS_FRAME):
         case(e_FM_PORT_COUNTERS_DISCARD_FRAME):
@@ -763,6 +764,7 @@ static t_Error BmiPortCheckAndGetCounterType(t_FmPort                      *p_Fm
         case(e_FM_PORT_COUNTERS_LENGTH_ERR):
         case(e_FM_PORT_COUNTERS_UNSUPPRTED_FORMAT):
         case(e_FM_PORT_COUNTERS_WRED_DISCARD):
+            *p_IsStats = TRUE;
             if (!(GET_UINT32(*p_Reg) & BMI_COUNTERS_EN))
                RETURN_ERROR(MINOR, E_INVALID_STATE, ("Requested counter was not enabled"));
             break;
@@ -775,67 +777,55 @@ static t_Error BmiPortCheckAndGetCounterType(t_FmPort                      *p_Fm
     {
         case(e_FM_PORT_COUNTERS_CYCLE):
             *p_PerfType = E_FMAN_PORT_PERF_CNT_CYCLE;
-            *p_IsStats = FALSE;
             break;
         case(e_FM_PORT_COUNTERS_TASK_UTIL):
             *p_PerfType = E_FMAN_PORT_PERF_CNT_TASK_UTIL;
             break;
         case(e_FM_PORT_COUNTERS_QUEUE_UTIL):
             *p_PerfType = E_FMAN_PORT_PERF_CNT_QUEUE_UTIL;
-            *p_IsStats = FALSE;
             break;
         case(e_FM_PORT_COUNTERS_DMA_UTIL):
             *p_PerfType = E_FMAN_PORT_PERF_CNT_DMA_UTIL;
-            *p_IsStats = FALSE;
             break;
         case(e_FM_PORT_COUNTERS_FIFO_UTIL):
             *p_PerfType = E_FMAN_PORT_PERF_CNT_FIFO_UTIL;
-            *p_IsStats = FALSE;
             break;
         case(e_FM_PORT_COUNTERS_RX_PAUSE_ACTIVATION):
             *p_PerfType = E_FMAN_PORT_PERF_CNT_RX_PAUSE;
-            *p_IsStats = FALSE;
             break;
         case(e_FM_PORT_COUNTERS_FRAME):
             *p_StatsType = E_FMAN_PORT_STATS_CNT_FRAME;
-            *p_IsStats = TRUE;
             break;
         case(e_FM_PORT_COUNTERS_DISCARD_FRAME):
             *p_StatsType = E_FMAN_PORT_STATS_CNT_DISCARD;
-            *p_IsStats = TRUE;
             break;
         case(e_FM_PORT_COUNTERS_DEALLOC_BUF):
             *p_StatsType = E_FMAN_PORT_STATS_CNT_DEALLOC_BUF;
-            *p_IsStats = TRUE;
             break;
         case(e_FM_PORT_COUNTERS_RX_BAD_FRAME):
             *p_StatsType = E_FMAN_PORT_STATS_CNT_RX_BAD_FRAME;
-            *p_IsStats = TRUE;
             break;
         case(e_FM_PORT_COUNTERS_RX_LARGE_FRAME):
             *p_StatsType = E_FMAN_PORT_STATS_CNT_RX_LARGE_FRAME;
-            *p_IsStats = TRUE;
             break;
         case(e_FM_PORT_COUNTERS_RX_OUT_OF_BUFFERS_DISCARD):
             *p_StatsType = E_FMAN_PORT_STATS_CNT_RX_OUT_OF_BUF;
-            *p_IsStats = TRUE;
             break;
         case(e_FM_PORT_COUNTERS_RX_FILTER_FRAME):
             *p_StatsType = E_FMAN_PORT_STATS_CNT_FILTERED_FRAME;
             break;
         case(e_FM_PORT_COUNTERS_RX_LIST_DMA_ERR):
             *p_StatsType = E_FMAN_PORT_STATS_CNT_DMA_ERR;
-            *p_IsStats = TRUE;
             break;
         case(e_FM_PORT_COUNTERS_WRED_DISCARD):
             *p_StatsType = E_FMAN_PORT_STATS_CNT_WRED_DISCARD;
-            *p_IsStats = TRUE;
+            break;
         case(e_FM_PORT_COUNTERS_LENGTH_ERR):
             *p_StatsType = E_FMAN_PORT_STATS_CNT_LEN_ERR;
-            *p_IsStats = TRUE;
+            break;
         case(e_FM_PORT_COUNTERS_UNSUPPRTED_FORMAT):
             *p_StatsType = E_FMAN_PORT_STATS_CNT_UNSUPPORTED_FORMAT;
-            *p_IsStats = TRUE;
+            break;
         default:
             break;
     }
@@ -865,10 +855,10 @@ static t_Error AdditionalPrsParams(t_FmPort *p_FmPort, t_FmPcdPrsAdditionalHdrPa
             case (HEADER_TYPE_MPLS):
                 if (p_prsOpts->mplsPrsOptions.labelInterpretationEnable)
                     tmpReg |= PRS_HDR_MPLS_LBL_INTER_EN;
-                GET_PRS_HDR_NUM(hdrNum, p_prsOpts->mplsPrsOptions.nextParse);
+                hdrNum = GetPrsHdrNum(p_prsOpts->mplsPrsOptions.nextParse);
                 if (hdrNum == ILLEGAL_HDR_NUM)
                     RETURN_ERROR(MAJOR, E_INVALID_VALUE, NO_MSG);
-                GET_PRS_HDR_NUM(Ipv4HdrNum, HEADER_TYPE_IPv4);
+                Ipv4HdrNum = GetPrsHdrNum(HEADER_TYPE_IPv4);
                 if (hdrNum < Ipv4HdrNum)
                     RETURN_ERROR(MAJOR, E_INVALID_VALUE,
                         ("Header must be equal or higher than IPv4"));
@@ -910,6 +900,35 @@ static t_Error AdditionalPrsParams(t_FmPort *p_FmPort, t_FmPcdPrsAdditionalHdrPa
     *p_SoftSeqAttachReg = tmpReg;
 
     return E_OK;
+}
+
+uint8_t GetPrsHdrNum(e_NetHeaderType hdr)
+{
+    switch (hdr) {
+        case (HEADER_TYPE_ETH):              return 0;
+        case (HEADER_TYPE_LLC_SNAP):         return 1;
+        case (HEADER_TYPE_VLAN):             return 2;
+        case (HEADER_TYPE_PPPoE):            return 3;
+        case (HEADER_TYPE_PPP):              return 3;
+        case (HEADER_TYPE_MPLS):             return 4;
+        case (HEADER_TYPE_IPv4):             return 5;
+        case (HEADER_TYPE_IPv6):             return 6;
+        case (HEADER_TYPE_GRE):              return 7;
+        case (HEADER_TYPE_MINENCAP):         return 8;
+        case (HEADER_TYPE_USER_DEFINED_L3):  return 9;
+        case (HEADER_TYPE_TCP):              return 10;
+        case (HEADER_TYPE_UDP):              return 11;
+        case (HEADER_TYPE_IPSEC_AH):
+        case (HEADER_TYPE_IPSEC_ESP):        return 12;
+        case (HEADER_TYPE_SCTP):             return 13;
+        case (HEADER_TYPE_DCCP):             return 14;
+        case (HEADER_TYPE_USER_DEFINED_L4):  return 15;
+        case (HEADER_TYPE_USER_DEFINED_SHIM1):
+        case (HEADER_TYPE_USER_DEFINED_SHIM2):
+        case (HEADER_TYPE_MACSEC):           return NO_HDR_NUM;
+        default:
+            return ILLEGAL_HDR_NUM;
+    }
 }
 
 static uint32_t GetPortSchemeBindParams(t_Handle h_FmPort, t_FmPcdKgInterModuleBindPortToSchemes *p_SchemeBind)
@@ -1172,7 +1191,7 @@ static t_Error SetPcd(t_FmPort *p_FmPort, t_FmPortPcdParams *p_PcdParams)
     {
         ASSERT_COND(p_PcdParams->p_PrsParams);
         /* if PRS is used it is always first */
-        GET_PRS_HDR_NUM(hdrNum, p_PcdParams->p_PrsParams->firstPrsHdr);
+        hdrNum = GetPrsHdrNum(p_PcdParams->p_PrsParams->firstPrsHdr);
         if (hdrNum == ILLEGAL_HDR_NUM)
             RETURN_ERROR(MAJOR, E_NOT_SUPPORTED, ("Unsupported header."));
         p_FmPort->savedBmiNia |= (uint32_t)(NIA_ENG_PRS | (uint32_t)(hdrNum));
@@ -1230,54 +1249,59 @@ static t_Error SetPcd(t_FmPort *p_FmPort, t_FmPortPcdParams *p_PcdParams)
             switch (p_FmPort->optArray[i])
             {
                 case (ETH_BROADCAST):
-                    GET_PRS_HDR_NUM(hdrNum, HEADER_TYPE_ETH)
+                    hdrNum = GetPrsHdrNum(HEADER_TYPE_ETH);
                     tmpHxs[hdrNum] |= (i+1) << PRS_HDR_ETH_BC_SHIFT;
                     break;
                 case (ETH_MULTICAST):
-                    GET_PRS_HDR_NUM(hdrNum, HEADER_TYPE_ETH)
+                    hdrNum = GetPrsHdrNum(HEADER_TYPE_ETH);
                     tmpHxs[hdrNum] |= (i+1) << PRS_HDR_ETH_MC_SHIFT;
                     break;
                 case (VLAN_STACKED):
-                    GET_PRS_HDR_NUM(hdrNum, HEADER_TYPE_VLAN)
+                    hdrNum = GetPrsHdrNum(HEADER_TYPE_VLAN);
                     tmpHxs[hdrNum] |= (i+1)<< PRS_HDR_VLAN_STACKED_SHIFT;
                     break;
                 case (MPLS_STACKED):
-                    GET_PRS_HDR_NUM(hdrNum, HEADER_TYPE_MPLS)
+                    hdrNum = GetPrsHdrNum(HEADER_TYPE_MPLS);
                     tmpHxs[hdrNum] |= (i+1) << PRS_HDR_MPLS_STACKED_SHIFT;
                     break;
                 case (IPV4_BROADCAST_1):
-                    GET_PRS_HDR_NUM(hdrNum, HEADER_TYPE_IPv4)
+                    hdrNum = GetPrsHdrNum(HEADER_TYPE_IPv4);
                     tmpHxs[hdrNum] |= (i+1) << PRS_HDR_IPV4_1_BC_SHIFT;
                     break;
                 case (IPV4_MULTICAST_1):
-                    GET_PRS_HDR_NUM(hdrNum, HEADER_TYPE_IPv4)
+                    hdrNum = GetPrsHdrNum(HEADER_TYPE_IPv4);
                     tmpHxs[hdrNum] |= (i+1) << PRS_HDR_IPV4_1_MC_SHIFT;
                     break;
                 case (IPV4_UNICAST_2):
-                    GET_PRS_HDR_NUM(hdrNum, HEADER_TYPE_IPv4)
+                    hdrNum = GetPrsHdrNum(HEADER_TYPE_IPv4);
                     tmpHxs[hdrNum] |= (i+1) << PRS_HDR_IPV4_2_UC_SHIFT;
                     break;
                 case (IPV4_MULTICAST_BROADCAST_2):
-                    GET_PRS_HDR_NUM(hdrNum, HEADER_TYPE_IPv4)
+                    hdrNum = GetPrsHdrNum(HEADER_TYPE_IPv4);
                     tmpHxs[hdrNum] |= (i+1) << PRS_HDR_IPV4_2_MC_BC_SHIFT;
                     break;
                 case (IPV6_MULTICAST_1):
-                    GET_PRS_HDR_NUM(hdrNum, HEADER_TYPE_IPv6)
+                    hdrNum = GetPrsHdrNum(HEADER_TYPE_IPv6);
                     tmpHxs[hdrNum] |= (i+1) << PRS_HDR_IPV6_1_MC_SHIFT;
                     break;
                 case (IPV6_UNICAST_2):
-                    GET_PRS_HDR_NUM(hdrNum, HEADER_TYPE_IPv6)
+                    hdrNum = GetPrsHdrNum(HEADER_TYPE_IPv6);
                     tmpHxs[hdrNum] |= (i+1) << PRS_HDR_IPV6_2_UC_SHIFT;
                     break;
                 case (IPV6_MULTICAST_2):
-                    GET_PRS_HDR_NUM(hdrNum, HEADER_TYPE_IPv6)
+                    hdrNum = GetPrsHdrNum(HEADER_TYPE_IPv6);
                     tmpHxs[hdrNum] |= (i+1) << PRS_HDR_IPV6_2_MC_SHIFT;
                     break;
             }
 
-        if (FmPcdNetEnvIsHdrExist(p_FmPort->h_FmPcd,
-                                  p_FmPort->netEnvId, HEADER_TYPE_UDP_ENCAP_ESP))
+        if (FmPcdNetEnvIsHdrExist(p_FmPort->h_FmPcd, p_FmPort->netEnvId,
+                                  HEADER_TYPE_UDP_ENCAP_ESP))
         {
+            if (p_PcdParams->p_PrsParams->numOfHdrsWithAdditionalParams == FM_PCD_PRS_NUM_OF_HDRS)
+                RETURN_ERROR(
+                        MINOR, E_INVALID_VALUE,
+                        ("If HEADER_TYPE_UDP_ENCAP_ESP is used, numOfHdrsWithAdditionalParams may be up to FM_PCD_PRS_NUM_OF_HDRS - 1"));
+
             p_PcdParams->p_PrsParams->additionalParams
                 [p_PcdParams->p_PrsParams->numOfHdrsWithAdditionalParams].hdr = HEADER_TYPE_UDP;
             p_PcdParams->p_PrsParams->additionalParams
@@ -1286,29 +1310,30 @@ static t_Error SetPcd(t_FmPort *p_FmPort, t_FmPortPcdParams *p_PcdParams)
         }
 
         /* set MPLS default next header - HW reset workaround  */
-        GET_PRS_HDR_NUM(hdrNum, HEADER_TYPE_MPLS)
+        hdrNum = GetPrsHdrNum(HEADER_TYPE_MPLS);
         tmpHxs[hdrNum] |= PRS_HDR_MPLS_LBL_INTER_EN;
-        GET_PRS_HDR_NUM(L3HdrNum, HEADER_TYPE_USER_DEFINED_L3);
+        L3HdrNum = GetPrsHdrNum(HEADER_TYPE_USER_DEFINED_L3);
         tmpHxs[hdrNum] |= (uint32_t)L3HdrNum << PRS_HDR_MPLS_NEXT_HDR_SHIFT;
 
         /* for GRE, disable errors */
-        GET_PRS_HDR_NUM(greHdrNum, HEADER_TYPE_GRE);
+        greHdrNum = GetPrsHdrNum(HEADER_TYPE_GRE);
         tmpHxs[greHdrNum] |= PRS_HDR_ERROR_DIS;
 
         /* For UDP remove PAD from L4 checksum calculation */
-        GET_PRS_HDR_NUM(hdrNum, HEADER_TYPE_UDP);
+        hdrNum = GetPrsHdrNum(HEADER_TYPE_UDP);
         tmpHxs[hdrNum] |= PRS_HDR_UDP_PAD_REMOVAL;
         /* For TCP remove PAD from L4 checksum calculation */
-        GET_PRS_HDR_NUM(hdrNum, HEADER_TYPE_TCP);
+        hdrNum = GetPrsHdrNum(HEADER_TYPE_TCP);
         tmpHxs[hdrNum] |= PRS_HDR_TCP_PAD_REMOVAL;
 
         /* config additional params for specific headers */
         for (i=0; i<p_PcdParams->p_PrsParams->numOfHdrsWithAdditionalParams; i++)
         {
-            GET_PRS_HDR_NUM(hdrNum, p_PcdParams->p_PrsParams->additionalParams[i].hdr);
-            if (hdrNum== ILLEGAL_HDR_NUM)
+            hdrNum =
+              GetPrsHdrNum(p_PcdParams->p_PrsParams->additionalParams[i].hdr);
+            if (hdrNum == ILLEGAL_HDR_NUM)
                 RETURN_ERROR(MAJOR, E_INVALID_VALUE, NO_MSG);
-            if (hdrNum==NO_HDR_NUM)
+            if (hdrNum == NO_HDR_NUM)
                 RETURN_ERROR(MAJOR, E_INVALID_VALUE, ("Private headers may not use additional parameters"));
 
             err = AdditionalPrsParams(p_FmPort, &p_PcdParams->p_PrsParams->additionalParams[i], &tmpHxs[hdrNum]);
@@ -1320,10 +1345,10 @@ static t_Error SetPcd(t_FmPort *p_FmPort, t_FmPortPcdParams *p_PcdParams)
         if (p_FmPort->h_IpReassemblyManip)
         {
            /* link to sw parser code for IP Frag - only if no other code is applied. */
-            GET_PRS_HDR_NUM(hdrNum, HEADER_TYPE_IPv4)
+            hdrNum = GetPrsHdrNum(HEADER_TYPE_IPv4);
             if (!(tmpHxs[hdrNum] & PRS_HDR_SW_PRS_EN))
                 tmpHxs[hdrNum] |= (PRS_HDR_SW_PRS_EN | IP_FRAG_SW_PATCH_IPv4_LABEL);
-            GET_PRS_HDR_NUM(hdrNum, HEADER_TYPE_IPv6)
+            hdrNum = GetPrsHdrNum(HEADER_TYPE_IPv6);
             if (!(tmpHxs[hdrNum] & PRS_HDR_SW_PRS_EN))
                 tmpHxs[hdrNum] |= (PRS_HDR_SW_PRS_EN | IP_FRAG_SW_PATCH_IPv6_LABEL);
         }
@@ -1332,7 +1357,7 @@ static t_Error SetPcd(t_FmPort *p_FmPort, t_FmPortPcdParams *p_PcdParams)
             (p_FmPort->portType == e_FM_PORT_TYPE_OH_OFFLINE_PARSING))
         {
             /* link to sw parser code for IP Frag - only if no other code is applied. */
-            GET_PRS_HDR_NUM(hdrNum, HEADER_TYPE_IPv6)
+            hdrNum = GetPrsHdrNum(HEADER_TYPE_IPv6);
             if (!(tmpHxs[hdrNum] & PRS_HDR_SW_PRS_EN))
                 tmpHxs[hdrNum] |= (PRS_HDR_SW_PRS_EN | IP_FRAG_SW_PATCH_IPv6_LABEL);
         }
@@ -1444,7 +1469,7 @@ static t_Error DeletePcd(t_FmPort *p_FmPort)
     /* "cut" PCD out of the port's flow - go to BMI */
     /* WRITE_UINT32(*p_BmiNia, (p_FmPort->savedBmiNia & BMI_RFNE_FDCS_MASK) | (NIA_ENG_BMI | NIA_BMI_AC_ENQ_FRAME)); */
 
-    if (p_FmPort->pcdEngines | FM_PCD_PRS)
+    if (p_FmPort->pcdEngines & FM_PCD_PRS)
     {
         WRITE_UINT32(*p_BmiPrsStartOffset, 0);
 
@@ -1937,7 +1962,8 @@ t_Handle FM_PORT_Config(t_FmPortParams *p_FmPortParams)
     FM_GetRevision(p_FmPort->h_Fm, &p_FmPort->fmRevInfo);
 
     /* calculate global portId number */
-    SW_PORT_ID_TO_HW_PORT_ID(p_FmPort->hardwarePortId, p_FmPort->portType, p_FmPortParams->portId);
+    p_FmPort->hardwarePortId = SwPortIdToHwPortId(p_FmPort->portType,
+                                                  p_FmPortParams->portId);
 
     if (p_FmPort->fmRevInfo.majorRev >= 6)
     {
@@ -2014,40 +2040,29 @@ t_Handle FM_PORT_Config(t_FmPortParams *p_FmPortParams)
 
     p_FmPort->maxFrameLength                                        = DEFAULT_PORT_maxFrameLength;
     /* resource distribution. */
-#ifdef FM_NO_GUARANTEED_RESET_VALUES
-    if (1) /* if (p_FmPort->fmRevInfo.majorRev < 6) */
+
+
+    if ((p_FmPort->portType == e_FM_PORT_TYPE_OH_HOST_COMMAND) &&
+        (p_FmPortParams->portId != FM_OH_PORT_ID))
     {
-        p_FmPort->fifoBufs.num                                      = DEFAULT_PORT_numOfFifoBufs(p_FmPort->portType)*BMI_FIFO_UNITS;
-        p_FmPort->fifoBufs.extra                                    = DEFAULT_PORT_extraNumOfFifoBufs*BMI_FIFO_UNITS;
-        p_FmPort->openDmas.num                                      = DEFAULT_PORT_numOfOpenDmas(p_FmPort->portType);
-        p_FmPort->openDmas.extra                                    = DEFAULT_PORT_extraNumOfOpenDmas(p_FmPort->portType);
-        p_FmPort->tasks.num                                         = DEFAULT_PORT_numOfTasks(p_FmPort->portType);
-        p_FmPort->tasks.extra                                       = DEFAULT_PORT_extraNumOfTasks(p_FmPort->portType);
+        /* Overwrite HC defaults */
+        p_FmPort->fifoBufs.num      = DEFAULT_PORT_numOfFifoBufs(p_FmPort->portType)*BMI_FIFO_UNITS;
+        p_FmPort->fifoBufs.extra    = DEFAULT_PORT_extraNumOfFifoBufs*BMI_FIFO_UNITS;
+        p_FmPort->openDmas.num      = DEFAULT_PORT_numOfOpenDmas(p_FmPort->portType);
+        p_FmPort->openDmas.extra    = DEFAULT_PORT_extraNumOfOpenDmas(p_FmPort->portType);
+        p_FmPort->tasks.num         = DEFAULT_PORT_numOfTasks(p_FmPort->portType);
+        p_FmPort->tasks.extra       = DEFAULT_PORT_extraNumOfTasks(p_FmPort->portType);
     }
     else
-#endif /* FM_NO_GUARANTEED_RESET_VALUES */
     {
-        if ((p_FmPort->portType == e_FM_PORT_TYPE_OH_HOST_COMMAND) &&
-            (p_FmPortParams->portId != FM_OH_PORT_ID))
-        {
-            /* Overwrite HC defaults */
-            p_FmPort->fifoBufs.num      = DEFAULT_PORT_numOfFifoBufs(p_FmPort->portType)*BMI_FIFO_UNITS;
-            p_FmPort->fifoBufs.extra    = DEFAULT_PORT_extraNumOfFifoBufs*BMI_FIFO_UNITS;
-            p_FmPort->openDmas.num      = DEFAULT_PORT_numOfOpenDmas(p_FmPort->portType);
-            p_FmPort->openDmas.extra    = DEFAULT_PORT_extraNumOfOpenDmas(p_FmPort->portType);
-            p_FmPort->tasks.num         = DEFAULT_PORT_numOfTasks(p_FmPort->portType);
-            p_FmPort->tasks.extra       = DEFAULT_PORT_extraNumOfTasks(p_FmPort->portType);
-        }
-        else
-        {
-            p_FmPort->fifoBufs.num                                      = 0;
-            p_FmPort->fifoBufs.extra                                    = 0;
-            p_FmPort->openDmas.num                                      = 0;
-            p_FmPort->openDmas.extra                                    = 0;
-            p_FmPort->tasks.num                                         = 0;
-            p_FmPort->tasks.extra                                       = 0;
-        }
+        p_FmPort->fifoBufs.num                                      = 0;
+        p_FmPort->fifoBufs.extra                                    = 0;
+        p_FmPort->openDmas.num                                      = 0;
+        p_FmPort->openDmas.extra                                    = 0;
+        p_FmPort->tasks.num                                         = 0;
+        p_FmPort->tasks.extra                                       = 0;
     }
+
 
 #ifdef FM_HEAVY_TRAFFIC_SEQUENCER_HANG_ERRATA_FMAN_A006981
     if ((p_FmPort->fmRevInfo.majorRev == 6) &&
@@ -2069,19 +2084,12 @@ t_Handle FM_PORT_Config(t_FmPortParams *p_FmPortParams)
         p_FmPort->p_FmPortDriverParam->cutBytesFromEnd              = DEFAULT_PORT_cutBytesFromEnd;
         p_FmPort->p_FmPortDriverParam->enBufPoolDepletion           = FALSE;
         p_FmPort->p_FmPortDriverParam->frmDiscardOverride           = DEFAULT_PORT_frmDiscardOverride;
-#ifdef FM_NO_GUARANTEED_RESET_VALUES
-    if (1) /* if (p_FmPort->fmRevInfo.majorRev < 6) */
-    {
-        p_FmPort->p_FmPortDriverParam->rxFifoPriElevationLevel      = DEFAULT_PORT_rxFifoPriElevationLevel;
-        p_FmPort->p_FmPortDriverParam->rxFifoThreshold              = DEFAULT_PORT_rxFifoThreshold;
-    }
-    else
-#endif /* FM_NO_GUARANTEED_RESET_VALUES */
-    {
+
+
         tmpReg = GET_UINT32(p_FmPort->p_FmPortBmiRegs->rxPortBmiRegs.fmbm_rfp);
         p_FmPort->p_FmPortDriverParam->rxFifoPriElevationLevel      = (((tmpReg & BMI_RX_FIFO_PRI_ELEVATION_MASK) >> BMI_RX_FIFO_PRI_ELEVATION_SHIFT) + 1) * BMI_FIFO_UNITS ;
         p_FmPort->p_FmPortDriverParam->rxFifoThreshold              = (((tmpReg  & BMI_RX_FIFO_THRESHOLD_MASK) >> BMI_RX_FIFO_THRESHOLD_SHIFT) + 1) * BMI_FIFO_UNITS;
-    }
+
 
         p_FmPort->p_FmPortDriverParam->bufMargins.endMargins        = DEFAULT_PORT_BufMargins_endMargins;
         p_FmPort->p_FmPortDriverParam->errorsToDiscard              = DEFAULT_PORT_errorsToDiscard;
@@ -2098,19 +2106,6 @@ t_Handle FM_PORT_Config(t_FmPortParams *p_FmPortParams)
         WRITE_UINT32(p_FmPort->p_FmPortBmiRegs->txPortBmiRegs.fmbm_tfp, tmpReg);
 #endif /* FM_WRONG_RESET_VALUES_ERRATA_FMAN_A005127 */
     case (e_FM_PORT_TYPE_TX_10G):
-#ifdef FM_NO_GUARANTEED_RESET_VALUES
-        if (1) /* if (p_FmPort->fmRevInfo.majorRev < 6) */
-        {
-            p_FmPort->p_FmPortDriverParam->txFifoMinFillLevel       = DEFAULT_PORT_txFifoMinFillLevel;
-            p_FmPort->p_FmPortDriverParam->dfltCfg.tx_fifo_deq_pipeline_depth                          =
-                (uint8_t)((p_FmPort->portType == e_FM_PORT_TYPE_TX) ?
-                          DEFAULT_PORT_fifoDeqPipelineDepth_1G :
-                          DEFAULT_PORT_fifoDeqPipelineDepth_10G);
-            p_FmPort->p_FmPortDriverParam->txFifoLowComfLevel       = DEFAULT_PORT_txFifoLowComfLevel;
-        }
-        else
-#endif /* FM_NO_GUARANTEED_RESET_VALUES */
-        {
             tmpReg = GET_UINT32(p_FmPort->p_FmPortBmiRegs->txPortBmiRegs.fmbm_tfp);
             p_FmPort->p_FmPortDriverParam->txFifoMinFillLevel =
                 ((tmpReg & BMI_TX_FIFO_MIN_FILL_MASK) >> BMI_TX_FIFO_MIN_FILL_SHIFT) * BMI_FIFO_UNITS ;
@@ -2118,7 +2113,6 @@ t_Handle FM_PORT_Config(t_FmPortParams *p_FmPortParams)
                 (uint8_t)(((tmpReg & BMI_FIFO_PIPELINE_DEPTH_MASK) >> BMI_FIFO_PIPELINE_DEPTH_SHIFT) + 1);
             p_FmPort->p_FmPortDriverParam->txFifoLowComfLevel =
                 (((tmpReg & BMI_TX_LOW_COMF_MASK) >> BMI_TX_LOW_COMF_SHIFT) + 1) * BMI_FIFO_UNITS;
-        }
 
         p_FmPort->p_FmPortDriverParam->deqType                      = DEFAULT_PORT_deqType;
         p_FmPort->p_FmPortDriverParam->deqPrefetchOption            = DEFAULT_PORT_deqPrefetchOption;
@@ -2142,12 +2136,6 @@ t_Handle FM_PORT_Config(t_FmPortParams *p_FmPortParams)
         p_FmPort->p_FmPortDriverParam->deqType                      = DEFAULT_PORT_deqType;
         p_FmPort->p_FmPortDriverParam->deqByteCnt                   = DEFAULT_PORT_deqByteCnt_1G;
 
-#ifdef FM_NO_GUARANTEED_RESET_VALUES
-    if (1) /* if (p_FmPort->fmRevInfo.majorRev < 6) */
-        p_FmPort->p_FmPortDriverParam->dfltCfg.tx_fifo_deq_pipeline_depth                              = DEFAULT_PORT_fifoDeqPipelineDepth_OH;
-    else
-#endif /* FM_NO_GUARANTEED_RESET_VALUES */
-    {
         tmpReg = GET_UINT32(p_FmPort->p_FmPortBmiRegs->ohPortBmiRegs.fmbm_ofp);
         p_FmPort->p_FmPortDriverParam->dfltCfg.tx_fifo_deq_pipeline_depth =
             (uint8_t)(((tmpReg & BMI_FIFO_PIPELINE_DEPTH_MASK) >> BMI_FIFO_PIPELINE_DEPTH_SHIFT) + 1);
@@ -2157,7 +2145,6 @@ t_Handle FM_PORT_Config(t_FmPortParams *p_FmPortParams)
             /* Overwrite HC defaults */
             p_FmPort->p_FmPortDriverParam->dfltCfg.tx_fifo_deq_pipeline_depth = DEFAULT_PORT_fifoDeqPipelineDepth_OH;
         }
-    }
 
 #ifndef FM_FRAME_END_PARAMS_FOR_OP
         if (p_FmPort->fmRevInfo.majorRev < 6)
@@ -2392,18 +2379,6 @@ t_Error FM_PORT_Init(t_Handle h_FmPort)
                    ((uint64_t)(fmParams.fmMuramPhysBaseAddr.high) << 32));
     p_FmPort->h_FmMuram = FmGetMuramHandle(p_FmPort->h_Fm);
 
-#ifndef FM_NO_GUARANTEED_RESET_VALUES
-    if (p_FmPort->fmRevInfo.majorRev >= 6)
-    {
-        p_FmPort->tasks.num = fmParams.numOfTasks;
-        p_FmPort->tasks.extra = fmParams.numOfExtraTasks;
-        p_FmPort->openDmas.num = fmParams.numOfOpenDmas;
-        p_FmPort->openDmas.extra = fmParams.numOfExtraOpenDmas;
-        p_FmPort->fifoBufs.num = fmParams.sizeOfFifo;
-        p_FmPort->fifoBufs.extra = fmParams.extraSizeOfFifo;
-    }
-#endif /* FM_NO_GUARANTEED_RESET_VALUES */
-
     errCode = InitLowLevelDriver(p_FmPort);
     if (errCode != E_OK)
         RETURN_ERROR(MAJOR, errCode, NO_MSG);
@@ -2478,6 +2453,7 @@ t_Error FM_PORT_Free(t_Handle h_FmPort)
 
     FmPortDriverParamFree(p_FmPort);
 
+    memset(&fmParams, 0, sizeof(fmParams));
     fmParams.hardwarePortId = p_FmPort->hardwarePortId;
     fmParams.portType = (e_FmPortType)p_FmPort->portType;
     fmParams.deqPipelineDepth = p_FmPort->p_FmPortDriverParam->dfltCfg.tx_fifo_deq_pipeline_depth;
@@ -2740,7 +2716,8 @@ t_Error FM_PORT_ConfigSyncReq(t_Handle h_FmPort, bool syncReq)
     SANITY_CHECK_RETURN_ERROR(p_FmPort, E_INVALID_HANDLE);
     SANITY_CHECK_RETURN_ERROR(p_FmPort->p_FmPortDriverParam, E_INVALID_HANDLE);
 
-    if ((p_FmPort->portType == e_FM_PORT_TYPE_TX_10G) && (p_FmPort->portType == e_FM_PORT_TYPE_TX))
+     if ((p_FmPort->portType == e_FM_PORT_TYPE_TX_10G)
+            || (p_FmPort->portType == e_FM_PORT_TYPE_TX))
         RETURN_ERROR(MAJOR, E_INVALID_OPERATION, ("Not available for Tx ports"));
 
     p_FmPort->p_FmPortDriverParam->dfltCfg.sync_req = syncReq;
@@ -2755,7 +2732,8 @@ t_Error FM_PORT_ConfigFrmDiscardOverride(t_Handle h_FmPort, bool override)
 
     SANITY_CHECK_RETURN_ERROR(p_FmPort, E_INVALID_HANDLE);
     SANITY_CHECK_RETURN_ERROR(p_FmPort->p_FmPortDriverParam, E_INVALID_HANDLE);
-    if ((p_FmPort->portType == e_FM_PORT_TYPE_TX_10G) && (p_FmPort->portType == e_FM_PORT_TYPE_TX))
+    if ((p_FmPort->portType == e_FM_PORT_TYPE_TX_10G)
+            || (p_FmPort->portType == e_FM_PORT_TYPE_TX))
         RETURN_ERROR(MAJOR, E_INVALID_OPERATION, ("not available for Tx ports"));
 
     p_FmPort->p_FmPortDriverParam->dfltCfg.discard_override = override;
@@ -3318,14 +3296,12 @@ t_Error FM_PORT_SetPfcPrioritiesMappingToQmanWQ(t_Handle h_FmPort, uint8_t prio,
 t_Error FM_PORT_SetFrameQueueCounters(t_Handle h_FmPort, bool enable)
 {
     t_FmPort                *p_FmPort = (t_FmPort*)h_FmPort;
-    int                     err;
 
     SANITY_CHECK_RETURN_ERROR(p_FmPort, E_INVALID_HANDLE);
     SANITY_CHECK_RETURN_ERROR(!p_FmPort->p_FmPortDriverParam, E_INVALID_STATE);
 
-    err = fman_port_set_queue_cnt_mode(&p_FmPort->port, enable);
-    if (err != 0)
-        RETURN_ERROR(MAJOR, E_INVALID_VALUE, ("fman_port_set_perf_cnt_mode"));
+    fman_port_set_queue_cnt_mode(&p_FmPort->port, enable);
+
     return E_OK;
 }
 
@@ -3646,8 +3622,7 @@ uint32_t FM_PORT_GetCounter(t_Handle h_FmPort, e_FmPortCounters counter)
                 queueType = E_FMAN_PORT_DEQ_CONFIRM;
                break;
             default:
-               REPORT_ERROR(MINOR, E_INVALID_STATE, ("Requested counter is not available"));
-               return 0;
+               RETURN_ERROR(MAJOR, E_INVALID_STATE, ("Requested counter is not available"));
         }
 
         return fman_port_get_qmi_counter(&p_FmPort->port, queueType);
@@ -3832,7 +3807,9 @@ t_Error FM_PORT_VSPAlloc(t_Handle h_FmPort, t_FmPortVSPAllocParams *p_VSPParams)
     /*for numOfProfiles = 0 don't call this function*/
     SANITY_CHECK_RETURN_ERROR(p_VSPParams->numOfProfiles, E_INVALID_VALUE);
     /*dfltRelativeId should be in the range of numOfProfiles*/
-    SANITY_CHECK_RETURN_ERROR(IN_RANGE(0, p_VSPParams->dfltRelativeId, (p_VSPParams->numOfProfiles - 1)), E_INVALID_VALUE);
+    SANITY_CHECK_RETURN_ERROR(
+        p_VSPParams->dfltRelativeId < p_VSPParams->numOfProfiles,
+        E_INVALID_VALUE);
     /*p_FmPort should be from Rx type or OP*/
     SANITY_CHECK_RETURN_ERROR(((p_FmPort->portType == e_FM_PORT_TYPE_RX_10G) ||
                                (p_FmPort->portType == e_FM_PORT_TYPE_RX) ||
@@ -4069,7 +4046,7 @@ t_Error     FM_PORT_PcdPlcrModifyInitialProfile (t_Handle h_FmPort, t_Handle h_P
         RETURN_ERROR(MAJOR, E_INVALID_OPERATION, ("Invalid profile"));
     }
 
-    tmpReg = (uint32_t)(NIA_ENG_PLCR | NIA_PLCR_ABSOLUTE | absoluteProfileId);
+    tmpReg |= (uint32_t)(NIA_ENG_PLCR | NIA_PLCR_ABSOLUTE | absoluteProfileId);
 
     if (p_FmPort->pcdEngines & FM_PCD_PRS) /* e_FM_PCD_SUPPORT_PRS_AND_PLCR */
     {
@@ -4755,7 +4732,7 @@ t_Error FM_PORT_PcdPrsModifyStartOffset (t_Handle h_FmPort, t_FmPcdPrsStart *p_F
     }
 
     /* set the first header */
-    GET_PRS_HDR_NUM(hdrNum, p_FmPcdPrsStart->firstPrsHdr);
+    hdrNum = GetPrsHdrNum(p_FmPcdPrsStart->firstPrsHdr);
     if ((hdrNum == ILLEGAL_HDR_NUM) || (hdrNum == NO_HDR_NUM))
     {
         RELEASE_LOCK(p_FmPort->lock);
