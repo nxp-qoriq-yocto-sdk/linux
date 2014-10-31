@@ -1349,6 +1349,9 @@ t_Error FmPcdRegisterReassmPort(t_Handle h_FmPcd, t_Handle h_IpReasmCommonPramTb
     ASSERT_COND(h_IpReasmCommonPramTbl);
 
     bitFor1Micro = FmGetTimeStampScale(p_FmPcd->h_Fm);
+    if (bitFor1Micro == 0)
+        RETURN_ERROR(MAJOR, E_NOT_AVAILABLE, ("Timestamp scale"));
+
     bitFor1Micro = 32 - bitFor1Micro;
     LOG2(FM_PCD_MANIP_IP_REASSM_TIMEOUT_THREAD_THRESH, log2num);
     tsbs = bitFor1Micro - log2num;
@@ -1381,10 +1384,14 @@ t_Error FmPcdRegisterReassmPort(t_Handle h_FmPcd, t_Handle h_IpReasmCommonPramTb
 
 static t_Error CreateIpReassCommonTable(t_FmPcdManip *p_Manip)
 {
-    uint32_t    tmpReg32 = 0, i;
+    uint32_t    tmpReg32 = 0, i, bitFor1Micro;
     uint64_t    tmpReg64, size;
     t_FmPcd     *p_FmPcd = (t_FmPcd *)p_Manip->h_FmPcd;
     t_Error     err = E_OK;
+
+    bitFor1Micro = FmGetTimeStampScale(p_FmPcd->h_Fm);
+    if (bitFor1Micro == 0)
+        RETURN_ERROR(MAJOR, E_NOT_AVAILABLE, ("Timestamp scale"));
 
     /* Allocation of the IP Reassembly Common Parameters table. This table is located in the
     MURAM. Its size is 64 bytes and its base address should be 8-byte aligned.
@@ -1467,7 +1474,8 @@ static t_Error CreateIpReassCommonTable(t_FmPcdManip *p_Manip)
 
     /* Sets the Expiration Delay */
     tmpReg32 = 0;
-    tmpReg32 |= (((uint32_t)(1 << FmGetTimeStampScale(p_FmPcd->h_Fm))) * p_Manip->ipReassmParams.timeoutThresholdForReassmProcess);
+    tmpReg32 |= (((uint32_t)(1 << bitFor1Micro))
+            * p_Manip->ipReassmParams.timeoutThresholdForReassmProcess);
     WRITE_UINT32(p_Manip->ipReassmParams.p_IpReassCommonTbl->expirationDelay, tmpReg32);
 
     err = FmPcdRegisterReassmPort(p_FmPcd, p_Manip->ipReassmParams.p_IpReassCommonTbl);
@@ -1641,23 +1649,6 @@ static t_Error UpdateInitIpReasm(t_Handle       h_FmPcd,
             RETURN_ERROR(MAJOR, err, NO_MSG);
         if (fmPortGetSetCcParams.getCcParams.type & (NUM_OF_TASKS | NUM_OF_EXTRA_TASKS | DISCARD_MASK | FM_REV))
             RETURN_ERROR(MAJOR, E_INVALID_STATE, ("offset of the data wasn't configured previously"));
-    }
-    else if (validate)
-    {
-        if ((!(p_Manip->shadowUpdateParams & (NUM_OF_TASKS | NUM_OF_EXTRA_TASKS | DISCARD_MASK))) ||
-            ((p_Manip->updateParams & (NUM_OF_TASKS | NUM_OF_EXTRA_TASKS | DISCARD_MASK))))
-            RETURN_ERROR(MAJOR, E_INVALID_STATE, ("in this stage parameters from Port has be updated"));
-
-        fmPortGetSetCcParams.setCcParams.type = 0;
-        fmPortGetSetCcParams.getCcParams.type = p_Manip->shadowUpdateParams;
-        if ((err = FmPortGetSetCcParams(h_FmPort, &fmPortGetSetCcParams)) != E_OK)
-            RETURN_ERROR(MAJOR, err, NO_MSG);
-        if (fmPortGetSetCcParams.getCcParams.type & (NUM_OF_TASKS | NUM_OF_EXTRA_TASKS | DISCARD_MASK))
-            RETURN_ERROR(MAJOR, E_INVALID_STATE, ("offset of the data wasn't configured previously"));
-    }
-
-    if (p_Manip->updateParams)
-    {
         if (p_Manip->updateParams & (NUM_OF_TASKS | NUM_OF_EXTRA_TASKS | DISCARD_MASK))
         {
             t_FmPcd     *p_FmPcd = (t_FmPcd *)h_FmPcd;
@@ -2389,6 +2380,7 @@ static t_Error CapwapReassembly(t_CapwapReassemblyParams    *p_ManipParams,
     uint8_t     log2Num;
     uint8_t     numOfSets;
     uint32_t    j = 0;
+    uint32_t bitFor1Micro;
 
     SANITY_CHECK_RETURN_ERROR(p_Manip->h_Ad, E_INVALID_HANDLE);
     SANITY_CHECK_RETURN_ERROR(p_FmPcd->h_Hc, E_INVALID_HANDLE);
@@ -2413,6 +2405,10 @@ static t_Error CapwapReassembly(t_CapwapReassemblyParams    *p_ManipParams,
             (p_ManipParams->maxNumFramesInProcess > 2048))
             RETURN_ERROR(MAJOR,E_INVALID_VALUE, ("In the case of numOfFramesPerHashEntry = e_FM_PCD_MANIP_FOUR_WAYS_HASH maxNumFramesInProcess has to be in the range 8-2048"));
     }
+
+    bitFor1Micro = FmGetTimeStampScale(p_FmPcd->h_Fm);
+    if (bitFor1Micro == 0)
+        RETURN_ERROR(MAJOR, E_NOT_AVAILABLE, ("Timestamp scale"));
 
     p_Manip->updateParams |= (NUM_OF_TASKS | OFFSET_OF_PR | OFFSET_OF_DATA | HW_PORT_ID);
 
@@ -2476,7 +2472,7 @@ static t_Error CapwapReassembly(t_CapwapReassemblyParams    *p_ManipParams,
 
     p_Manip->fragParams.fqidForTimeOutFrames = p_ManipParams->fqidForTimeOutFrames;
     p_Manip->fragParams.timeoutRoutineRequestTime = p_ManipParams->timeoutRoutineRequestTime;
-    p_Manip->fragParams.bitFor1Micro = FmGetTimeStampScale(p_FmPcd->h_Fm);
+    p_Manip->capwapFragParams.bitFor1Micro = bitFor1Micro;
 
     tmpReg32 = 0;
     tmpReg32 |= (((uint32_t)1<<p_Manip->fragParams.bitFor1Micro) * p_ManipParams->timeoutThresholdForReassmProcess);
@@ -3282,6 +3278,7 @@ static t_Handle ManipOrStatsSetNode(t_Handle h_FmPcd, t_Handle *p_Params, bool s
     else
     {
         REPORT_ERROR(MAJOR, E_NOT_SUPPORTED, ("Statistics node!"));
+        XX_Free(p_Manip);
         return NULL;
     }
 #endif /* FM_CAPWAP_SUPPORT */

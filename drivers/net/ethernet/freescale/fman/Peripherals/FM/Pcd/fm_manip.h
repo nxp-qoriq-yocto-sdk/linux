@@ -271,7 +271,7 @@ typedef enum e_ManipInfo {
 #pragma pack(push,1)
 #endif /* defined(__MWERKS__) && ... */
 
-typedef _Packed struct t_CapwapReasmPram {
+typedef struct t_CapwapReasmPram {
     volatile uint32_t mode;
     volatile uint32_t autoLearnHashTblPtr;
     volatile uint32_t intStatsTblPtr;
@@ -295,7 +295,7 @@ typedef _Packed struct t_CapwapReasmPram {
     volatile uint32_t internalBufferBusy;
     volatile uint32_t externalBufferBusy;
     volatile uint32_t reserved1[4];
-} _PackedType t_CapwapReasmPram;
+} t_CapwapReasmPram;
 
 typedef _Packed struct t_IpReassTbl {
     volatile uint16_t waysNumAndSetSize;
@@ -317,7 +317,7 @@ typedef _Packed struct t_IpReassTbl {
     volatile uint32_t reserved2[2];
 } _PackedType t_IpReassTbl;
 
-typedef _Packed struct t_IpReassCommonTbl {
+typedef struct t_IpReassCommonTbl {
     volatile uint32_t timeoutModeAndFqid;
     volatile uint32_t reassFrmDescIndexPoolTblPtr;
     volatile uint32_t liodnAndReassFrmDescPoolPtrHi;
@@ -334,7 +334,7 @@ typedef _Packed struct t_IpReassCommonTbl {
     volatile uint32_t totalDmaSemaphoreDepletionCounter;
     volatile uint32_t totalNCSPCounter;
     volatile uint32_t discardMask;
-} _PackedType t_IpReassCommonTbl;
+} t_IpReassCommonTbl;
 
 typedef _Packed struct t_Hmtd {
     volatile uint16_t   cfg;

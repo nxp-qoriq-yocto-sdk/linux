@@ -83,15 +83,15 @@ t_Error DTSEC_MII_ReadPhyReg(t_Handle h_Dtsec,
     dtsec_freq = (uint16_t)(p_Dtsec->fmMacControllerDriver.clkFreq >> 1);
     miiregs = p_Dtsec->p_MiiMemMap;
 
-    err = (t_Error)fman_dtsec_mii_read_reg(miiregs, phyAddr, reg, p_Data, dtsec_freq);
+    err = fman_dtsec_mii_read_reg(miiregs, phyAddr, reg, p_Data, dtsec_freq);
 
     if (*p_Data == 0xffff)
         RETURN_ERROR(MINOR, E_NO_DEVICE,
                      ("Read wrong data (0xffff): phyAddr 0x%x, reg 0x%x",
                       phyAddr, reg));
     if (err)
-        RETURN_ERROR(MINOR, err, NO_MSG);
+        RETURN_ERROR(MINOR, (t_Error)err, NO_MSG);
 
-    return err;
+    return E_OK;
 }
 
