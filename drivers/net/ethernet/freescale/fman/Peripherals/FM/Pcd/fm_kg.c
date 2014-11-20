@@ -161,8 +161,8 @@ static e_FmPcdKgExtractDfltSelect GetGenericSwDefault(t_FmPcdKgExtractDflt swDef
                 if (swDefaults[i].type == e_FM_PCD_KG_GENERIC_FROM_DATA)
                     return swDefaults[i].dfltSelect;
         default:
-            return e_FM_PCD_KG_DFLT_ILLEGAL;
-    }
+    return e_FM_PCD_KG_DFLT_ILLEGAL;
+}
 }
 
 static uint8_t GetGenCode(e_FmPcdExtractFrom src, uint8_t *p_Offset)
@@ -347,14 +347,14 @@ static t_GenericCodes GetGenFieldCode(e_NetHeaderType hdr, t_FmPcdFields field, 
                 case (HEADER_TYPE_NONE):
                     ASSERT_COND(FALSE);
                 case (HEADER_TYPE_ETH):
-                switch (field.eth)
-                {
-                    case (NET_HEADER_FIELD_ETH_TYPE):
-                        return KG_SCH_GEN_ETH_TYPE_NO_V;
-                    default:
-                        REPORT_ERROR(MAJOR, E_NOT_SUPPORTED, ("Extraction not supported"));
-                        return 0;
-                }
+                    switch (field.eth)
+                    {
+                        case (NET_HEADER_FIELD_ETH_TYPE):
+                            return KG_SCH_GEN_ETH_TYPE_NO_V;
+                        default:
+                            REPORT_ERROR(MAJOR, E_NOT_SUPPORTED, ("Extraction not supported"));
+                            return 0;
+                    }
                 case (HEADER_TYPE_VLAN):
                     switch (field.vlan)
                     {
@@ -400,9 +400,9 @@ static t_GenericCodes GetGenFieldCode(e_NetHeaderType hdr, t_FmPcdFields field, 
                     REPORT_ERROR(MAJOR, E_NOT_SUPPORTED, ("Extraction not supported"));
                     return 0;
                 default:
-                    REPORT_ERROR(MAJOR, E_NOT_SUPPORTED, ("Header not supported"));
-                    return 0;
-            }
+    REPORT_ERROR(MAJOR, E_NOT_SUPPORTED, ("Header not supported"));
+    return 0;
+}
 }
 
 static t_KnownFieldsMasks GetKnownProtMask(t_FmPcd *p_FmPcd, e_NetHeaderType hdr, e_FmPcdHdrIndex index, t_FmPcdFields field)
@@ -644,9 +644,9 @@ static t_KnownFieldsMasks GetKnownProtMask(t_FmPcd *p_FmPcd, e_NetHeaderType hdr
                     return 0;
             }
         default:
-            REPORT_ERROR(MAJOR, E_NOT_SUPPORTED, ("Extraction not supported"));
-            return 0;
-    }
+    REPORT_ERROR(MAJOR, E_NOT_SUPPORTED, ("Extraction not supported"));
+    return 0;
+}
 }
 
 
@@ -1476,17 +1476,18 @@ static t_Error BuildSchemeRegs(t_FmPcdKgScheme            *p_Scheme,
                                 }
                                 else
                                     generic = TRUE;
-
                             }
                             else
                                 generic = TRUE;
                             if (generic)
                             {
                                 /* tmp - till we cover more headers under generic */
+                                XX_Free(p_LocalExtractsArray);
                                 RETURN_ERROR(MAJOR, E_NOT_SUPPORTED, ("Full header selection not supported"));
                             }
                             break;
                         default:
+                            XX_Free(p_LocalExtractsArray);
                             RETURN_ERROR(MAJOR, E_INVALID_SELECTION, NO_MSG);
                     }
                     break;
@@ -1507,15 +1508,24 @@ static t_Error BuildSchemeRegs(t_FmPcdKgScheme            *p_Scheme,
             {
                 /* set generic register fields */
                 if (currGenId >= FM_KG_NUM_OF_GENERIC_REGS)
+                {
+                    XX_Free(p_LocalExtractsArray);
                     RETURN_ERROR(MAJOR, E_FULL, ("Generic registers are fully used"));
+                }
                 if (!code)
+                {
+                    XX_Free(p_LocalExtractsArray);
                     RETURN_ERROR(MAJOR, E_NOT_SUPPORTED, NO_MSG);
+                }
 
                 genTmp = KG_SCH_GEN_VALID;
                 genTmp |= (uint32_t)(code << KG_SCH_GEN_HT_SHIFT);
                 genTmp |= offset;
                 if ((size > MAX_KG_SCH_SIZE) || (size < 1))
-                      RETURN_ERROR(MAJOR, E_NOT_SUPPORTED, ("Illegal extraction (size out of range)"));
+                {
+                    XX_Free(p_LocalExtractsArray);
+                    RETURN_ERROR(MAJOR, E_NOT_SUPPORTED, ("Illegal extraction (size out of range)"));
+                }
                 genTmp |= (uint32_t)((size - 1) << KG_SCH_GEN_SIZE_SHIFT);
                 swDefault = GetGenericSwDefault(swDefaults, numOfSwDefaults, code);
                 if (swDefault == e_FM_PCD_KG_DFLT_ILLEGAL)
@@ -1573,9 +1583,15 @@ static t_Error BuildSchemeRegs(t_FmPcdKgScheme            *p_Scheme,
 
         /*  configure kgse_hc  */
         if (p_KeyAndHash->hashShift > MAX_HASH_SHIFT)
-             RETURN_ERROR(MAJOR, E_INVALID_VALUE, ("hashShift must not be larger than %d", MAX_HASH_SHIFT));
+        {
+            XX_Free(p_LocalExtractsArray);
+            RETURN_ERROR(MAJOR, E_INVALID_VALUE, ("hashShift must not be larger than %d", MAX_HASH_SHIFT));
+        }
         if (p_KeyAndHash->hashDistributionFqidsShift > MAX_DIST_FQID_SHIFT)
-             RETURN_ERROR(MAJOR, E_INVALID_VALUE, ("hashDistributionFqidsShift must not be larger than %d", MAX_DIST_FQID_SHIFT));
+        {
+            XX_Free(p_LocalExtractsArray);
+            RETURN_ERROR(MAJOR, E_INVALID_VALUE, ("hashDistributionFqidsShift must not be larger than %d", MAX_DIST_FQID_SHIFT));
+        }
 
         tmpReg = 0;
 
@@ -1588,7 +1604,10 @@ static t_Error BuildSchemeRegs(t_FmPcdKgScheme            *p_Scheme,
                     (!!(p_SchemeRegs->kgse_ekfc & KG_SCH_KN_IPSRC1) != !!(p_SchemeRegs->kgse_ekfc & KG_SCH_KN_IPDST1)) ||
                     (!!(p_SchemeRegs->kgse_ekfc & KG_SCH_KN_IPSRC2) != !!(p_SchemeRegs->kgse_ekfc & KG_SCH_KN_IPDST2)) ||
                     (!!(p_SchemeRegs->kgse_ekfc & KG_SCH_KN_L4PSRC) != !!(p_SchemeRegs->kgse_ekfc & KG_SCH_KN_L4PDST)))
+            {
+                XX_Free(p_LocalExtractsArray);
                 RETURN_ERROR(MAJOR, E_INVALID_STATE, ("symmetricHash set but src/dest extractions missing"));
+            }
             tmpReg |= KG_SCH_HASH_CONFIG_SYM;
         }
         p_SchemeRegs->kgse_hc = tmpReg;
@@ -1985,7 +2004,7 @@ void FmPcdKgDestroyClsPlanGrp(t_Handle h_FmPcd, uint8_t grpId)
     memset(&p_FmPcd->p_FmPcdKg->clsPlanGrps[grpId], 0, sizeof(t_FmPcdKgClsPlanGrp));
 }
 
-t_Error FmPcdKgBuildBindPortToSchemes(t_Handle h_FmPcd , t_FmPcdKgInterModuleBindPortToSchemes *p_BindPort, uint32_t *p_SpReg, bool add)
+t_Error FmPcdKgBuildBindPortToSchemes(t_Handle h_FmPcd, t_FmPcdKgInterModuleBindPortToSchemes *p_BindPort, uint32_t *p_SpReg, bool add)
 {
     t_FmPcd                 *p_FmPcd = (t_FmPcd*)h_FmPcd;
     uint32_t                j, schemesPerPortVector = 0;

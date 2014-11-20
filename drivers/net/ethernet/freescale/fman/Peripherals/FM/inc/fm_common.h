@@ -235,7 +235,6 @@ typedef struct {
     uint32_t            type;
     uint8_t             prOffset;
     uint16_t            dataOffset;
-  //  uint8_t             poolIndex;
     uint8_t             internalBufferOffset;
     uint8_t             numOfTasks;
     uint8_t             numOfExtraTasks;

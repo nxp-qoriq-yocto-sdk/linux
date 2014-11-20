@@ -1349,6 +1349,9 @@ t_Error FmPcdRegisterReassmPort(t_Handle h_FmPcd, t_Handle h_IpReasmCommonPramTb
     ASSERT_COND(h_IpReasmCommonPramTbl);
 
     bitFor1Micro = FmGetTimeStampScale(p_FmPcd->h_Fm);
+    if (bitFor1Micro == 0)
+        RETURN_ERROR(MAJOR, E_NOT_AVAILABLE, ("Timestamp scale"));
+
     bitFor1Micro = 32 - bitFor1Micro;
     LOG2(FM_PCD_MANIP_IP_REASSM_TIMEOUT_THREAD_THRESH, log2num);
     tsbs = bitFor1Micro - log2num;
@@ -3282,6 +3285,7 @@ static t_Handle ManipOrStatsSetNode(t_Handle h_FmPcd, t_Handle *p_Params, bool s
     else
     {
         REPORT_ERROR(MAJOR, E_NOT_SUPPORTED, ("Statistics node!"));
+        XX_Free(p_Manip);
         return NULL;
     }
 #endif /* FM_CAPWAP_SUPPORT */

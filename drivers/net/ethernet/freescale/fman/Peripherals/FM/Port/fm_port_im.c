@@ -140,7 +140,7 @@ t_Error FmPortImRx(t_FmPort *p_FmPort)
     uint32_t                bdStatus;
     volatile uint8_t        buffPos;
     uint16_t                length;
-    uint16_t                errors/*, reportErrors*/;
+    uint16_t                errors;
     uint8_t                 *p_CurData, *p_Data;
     uint32_t                flags;
 

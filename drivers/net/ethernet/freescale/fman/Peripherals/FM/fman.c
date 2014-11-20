@@ -788,7 +788,7 @@ int fman_fpm_init(struct fman_fpm_regs *fpm_rg, struct fman_cfg *cfg)
 	/* RAM ECC -  enable and clear events*/
 	/* first we need to clear all parser memory,
 	 * as it is uninitialized and may cause ECC errors */
-	tmp_reg = 0;
+
 	/* event bits */
 	tmp_reg = (FPM_RAM_MURAM_ECC | FPM_RAM_IRAM_ECC);
 	/* Rams enable not effected by RCR bit, but by a COP configuration */

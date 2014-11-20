@@ -231,7 +231,7 @@ static void CalcRates(t_Handle                              h_FmPcd,
 
     bitFor1Micro = FmGetTimeStampScale(p_FmPcd->h_Fm);  /* TimeStamp per nano seconds units */
     /* we want the tsu to count 10 nano for better precision normally tsu is 3.9 nano, now we will get 39 */
-    tsuInTenthNanos = (uint32_t)(1000*10/(1<<bitFor1Micro));
+    tsuInTenthNanos = (uint32_t)(1000*10/(1 << bitFor1Micro));
 
     /* we choose the faster rate to calibrate fpp */
     /* The meaning of this step:
@@ -1558,7 +1558,6 @@ t_Error FM_PCD_PlcrDumpRegs(t_Handle h_FmPcd)
     DUMP_VAR(p_FmPcd->p_FmPcdPlcr->p_FmPcdPlcrRegs,fmpl_rypcnt);
     DUMP_VAR(p_FmPcd->p_FmPcdPlcr->p_FmPcdPlcrRegs,fmpl_tpcnt);
     DUMP_VAR(p_FmPcd->p_FmPcdPlcr->p_FmPcdPlcrRegs,fmpl_flmcnt);
-
     DUMP_VAR(p_FmPcd->p_FmPcdPlcr->p_FmPcdPlcrRegs,fmpl_serc);
     DUMP_VAR(p_FmPcd->p_FmPcdPlcr->p_FmPcdPlcrRegs,fmpl_upcr);
     DUMP_VAR(p_FmPcd->p_FmPcdPlcr->p_FmPcdPlcrRegs,fmpl_dpmr);
@@ -1621,6 +1620,11 @@ t_Handle FM_PCD_PlcrProfileSet(t_Handle     h_FmPcd,
                                                     p_ProfileParams->id.newParams.h_FmPort,
                                                     p_ProfileParams->id.newParams.relativeProfileId,
                                                     &absoluteProfileId);
+        if (err)
+        {
+             REPORT_ERROR(MAJOR, err, NO_MSG);
+             return NULL;
+        }
 
          if (absoluteProfileId >= FM_PCD_PLCR_NUM_ENTRIES)
          {

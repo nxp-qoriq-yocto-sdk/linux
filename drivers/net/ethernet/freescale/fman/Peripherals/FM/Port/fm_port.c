@@ -87,7 +87,7 @@ static t_Error CheckInitParameters(t_FmPort *p_FmPort)
             if (p_Params->intContext.size && (p_Params->intContext.size + p_Params->intContext.extBufOffset > p_Params->bufMargins.startMargins))
                 RETURN_ERROR(MAJOR, E_INVALID_VALUE, ("intContext.size is larger than start margins"));
 
-            if ((p_Params->liodnOffset != DPAA_LIODN_DONT_OVERRIDE) &&
+            if ((p_Params->liodnOffset != (uint16_t)DPAA_LIODN_DONT_OVERRIDE) &&
                 (p_Params->liodnOffset & ~FM_LIODN_OFFSET_MASK))
                 RETURN_ERROR(MAJOR, E_INVALID_VALUE, ("liodnOffset is larger than %d", FM_LIODN_OFFSET_MASK+1));
 
@@ -751,6 +751,7 @@ static t_Error BmiPortCheckAndGetCounterType(t_FmPort                      *p_Fm
         case(e_FM_PORT_COUNTERS_FIFO_UTIL):
         case(e_FM_PORT_COUNTERS_RX_PAUSE_ACTIVATION):
             /* performance counters - may be read when disabled */
+            *p_IsStats = FALSE;
             break;
         case(e_FM_PORT_COUNTERS_FRAME):
         case(e_FM_PORT_COUNTERS_DISCARD_FRAME):
@@ -763,6 +764,7 @@ static t_Error BmiPortCheckAndGetCounterType(t_FmPort                      *p_Fm
         case(e_FM_PORT_COUNTERS_LENGTH_ERR):
         case(e_FM_PORT_COUNTERS_UNSUPPRTED_FORMAT):
         case(e_FM_PORT_COUNTERS_WRED_DISCARD):
+            *p_IsStats = TRUE;
             if (!(GET_UINT32(*p_Reg) & BMI_COUNTERS_EN))
                RETURN_ERROR(MINOR, E_INVALID_STATE, ("Requested counter was not enabled"));
             break;
@@ -775,67 +777,55 @@ static t_Error BmiPortCheckAndGetCounterType(t_FmPort                      *p_Fm
     {
         case(e_FM_PORT_COUNTERS_CYCLE):
             *p_PerfType = E_FMAN_PORT_PERF_CNT_CYCLE;
-            *p_IsStats = FALSE;
             break;
         case(e_FM_PORT_COUNTERS_TASK_UTIL):
             *p_PerfType = E_FMAN_PORT_PERF_CNT_TASK_UTIL;
             break;
         case(e_FM_PORT_COUNTERS_QUEUE_UTIL):
             *p_PerfType = E_FMAN_PORT_PERF_CNT_QUEUE_UTIL;
-            *p_IsStats = FALSE;
             break;
         case(e_FM_PORT_COUNTERS_DMA_UTIL):
             *p_PerfType = E_FMAN_PORT_PERF_CNT_DMA_UTIL;
-            *p_IsStats = FALSE;
             break;
         case(e_FM_PORT_COUNTERS_FIFO_UTIL):
             *p_PerfType = E_FMAN_PORT_PERF_CNT_FIFO_UTIL;
-            *p_IsStats = FALSE;
             break;
         case(e_FM_PORT_COUNTERS_RX_PAUSE_ACTIVATION):
             *p_PerfType = E_FMAN_PORT_PERF_CNT_RX_PAUSE;
-            *p_IsStats = FALSE;
             break;
         case(e_FM_PORT_COUNTERS_FRAME):
             *p_StatsType = E_FMAN_PORT_STATS_CNT_FRAME;
-            *p_IsStats = TRUE;
             break;
         case(e_FM_PORT_COUNTERS_DISCARD_FRAME):
             *p_StatsType = E_FMAN_PORT_STATS_CNT_DISCARD;
-            *p_IsStats = TRUE;
             break;
         case(e_FM_PORT_COUNTERS_DEALLOC_BUF):
             *p_StatsType = E_FMAN_PORT_STATS_CNT_DEALLOC_BUF;
-            *p_IsStats = TRUE;
             break;
         case(e_FM_PORT_COUNTERS_RX_BAD_FRAME):
             *p_StatsType = E_FMAN_PORT_STATS_CNT_RX_BAD_FRAME;
-            *p_IsStats = TRUE;
             break;
         case(e_FM_PORT_COUNTERS_RX_LARGE_FRAME):
             *p_StatsType = E_FMAN_PORT_STATS_CNT_RX_LARGE_FRAME;
-            *p_IsStats = TRUE;
             break;
         case(e_FM_PORT_COUNTERS_RX_OUT_OF_BUFFERS_DISCARD):
             *p_StatsType = E_FMAN_PORT_STATS_CNT_RX_OUT_OF_BUF;
-            *p_IsStats = TRUE;
             break;
         case(e_FM_PORT_COUNTERS_RX_FILTER_FRAME):
             *p_StatsType = E_FMAN_PORT_STATS_CNT_FILTERED_FRAME;
             break;
         case(e_FM_PORT_COUNTERS_RX_LIST_DMA_ERR):
             *p_StatsType = E_FMAN_PORT_STATS_CNT_DMA_ERR;
-            *p_IsStats = TRUE;
             break;
         case(e_FM_PORT_COUNTERS_WRED_DISCARD):
             *p_StatsType = E_FMAN_PORT_STATS_CNT_WRED_DISCARD;
-            *p_IsStats = TRUE;
+            break;
         case(e_FM_PORT_COUNTERS_LENGTH_ERR):
             *p_StatsType = E_FMAN_PORT_STATS_CNT_LEN_ERR;
-            *p_IsStats = TRUE;
+            break;
         case(e_FM_PORT_COUNTERS_UNSUPPRTED_FORMAT):
             *p_StatsType = E_FMAN_PORT_STATS_CNT_UNSUPPORTED_FORMAT;
-            *p_IsStats = TRUE;
+            break;
         default:
             break;
     }
@@ -1306,9 +1296,9 @@ static t_Error SetPcd(t_FmPort *p_FmPort, t_FmPortPcdParams *p_PcdParams)
         for (i=0; i<p_PcdParams->p_PrsParams->numOfHdrsWithAdditionalParams; i++)
         {
             GET_PRS_HDR_NUM(hdrNum, p_PcdParams->p_PrsParams->additionalParams[i].hdr);
-            if (hdrNum== ILLEGAL_HDR_NUM)
+            if (hdrNum == ILLEGAL_HDR_NUM)
                 RETURN_ERROR(MAJOR, E_INVALID_VALUE, NO_MSG);
-            if (hdrNum==NO_HDR_NUM)
+            if (hdrNum == NO_HDR_NUM)
                 RETURN_ERROR(MAJOR, E_INVALID_VALUE, ("Private headers may not use additional parameters"));
 
             err = AdditionalPrsParams(p_FmPort, &p_PcdParams->p_PrsParams->additionalParams[i], &tmpHxs[hdrNum]);
@@ -1444,7 +1434,7 @@ static t_Error DeletePcd(t_FmPort *p_FmPort)
     /* "cut" PCD out of the port's flow - go to BMI */
     /* WRITE_UINT32(*p_BmiNia, (p_FmPort->savedBmiNia & BMI_RFNE_FDCS_MASK) | (NIA_ENG_BMI | NIA_BMI_AC_ENQ_FRAME)); */
 
-    if (p_FmPort->pcdEngines | FM_PCD_PRS)
+    if (p_FmPort->pcdEngines & FM_PCD_PRS)
     {
         WRITE_UINT32(*p_BmiPrsStartOffset, 0);
 
@@ -2478,6 +2468,7 @@ t_Error FM_PORT_Free(t_Handle h_FmPort)
 
     FmPortDriverParamFree(p_FmPort);
 
+    memset(&fmParams, 0, sizeof(fmParams));
     fmParams.hardwarePortId = p_FmPort->hardwarePortId;
     fmParams.portType = (e_FmPortType)p_FmPort->portType;
     fmParams.deqPipelineDepth = p_FmPort->p_FmPortDriverParam->dfltCfg.tx_fifo_deq_pipeline_depth;
@@ -3318,14 +3309,12 @@ t_Error FM_PORT_SetPfcPrioritiesMappingToQmanWQ(t_Handle h_FmPort, uint8_t prio,
 t_Error FM_PORT_SetFrameQueueCounters(t_Handle h_FmPort, bool enable)
 {
     t_FmPort                *p_FmPort = (t_FmPort*)h_FmPort;
-    int                     err;
 
     SANITY_CHECK_RETURN_ERROR(p_FmPort, E_INVALID_HANDLE);
     SANITY_CHECK_RETURN_ERROR(!p_FmPort->p_FmPortDriverParam, E_INVALID_STATE);
 
-    err = fman_port_set_queue_cnt_mode(&p_FmPort->port, enable);
-    if (err != 0)
-        RETURN_ERROR(MAJOR, E_INVALID_VALUE, ("fman_port_set_perf_cnt_mode"));
+    fman_port_set_queue_cnt_mode(&p_FmPort->port, enable);
+
     return E_OK;
 }
 
@@ -3646,8 +3635,7 @@ uint32_t FM_PORT_GetCounter(t_Handle h_FmPort, e_FmPortCounters counter)
                 queueType = E_FMAN_PORT_DEQ_CONFIRM;
                break;
             default:
-               REPORT_ERROR(MINOR, E_INVALID_STATE, ("Requested counter is not available"));
-               return 0;
+               RETURN_ERROR(MAJOR, E_INVALID_STATE, ("Requested counter is not available"));
         }
 
         return fman_port_get_qmi_counter(&p_FmPort->port, queueType);
@@ -4069,7 +4057,7 @@ t_Error     FM_PORT_PcdPlcrModifyInitialProfile (t_Handle h_FmPort, t_Handle h_P
         RETURN_ERROR(MAJOR, E_INVALID_OPERATION, ("Invalid profile"));
     }
 
-    tmpReg = (uint32_t)(NIA_ENG_PLCR | NIA_PLCR_ABSOLUTE | absoluteProfileId);
+    tmpReg |= (uint32_t)(NIA_ENG_PLCR | NIA_PLCR_ABSOLUTE | absoluteProfileId);
 
     if (p_FmPort->pcdEngines & FM_PCD_PRS) /* e_FM_PCD_SUPPORT_PRS_AND_PLCR */
     {
