@@ -277,7 +277,7 @@ t_Handle FmHcConfigAndInit(t_FmHcParams *p_FmHcParams)
     }
  
     err = FM_PORT_ConfigMaxFrameLength(p_FmHc->h_HcPortDev, sizeof(t_HcFrame));
-    if (err != E_OK)
+if (err != E_OK)
     {
         REPORT_ERROR(MAJOR, err, ("FM HC port init!"));
         FmHcFree(p_FmHc);
@@ -644,7 +644,7 @@ t_Error FmHcPcdKgSetClsPlan(t_Handle h_FmHc, t_FmPcdKgInterModuleClsPlanSet *p_S
     t_FmHc                  *p_FmHc = (t_FmHc*)h_FmHc;
     t_HcFrame               *p_HcFrame;
     t_DpaaFD                fmFd;
-    uint32_t                i;
+    uint8_t                 i, idx;
     uint32_t                seqNum;
     t_Error                 err = E_OK;
 
@@ -660,7 +660,10 @@ t_Error FmHcPcdKgSetClsPlan(t_Handle h_FmHc, t_FmPcdKgInterModuleClsPlanSet *p_S
         p_HcFrame->opcode = (uint32_t)(HC_HCOR_GBL | HC_HCOR_OPCODE_KG_SCM);
         p_HcFrame->actionReg  = FmPcdKgBuildWriteClsPlanBlockActionReg((uint8_t)(i / CLS_PLAN_NUM_PER_GRP));
         p_HcFrame->extraReg = HC_HCOR_KG_SCHEME_REGS_MASK;
-        memcpy((void*)&p_HcFrame->hcSpecificData.clsPlanEntries, (void *)&p_Set->vectors[i-p_Set->baseEntry], CLS_PLAN_NUM_PER_GRP*sizeof(uint32_t));
+
+        idx = (uint8_t)(i - p_Set->baseEntry);
+        ASSERT_COND(idx < FM_PCD_MAX_NUM_OF_CLS_PLANS);
+        memcpy(&p_HcFrame->hcSpecificData.clsPlanEntries, &p_Set->vectors[idx], CLS_PLAN_NUM_PER_GRP*sizeof(uint32_t));
         p_HcFrame->commandSequence = seqNum;
 
         BUILD_FD(sizeof(t_HcFrame));
@@ -692,7 +695,11 @@ t_Error FmHcPcdKgDeleteClsPlan(t_Handle h_FmHc, uint8_t  grpId)
     ASSERT_COND(p_ClsPlanSet->numOfClsPlanEntries <= FM_PCD_MAX_NUM_OF_CLS_PLANS);
 
     if (FmHcPcdKgSetClsPlan(p_FmHc, p_ClsPlanSet) != E_OK)
+    {
+        XX_Free(p_ClsPlanSet);
         RETURN_ERROR(MAJOR, E_INVALID_STATE, NO_MSG);
+    }
+
     XX_Free(p_ClsPlanSet);
 
     FmPcdKgDestroyClsPlanGrp(p_FmHc->h_FmPcd, grpId);

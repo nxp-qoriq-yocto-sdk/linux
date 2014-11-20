@@ -94,7 +94,7 @@
 /* Miscellaneous macros */
 /*----------------------*/
 
-#define UNUSED(X) (X=X)
+#define UNUSED(_x)		((void)(_x))
 
 #define KILOBYTE            0x400UL                 /* 1024 */
 #define MEGABYTE            (KILOBYTE * KILOBYTE)   /* 1024*1024 */

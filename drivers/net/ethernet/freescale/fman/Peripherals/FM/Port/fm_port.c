@@ -90,7 +90,7 @@ static t_Error CheckInitParameters(t_FmPort *p_FmPort)
             if (p_Params->intContext.size && (p_Params->intContext.size + p_Params->intContext.extBufOffset > p_Params->bufMargins.startMargins))
                 RETURN_ERROR(MAJOR, E_INVALID_VALUE, ("intContext.size is larger than start margins"));
 
-            if ((p_Params->liodnOffset != DPAA_LIODN_DONT_OVERRIDE) &&
+            if ((p_Params->liodnOffset != (uint16_t)DPAA_LIODN_DONT_OVERRIDE) &&
                 (p_Params->liodnOffset & ~FM_LIODN_OFFSET_MASK))
                 RETURN_ERROR(MAJOR, E_INVALID_VALUE, ("liodnOffset is larger than %d", FM_LIODN_OFFSET_MASK+1));
 
@@ -1309,9 +1309,9 @@ static t_Error SetPcd(t_FmPort *p_FmPort, t_FmPortPcdParams *p_PcdParams)
         for (i=0; i<p_PcdParams->p_PrsParams->numOfHdrsWithAdditionalParams; i++)
         {
             GET_PRS_HDR_NUM(hdrNum, p_PcdParams->p_PrsParams->additionalParams[i].hdr);
-            if (hdrNum== ILLEGAL_HDR_NUM)
+            if (hdrNum == ILLEGAL_HDR_NUM)
                 RETURN_ERROR(MAJOR, E_INVALID_VALUE, NO_MSG);
-            if (hdrNum==NO_HDR_NUM)
+            if (hdrNum == NO_HDR_NUM)
                 RETURN_ERROR(MAJOR, E_INVALID_VALUE, ("Private headers may not use additional parameters"));
 
             err = AdditionalPrsParams(p_FmPort, &p_PcdParams->p_PrsParams->additionalParams[i], &tmpHxs[hdrNum]);
@@ -2029,26 +2029,26 @@ t_Handle FM_PORT_Config(t_FmPortParams *p_FmPortParams)
     else
 #endif /* FM_NO_GUARANTEED_RESET_VALUES */
     {
-        if ((p_FmPort->portType == e_FM_PORT_TYPE_OH_HOST_COMMAND) &&
-            (p_FmPortParams->portId != FM_OH_PORT_ID))
-        {
-            /* Overwrite HC defaults */
-            p_FmPort->fifoBufs.num      = DEFAULT_PORT_numOfFifoBufs(p_FmPort->portType)*BMI_FIFO_UNITS;
-            p_FmPort->fifoBufs.extra    = DEFAULT_PORT_extraNumOfFifoBufs*BMI_FIFO_UNITS;
-            p_FmPort->openDmas.num      = DEFAULT_PORT_numOfOpenDmas(p_FmPort->portType);
-            p_FmPort->openDmas.extra    = DEFAULT_PORT_extraNumOfOpenDmas(p_FmPort->portType);
-            p_FmPort->tasks.num         = DEFAULT_PORT_numOfTasks(p_FmPort->portType);
-            p_FmPort->tasks.extra       = DEFAULT_PORT_extraNumOfTasks(p_FmPort->portType);
-        }
-        else
-        {
-            p_FmPort->fifoBufs.num                                      = 0;
-            p_FmPort->fifoBufs.extra                                    = 0;
-            p_FmPort->openDmas.num                                      = 0;
-            p_FmPort->openDmas.extra                                    = 0;
-            p_FmPort->tasks.num                                         = 0;
-            p_FmPort->tasks.extra                                       = 0;
-        }
+    if ((p_FmPort->portType == e_FM_PORT_TYPE_OH_HOST_COMMAND) &&
+        (p_FmPortParams->portId != FM_OH_PORT_ID))
+    {
+        /* Overwrite HC defaults */
+        p_FmPort->fifoBufs.num      = DEFAULT_PORT_numOfFifoBufs(p_FmPort->portType)*BMI_FIFO_UNITS;
+        p_FmPort->fifoBufs.extra    = DEFAULT_PORT_extraNumOfFifoBufs*BMI_FIFO_UNITS;
+        p_FmPort->openDmas.num      = DEFAULT_PORT_numOfOpenDmas(p_FmPort->portType);
+        p_FmPort->openDmas.extra    = DEFAULT_PORT_extraNumOfOpenDmas(p_FmPort->portType);
+        p_FmPort->tasks.num         = DEFAULT_PORT_numOfTasks(p_FmPort->portType);
+        p_FmPort->tasks.extra       = DEFAULT_PORT_extraNumOfTasks(p_FmPort->portType);
+    }
+    else
+    {
+        p_FmPort->fifoBufs.num                                      = 0;
+        p_FmPort->fifoBufs.extra                                    = 0;
+        p_FmPort->openDmas.num                                      = 0;
+        p_FmPort->openDmas.extra                                    = 0;
+        p_FmPort->tasks.num                                         = 0;
+        p_FmPort->tasks.extra                                       = 0;
+    }
     }
 
 #ifdef FM_HEAVY_TRAFFIC_SEQUENCER_HANG_ERRATA_FMAN_A006981
@@ -2486,6 +2486,7 @@ t_Error FM_PORT_Free(t_Handle h_FmPort)
 
     FmPortDriverParamFree(p_FmPort);
 
+    memset(&fmParams, 0, sizeof(fmParams));
     fmParams.hardwarePortId = p_FmPort->hardwarePortId;
     fmParams.portType = (e_FmPortType)p_FmPort->portType;
     fmParams.deqPipelineDepth = p_FmPort->p_FmPortDriverParam->dfltCfg.tx_fifo_deq_pipeline_depth;
@@ -3329,14 +3330,12 @@ t_Error FM_PORT_SetPfcPrioritiesMappingToQmanWQ(t_Handle h_FmPort, uint8_t prio,
 t_Error FM_PORT_SetFrameQueueCounters(t_Handle h_FmPort, bool enable)
 {
     t_FmPort                *p_FmPort = (t_FmPort*)h_FmPort;
-    int                     err;
 
     SANITY_CHECK_RETURN_ERROR(p_FmPort, E_INVALID_HANDLE);
     SANITY_CHECK_RETURN_ERROR(!p_FmPort->p_FmPortDriverParam, E_INVALID_STATE);
 
-    err = fman_port_set_queue_cnt_mode(&p_FmPort->port, enable);
-    if (err != 0)
-        RETURN_ERROR(MAJOR, E_INVALID_VALUE, ("fman_port_set_perf_cnt_mode"));
+    fman_port_set_queue_cnt_mode(&p_FmPort->port, enable);
+
     return E_OK;
 }
 
@@ -5360,7 +5359,7 @@ static t_Error DsarCheckParams(t_FmPortDsarParams *params, t_FmPortDsarTablesSiz
     bool macInit = FALSE;
     uint8_t mac[6];
     int i;
-    
+
     // check table sizes
     if (params->p_AutoResArpInfo && sizes->maxNumOfArpEntries < params->p_AutoResArpInfo->tableSize)
         RETURN_ERROR(MAJOR, E_INVALID_VALUE, ("DSAR: Arp table size exceeds the configured maximum size."));
@@ -5391,11 +5390,11 @@ static t_Error DsarCheckParams(t_FmPortDsarParams *params, t_FmPortDsarTablesSiz
 	i = 0;
         if (!macInit)
 	{
-            memcpy(mac, params->p_AutoResArpInfo->p_AutoResTable[0].mac, 6);
-	    i = 1;
+        memcpy(mac, params->p_AutoResArpInfo->p_AutoResTable[0].mac, 6);
+        i = 1;
 	    macInit = TRUE;
 	}
-	for (; i < params->p_AutoResArpInfo->tableSize; i++)
+        for (; i < params->p_AutoResArpInfo->tableSize; i++)
 	    if (memcmp(mac, params->p_AutoResArpInfo->p_AutoResTable[i].mac, 6))
 	        RETURN_ERROR(MAJOR, E_INVALID_VALUE, ("DSAR: Only 1 mac address is currently supported."));
     }
