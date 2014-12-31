@@ -1,0 +1,41 @@
+Freescale Quad Timers
+-------------------------------
+
+The 32-bit quad timers are identical on the device. Each quad
+timer module contains four identical timer groups (32-bit)
+that serve as frequency dividers, clock generators,
+and event counters.
+
+Required properties:
+
+- compatible: Should be "fsl,quad-timer"
+- interrupts: Should contain the list of Quad Timer interrupts.
+  The interrupt field reprsent interrupt for all four timers in
+  one Quad timer module.
+- reg: Should contain location and length for all Quad timers register.
+
+
+Example:
+
+quadtmr@8f8000 {
+	compatible = "fsl,quad-timer";
+	reg = <0x8f8000 0x4000>;
+	#address-cells = <1>;
+	#size-cells = <0>;
+	interrupts = <  414 2 0 0
+			415 2 0 0
+			416 2 0 0
+			417 2 0 0
+			418 2 0 0
+			419 2 0 0
+			420 2 0 0
+			421 2 0 0
+			422 2 0 0
+			423 2 0 0
+			424 2 0 0
+			425 2 0 0
+			426 2 0 0
+			427 2 0 0
+			428 2 0 0
+			429 2 0 0>;
+	};

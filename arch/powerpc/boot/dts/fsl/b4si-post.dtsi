@@ -329,5 +329,6 @@
 /include/ "qoriq-duart-0.dtsi"
 /include/ "qoriq-duart-1.dtsi"
 /include/ "qoriq-sec5.3-0.dtsi"
+/include/ "qoriq-qtmr.dtsi"
 
 };
