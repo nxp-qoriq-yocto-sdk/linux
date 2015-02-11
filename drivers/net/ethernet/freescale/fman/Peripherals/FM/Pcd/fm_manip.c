@@ -3771,6 +3771,7 @@ t_Error FmPcdManipBuildIpReassmScheme(t_FmPcd *p_FmPcd, t_Handle h_NetEnv, t_Han
 {
     t_FmPcdManip            *p_Manip = (t_FmPcdManip *)h_Manip;
     t_FmPcdKgSchemeParams   *p_SchemeParams = NULL;
+    t_Handle                h_Scheme;
 
     ASSERT_COND(p_FmPcd);
     ASSERT_COND(h_NetEnv);
@@ -3779,6 +3780,22 @@ t_Error FmPcdManipBuildIpReassmScheme(t_FmPcd *p_FmPcd, t_Handle h_NetEnv, t_Han
     /* scheme was already build, no need to check for IPv6 */
     if (p_Manip->ipReassmParams.h_Ipv4Scheme)
         return E_OK;
+
+    if (isIpv4) {
+        h_Scheme = FmPcdKgGetSchemeHandle(p_FmPcd, p_Manip->ipReassmParams.relativeSchemeId[0]);
+        if (h_Scheme) {
+            /* scheme was found */
+            p_Manip->ipReassmParams.h_Ipv4Scheme = h_Scheme;
+            return E_OK;
+        }
+    } else {
+        h_Scheme = FmPcdKgGetSchemeHandle(p_FmPcd, p_Manip->ipReassmParams.relativeSchemeId[1]);
+        if (h_Scheme) {
+            /* scheme was found */
+            p_Manip->ipReassmParams.h_Ipv6Scheme = h_Scheme;
+            return E_OK;
+        }
+    }
 
     p_SchemeParams = XX_Malloc(sizeof(t_FmPcdKgSchemeParams));
     if (!p_SchemeParams)
@@ -3819,10 +3836,12 @@ t_Error FmPcdManipDeleteIpReassmSchemes(t_Handle h_Manip)
 
     ASSERT_COND(p_Manip);
 
-    if (p_Manip->ipReassmParams.h_Ipv4Scheme)
+    if ((p_Manip->ipReassmParams.h_Ipv4Scheme) &&
+        !FmPcdKgIsSchemeHasOwners(p_Manip->ipReassmParams.h_Ipv4Scheme))
         FM_PCD_KgSchemeDelete(p_Manip->ipReassmParams.h_Ipv4Scheme);
 
-    if (p_Manip->ipReassmParams.h_Ipv6Scheme)
+    if ((p_Manip->ipReassmParams.h_Ipv6Scheme) &&
+        !FmPcdKgIsSchemeHasOwners(p_Manip->ipReassmParams.h_Ipv6Scheme))
         FM_PCD_KgSchemeDelete(p_Manip->ipReassmParams.h_Ipv6Scheme);
 
     return E_OK;
