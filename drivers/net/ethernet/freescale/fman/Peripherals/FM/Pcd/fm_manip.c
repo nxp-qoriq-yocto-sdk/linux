@@ -608,10 +608,10 @@ static t_Error BuildHmct(t_FmPcdManip *p_Manip, t_FmPcdManipParams *p_FmPcdManip
     }
 
 
-    /* If this node has a nextManip, and no parsing is required after it, the old table must be copied to the new table
+    /* If this node has a nextManip, and no parsing is required, the old table must be copied to the new table
        the old table and should be freed */
     if (p_FmPcdManipParams->h_NextManip &&
-        (MANIP_DONT_REPARSE(p_FmPcdManipParams->h_NextManip)))
+        (MANIP_DONT_REPARSE(p_Manip)))
     {
         if (new)
         {
@@ -654,7 +654,7 @@ static t_Error CreateManipActionNew(t_FmPcdManip *p_Manip, t_FmPcdManipParams *p
     /* set Manip structure */
     if (p_FmPcdManipParams->h_NextManip)
     {
-        if (MANIP_DONT_REPARSE(p_FmPcdManipParams->h_NextManip))
+        if (p_FmPcdManipParams->u.hdr.dontParseAfterManip)
             nextSize = (uint32_t)(GetHmctSize(p_FmPcdManipParams->h_NextManip) + GetDataSize(p_FmPcdManipParams->h_NextManip));
         else
             p_Manip->cascadedNext = TRUE;
@@ -695,7 +695,7 @@ static t_Error CreateManipActionNew(t_FmPcdManip *p_Manip, t_FmPcdManipParams *p
 
 
     if (p_FmPcdManipParams->h_NextManip &&
-        (MANIP_DONT_REPARSE(p_FmPcdManipParams->h_NextManip)))
+        (MANIP_DONT_REPARSE(p_Manip)))
     {
         p_OldHmct = (uint8_t *)GetManipInfo(p_FmPcdManipParams->h_NextManip, e_MANIP_HMCT);
         p_CurManip = p_FmPcdManipParams->h_NextManip;
@@ -746,7 +746,7 @@ static t_Error CreateManipActionNew(t_FmPcdManip *p_Manip, t_FmPcdManipParams *p
         tmpReg |= HMTD_CFG_PRS_AFTER_HM;
     /* create cascade */
     if (p_FmPcdManipParams->h_NextManip &&
-        !MANIP_DONT_REPARSE(p_FmPcdManipParams->h_NextManip))
+        !MANIP_DONT_REPARSE(p_Manip))
     {
         /* indicate that there's another HM table descriptor */
         tmpReg |= HMTD_CFG_NEXT_AD_EN;
