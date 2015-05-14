@@ -1325,21 +1325,20 @@ static t_Error SetPcd(t_FmPort *p_FmPort, t_FmPortPcdParams *p_PcdParams)
            /* link to sw parser code for IP Frag - only if no other code is applied. */
             GET_PRS_HDR_NUM(hdrNum, HEADER_TYPE_IPv4)
             if (!(tmpHxs[hdrNum] & PRS_HDR_SW_PRS_EN))
-                tmpHxs[hdrNum] |= (PRS_HDR_SW_PRS_EN | IP_FRAG_SW_PATCH_IPv4_LABEL);
+                tmpHxs[hdrNum] |= (PRS_HDR_SW_PRS_EN | IPR_SW_PATCH_IPv4_LABEL);
             GET_PRS_HDR_NUM(hdrNum, HEADER_TYPE_IPv6)
             if (!(tmpHxs[hdrNum] & PRS_HDR_SW_PRS_EN))
-                tmpHxs[hdrNum] |= (PRS_HDR_SW_PRS_EN | IP_FRAG_SW_PATCH_IPv6_LABEL);
-        }
-
-        if (FmPcdIsAdvancedOffloadSupported(p_FmPort->h_FmPcd) &&
-            (p_FmPort->portType == e_FM_PORT_TYPE_OH_OFFLINE_PARSING))
-        {
-            /* link to sw parser code for IP Frag - only if no other code is applied. */
-            GET_PRS_HDR_NUM(hdrNum, HEADER_TYPE_IPv6)
-            if (!(tmpHxs[hdrNum] & PRS_HDR_SW_PRS_EN))
-                tmpHxs[hdrNum] |= (PRS_HDR_SW_PRS_EN | IP_FRAG_SW_PATCH_IPv6_LABEL);
-        }
-
+                tmpHxs[hdrNum] |= (PRS_HDR_SW_PRS_EN | IPR_SW_PATCH_IPv6_LABEL);
+        } else {
+			if (FmPcdIsAdvancedOffloadSupported(p_FmPort->h_FmPcd) &&
+				(p_FmPort->portType == e_FM_PORT_TYPE_OH_OFFLINE_PARSING))
+			{
+				/* link to sw parser code for IP Frag - only if no other code is applied. */
+				GET_PRS_HDR_NUM(hdrNum, HEADER_TYPE_IPv6)
+				if (!(tmpHxs[hdrNum] & PRS_HDR_SW_PRS_EN))
+					tmpHxs[hdrNum] |= (PRS_HDR_SW_PRS_EN | IPF_SW_PATCH_IPv6_LABEL);
+			}
+		}
 #ifdef FM_CAPWAP_SUPPORT
         if (FmPcdNetEnvIsHdrExist(p_FmPort->h_FmPcd,
                                   p_FmPort->netEnvId, HEADER_TYPE_UDP_LITE))

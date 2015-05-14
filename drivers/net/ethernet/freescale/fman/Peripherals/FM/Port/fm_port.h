@@ -214,17 +214,19 @@ typedef uint32_t fmPcdEngines_t; /**< options as defined below: */
 /*          SW parser IP-fragmentation labels (offsets)                */
 /***********************************************************************/
 #if (DPAA_VERSION == 10)
-#define IP_FRAG_SW_PATCH_IPv4_SIZE              0x025
-#define IP_FRAG_SW_PATCH_IPv4_LABEL             0x300
+#define IPR_SW_PATCH_IPv4_SIZE              0x025
+#define IPR_SW_PATCH_IPv4_LABEL             0x300
+#define IPR_SW_PATCH_IPv6_LABEL             \
+    (IPR_SW_PATCH_IPv4_LABEL + IPR_SW_PATCH_IPv4_SIZE)
+#define IPF_SW_PATCH_IPv6_LABEL IPR_SW_PATCH_IPv6_LABEL
 #else
-#define IP_FRAG_SW_PATCH_IPv4_SIZE              0x046
-#define IP_FRAG_SW_PATCH_IPv4_LABEL             0x2E0
+#define IPR_SW_PATCH_IPv4_LABEL             0x2B0
+#define IPR_SW_PATCH_IPv6_LABEL             0x2F6
+#define IPF_SW_PATCH_IPv6_LABEL				0x365
 #endif /* (DPAA_VERSION == 10) */
-#define IP_FRAG_SW_PATCH_IPv6_LABEL             \
-    (IP_FRAG_SW_PATCH_IPv4_LABEL + IP_FRAG_SW_PATCH_IPv4_SIZE)
 
 #ifdef FM_CAPWAP_SUPPORT
-#define UDP_LITE_SW_PATCH_LABEL                 0x2E0
+#define UDP_LITE_SW_PATCH_LABEL             0x2E0
 #endif /* FM_CAPWAP_SUPPORT */
 
 /**************************************************************************//**
