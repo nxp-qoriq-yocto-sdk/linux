@@ -279,6 +279,9 @@ static inline void build_stats_descriptor_part(struct dpa_ipsec_sa *sa,
 	case OP_PCL_IPSEC_AES_GCM16:
 		block_size = 16; /* block size in bytes */
 		break;
+	case OP_PCL_IPSEC_NULL_ENC:
+		block_size = 1;
+		break;
 	default:
 		pr_crit("Invalid cipher algorithm for SA %d\n", sa->id);
 		return;
@@ -695,6 +698,9 @@ int built_encap_extra_material(struct dpa_ipsec_sa *sa,
 	case OP_PCL_IPSEC_AES_GCM12:
 	case OP_PCL_IPSEC_AES_GCM16:
 		block_size = 16; /* block size in bytes */
+		break;
+	case OP_PCL_IPSEC_NULL_ENC:
+		block_size = 1;
 		break;
 	default:
 		pr_crit("Invalid cipher algorithm for SA %d\n", sa->id);
