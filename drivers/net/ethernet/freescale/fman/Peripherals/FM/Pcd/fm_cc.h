@@ -107,6 +107,7 @@
 #define CC_PC_GENERIC_WITH_MASK             0x28
 #define CC_PC_GENERIC_IC_GMASK              0x2B
 #define CC_PC_GENERIC_IC_HASH_INDEXED       0x2C
+#define CC_PC_GENERIC_IC_AGING_MASK         0x2D
 
 #define CC_PR_OFFSET                        0x25
 #define CC_PR_WITHOUT_OFFSET                0x26
@@ -174,6 +175,7 @@
 
 #define GLBL_MASK_FOR_HASH_INDEXED          0xfff00000
 #define CC_GLBL_MASK_SIZE                   4
+#define CC_AGING_MASK_SIZE                  4
 
 typedef uint32_t ccPrivateInfo_t; /**< private info of CC: */
 
@@ -182,6 +184,8 @@ typedef uint32_t ccPrivateInfo_t; /**< private info of CC: */
 #define CC_PRIVATE_INFO_IC_HASH_EXACT_MATCH        0x40000000
 #define CC_PRIVATE_INFO_IC_KEY_EXACT_MATCH         0x20000000
 #define CC_PRIVATE_INFO_IC_DEQ_FQID_INDEX_LOOKUP   0x10000000
+
+#define CC_BUILD_AGING_MASK(numOfKeys)      ((((1LL << ((numOfKeys) + 1)) - 1)) << (31 - (numOfKeys)))
 
 /***********************************************************************/
 /*          Memory map                                                 */
@@ -228,13 +232,6 @@ typedef _Packed union
 /***********************************************************************/
 /*  Driver's internal structures                                       */
 /***********************************************************************/
-
-typedef enum e_ModifyState
-{
-    e_MODIFY_STATE_ADD = 0,
-    e_MODIFY_STATE_REMOVE,
-    e_MODIFY_STATE_CHANGE
-} e_ModifyState;
 
 typedef struct t_FmPcdStatsObj
 {
@@ -288,6 +285,7 @@ typedef struct
     t_Handle        h_FrmReplicForRmv;
 #endif /* (DPAA_VERSION >= 11) */
     bool            tree;
+    e_FmCcModifyState   modifyState;
 
     t_FmPcdCcKeyAndNextEngineParams  keyAndNextEngineParams[CC_MAX_NUM_OF_KEYS];
 } t_FmPcdModifyCcKeyAdditionalParams;
@@ -311,6 +309,7 @@ typedef struct
     uint32_t            countersArraySize;
 
     bool                isHashBucket;               /**< Valid for match table node that is a bucket of a hash table only */
+    bool                agingSupport;               /**< Valid for match table node that is a bucket of a hash table only */
     t_Handle            h_MissStatsCounters;        /**< Valid for hash table node and match table that is a bucket;
                                                          Holds the statistics counters allocated by the hash table and
                                                          are shared by all hash table buckets; */
