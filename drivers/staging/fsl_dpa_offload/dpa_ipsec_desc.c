@@ -627,6 +627,8 @@ int built_encap_extra_material(struct dpa_ipsec_sa *sa,
 	 * to insert a dummy command because the LINUX CAAM API uses first word
 	 * for storing the length of the descriptor. */
 	extra_cmds = sa->sec_desc_extra_cmds - 1;
+	/* Reinitialize commands space to avoid garbage from recycled tunnels */
+	memset(extra_cmds, 0, (2 * MAX_EXTRA_DESC_COMMANDS));
 
 	/* Dummy command - will not be executed at all. Only for setting to 1
 	 * the length of the extra_cmds descriptor so that first extra material
@@ -813,6 +815,8 @@ void built_decap_extra_material(struct dpa_ipsec_sa *sa,
 	 * to insert a dummy command because the LINUX CAAM API uses first word
 	 * for storing the length of the descriptor. */
 	extra_cmds = sa->sec_desc_extra_cmds - 1;
+	/* Reinitialize commands space to avoid garbage from recycled tunnels */
+	memset(extra_cmds, 0, (2 * MAX_EXTRA_DESC_COMMANDS));
 
 	/* Dummy command - will not be executed at all. Only for setting to 1
 	 * the length of the extra_cmds descriptor so that first extra material
