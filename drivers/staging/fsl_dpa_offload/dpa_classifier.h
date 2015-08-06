@@ -93,6 +93,9 @@ struct dpa_cls_tbl_entry {
 	/* The index of this entry in the Cc node table */
 	uint8_t				entry_index;
 
+	/* The entry reference (absolute index in entry management list) */
+	uint8_t				entry_ref;
+
 	/* The priority value of this entry in the table */
 	int				priority;
 
@@ -162,6 +165,12 @@ struct dpa_cls_tbl_cc_node_info {
 	 * currently in use
 	 */
 	unsigned int			used;
+
+	/*
+	 * Reference to the first element from this set that is present
+	 * in the entry_list
+	*/
+	struct list_head		*first_entry;
 };
 
 /* DPA Classifier Table Control Data Structure */

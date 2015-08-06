@@ -1648,6 +1648,20 @@ static int table_delete_entry_by_ref(struct dpa_cls_table *ptable, int entry_id)
 			list_current = list_current->next;
 		}
 
+		/*
+		 * Update the pointer to the first entry in the internal Cc
+		 * node if this particular entry was removed.
+		 */
+		if (ptable->entry[entry_id].entry_index == 0) {
+			if (ptable->int_cc_node[cc_node_index].used == 1)
+	/* Internal Cc node became empty. First entry no longer exists. */
+	ptable->int_cc_node[cc_node_index].first_entry = NULL;
+			else
+	/* Update first entry to the next one. */
+	ptable->int_cc_node[cc_node_index].first_entry =
+					ptable->entry[entry_id].list_node.next;
+		}
+
 		list_del(&ptable->entry[entry_id].list_node);
 	}
 
@@ -2114,6 +2128,164 @@ int dpa_classif_table_get_params(int td, struct dpa_cls_tbl_params *params)
 	return 0;
 }
 EXPORT_SYMBOL(dpa_classif_table_get_params);
+
+int dpa_classif_table_poll(int					td,
+			const struct dpa_cls_tbl_poll_data	*poll_params,
+			void					*user_context)
+{
+	struct dpa_cls_table *cls_table;
+	int i = 0;
+	int j, err = 0;
+	uint32_t aging_mask;
+	t_Handle hash_cc_node;
+	struct dpa_cls_tbl_event_data event_data;
+	uint8_t key[DPA_OFFLD_MAXENTRYKEYSIZE];
+	uint8_t mask[DPA_OFFLD_MAXENTRYKEYSIZE];
+	struct dpa_cls_tbl_entry *index_entry;
+	struct dpa_cls_tbl_shadow_entry *shadow_entry;
+
+	dpa_cls_dbg(("DEBUG: dpa_classifier %s (%d) -->\n", __func__,
+		__LINE__));
+
+	/* Parameters sanity checks: */
+	if (!poll_params) {
+		log_err("\"poll_params\" cannot be NULL.\n");
+		return -EINVAL;
+	}
+
+	if (!poll_params->event_func) {
+		log_err("\"event_func\" not provided.\n");
+		return -EINVAL;
+	}
+
+	LOCK_OBJECT(table_array, td, cls_table, -EINVAL);
+
+	if (cls_table->params.type != DPA_CLS_TBL_HASH) {
+		log_err("Polling for table events is only supported for HASH tables.\n");
+		return -EINVAL;
+	}
+
+	if (cls_table->params.prefilled_entries) {
+		log_err("Polling for table events is not supported for prefilled tables.\n");
+		return -EINVAL;
+	}
+
+	hash_cc_node = (t_Handle)cls_table->params.cc_node;
+
+	event_data.td = td;
+	/*
+	 * The key and mask that is provided to the user is a local copy only
+	 * available in this function to avoid users messing up the shadow
+	 * table by mistake.
+	 */
+	event_data.key.byte = key;
+
+	/* Determine the HASH bucket to start with: */
+	if ((poll_params->start_ref >= 0) &&
+		(cls_table->entry[poll_params->start_ref].flags &
+						DPA_CLS_TBL_ENTRY_VALID)) {
+		i = cls_table->entry[poll_params->start_ref].int_cc_node_index;
+	}
+
+	/* Process HASH sets and get their aging mask. */
+	while (i < cls_table->int_cc_nodes_count) {
+		/* Get aging mask for this bucket */
+		err = FM_PCD_HashTableGetBucketAging(hash_cc_node, i,
+						poll_params->reset_aging,
+						&aging_mask, NULL);
+		if (err != E_OK) {
+			log_err("FMan driver call failed - FM_PCD_HashTableGetBucketAging. Cc node handle=0x%p, bucket_id=%d.\n",
+				hash_cc_node, i);
+			return -EPERM;
+		}
+
+		/* Align aging_mask to the number of entries in this HASH set */
+		j = cls_table->int_cc_node[i].used - 1;
+		aging_mask >>= (31 - j);
+		/* For each aged entry in the mask signal the event */
+		while ((!err) && (aging_mask) && (j >= 0)) {
+			if (aging_mask & 1) {
+				struct list_head fake_head;
+				/*
+				 * Find the entry associated with this
+				 * position in the index management list.
+				 * Start from the current bucket.
+				 */
+				event_data.entry_id =
+						DPA_OFFLD_INVALID_OBJECT_ID;
+				fake_head.next =
+					cls_table->int_cc_node[i].first_entry;
+				list_for_each_entry(index_entry, &fake_head,
+								list_node) {
+					if (index_entry->entry_index == j) {
+				event_data.entry_id = index_entry->entry_ref;
+				break;
+					}
+					if (index_entry->int_cc_node_index != i)
+						break;
+				}
+
+				BUG_ON(event_data.entry_id ==
+						DPA_OFFLD_INVALID_OBJECT_ID);
+
+				/*
+				 * If a shadow table exists, get the key
+				 * information. Otherwise just fill in zero
+				 * size on the key.
+				 */
+				if (index_entry->shadow_entry) {
+					shadow_entry = list_entry(
+						index_entry->shadow_entry,
+						struct dpa_cls_tbl_shadow_entry,
+						list_node);
+					event_data.key.size =
+							shadow_entry->key.size;
+					memcpy(event_data.key.byte,
+						shadow_entry->key.byte,
+						event_data.key.size);
+					if (shadow_entry->key.mask) {
+						event_data.key.mask = mask;
+						memcpy(event_data.key.mask,
+							shadow_entry->key.mask,
+							event_data.key.size);
+					} else
+						event_data.key.mask = NULL;
+				} else
+					/*
+					 * If no key data exists, just zero
+					 * out the entire event key
+					 */
+					memset(&event_data.key,
+						0,
+						sizeof(event_data.key));
+
+	/*
+	 * Call user event function. In the event function the user is not
+	 * allowed to make any modifications to THIS table. That can only
+	 * be done AFTER this table poll finishes.
+	 */
+	err = poll_params->event_func(DPA_CLS_EVENT_ENTRY_EXPIRED,
+					&event_data,
+					user_context);
+			}
+			aging_mask >>= 1;
+			j--;
+		}
+
+		/* Break if signalled to stop polling. */
+		if (err)
+			break;
+
+		i++;
+	}
+
+	RELEASE_OBJECT(cls_table);
+
+	dpa_cls_dbg(("DEBUG: dpa_classifier %s (%d) <--\n", __func__,
+		__LINE__));
+
+	return err;
+}
 
 static int alloc_table_management(struct dpa_cls_table *cls_table)
 {
@@ -2922,6 +3094,7 @@ static int table_insert_entry_hash(struct dpa_cls_table		*cls_table,
 	cls_table->entry[j].int_cc_node_index = (unsigned int)hash_set_index;
 	cls_table->entry[j].entry_index =
 			(uint8_t)cls_table->int_cc_node[hash_set_index].used;
+	cls_table->entry[j].entry_ref = j;
 	cls_table->entry[j].hmd = hmd;
 
 	/* Calculate the position in the index management list where this entry
@@ -2960,6 +3133,14 @@ static int table_insert_entry_hash(struct dpa_cls_table		*cls_table,
 
 	/* Add the index entry to the index management list */
 	list_add_tail(&cls_table->entry[j].list_node, list_current);
+
+	/*
+	 * If this is the first entry in this bucket, update the bucket
+	 * first entry pointer.
+	 */
+	if (cls_table->int_cc_node[hash_set_index].used == 0)
+		cls_table->int_cc_node[hash_set_index].first_entry =
+						&cls_table->entry[j].list_node;
 
 	cls_table->int_cc_node[hash_set_index].used++;
 

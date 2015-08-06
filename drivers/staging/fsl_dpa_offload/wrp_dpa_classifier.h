@@ -45,6 +45,9 @@
 #define WRP_DPA_CLS_CDEVNAME				"dpa_classifier"
 #define WRP_DPA_CLS_CLASS_NAME				"dpa_classifier"
 
+/* To keep the event queue under control: */
+#define TABLE_EVENT_QUEUE_SIZE				256
+
 
 int	wrp_dpa_classif_init(void);
 

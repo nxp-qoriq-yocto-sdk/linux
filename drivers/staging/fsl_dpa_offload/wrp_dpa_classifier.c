@@ -46,6 +46,7 @@
 #include "lnxwrp_fm.h"
 #include "fm_pcd_ioctls.h"
 #include "fm_port_ioctls.h"
+#include <linux/wait.h>
 #ifdef CONFIG_COMPAT
 #include "lnxwrp_ioctls_fm_compat.h"
 #endif /* CONFIG_COMPAT */
@@ -127,6 +128,68 @@ do {									\
 #endif /* DPA_CLASSIFIER_DEBUG */
 
 
+/*
+ * Table poll control data structure is created per table poll request and
+ * includes the resources necessary to synchronize and control the poll
+ * process throughout its lifetime.
+ */
+struct wrp_dpa_cls_table_poll_ctrl {
+	/* Semaphore acknowledging the reception of POLL_CONTINUE command */
+	struct semaphore wait_poll_continue;
+
+	/*
+	 * The context information to provide with each table event propagated
+	 * to user space. This is only meaningful to the user space
+	 * dpa_classifier library
+	 */
+	uint64_t ucontext;
+
+	/* The status code of this table poll */
+	int err;
+};
+
+/* The dpa_classifier event queue data type definition */
+struct wrp_dpa_cls_table_event_queue {
+	/* Double linked list of events (struct wrp_dpa_cls_table_event) */
+	struct list_head	data;
+
+	/* Number of events currently in the event queue */
+	atomic_t		count;
+
+	/* Waitqueue for reader processes */
+	wait_queue_head_t	wq;
+
+	/*
+	 * Access control to the event queue. Anyone working on the event
+	 * queue must first get hold of this mutex
+	 */
+	struct mutex		access;
+};
+
+/* Linux wrapper envelope of a table event */
+struct wrp_dpa_cls_table_event {
+	/* Event information */
+	struct dpa_cls_tbl_event_info event_info;
+
+	/* Storage space for the entry key (if one is available) */
+	struct dpa_offload_lookup_key key;
+
+	/*
+	 * This allows chaining to other such table events to form an event
+	 * queue (struct wrp_dpa_cls_table_event_queue)
+	 */
+	struct list_head node;
+};
+
+
+static int wrp_dpa_classif_enqueue_event(
+		struct wrp_dpa_cls_table_event_queue *event_queue,
+		struct wrp_dpa_cls_table_event *event);
+
+static struct wrp_dpa_cls_table_event *wrp_dpa_classif_dequeue_event(
+		struct wrp_dpa_cls_table_event_queue *event_queue,
+		unsigned int block);
+
 static long do_ioctl_table_create(unsigned long args, bool compat_mode);
 
 static long do_ioctl_table_modify_miss_action(unsigned long	args,
@@ -188,6 +251,7 @@ static long do_ioctl_mcast_add_member(unsigned long args, bool compat_mode);
 
 void *translate_fm_pcd_handle(void *fm_pcd);
 
+
 static const struct file_operations dpa_classif_fops = {
 	.owner			= THIS_MODULE,
 	.open			= wrp_dpa_classif_open,
@@ -203,6 +267,9 @@ static const struct file_operations dpa_classif_fops = {
 static int dpa_cls_cdev_major = -1;
 static struct class *classifier_class;
 static struct device *classifier_dev;
+
+/* The one and only dpa_classifier table events queue: */
+static struct wrp_dpa_cls_table_event_queue cls_table_event_queue;
 
 
 int	wrp_dpa_classif_init(void)
@@ -241,12 +308,20 @@ int	wrp_dpa_classif_init(void)
 		return PTR_ERR(classifier_dev);
 	}
 
+	/* Initialize the classifier table event queue: */
+	INIT_LIST_HEAD(&cls_table_event_queue.data);
+	mutex_init(&cls_table_event_queue.access);
+	atomic_set(&cls_table_event_queue.count, 0);
+	init_waitqueue_head(&cls_table_event_queue.wq);
+
 	return 0;
 }
 
 
 int wrp_dpa_classif_exit(void)
 {
+	struct wrp_dpa_cls_table_event *event, *tmp;
+
 	if (dpa_cls_cdev_major < 0)
 		return 0;
 
@@ -256,6 +331,16 @@ int wrp_dpa_classif_exit(void)
 	unregister_chrdev(dpa_cls_cdev_major, WRP_DPA_CLS_CDEVNAME);
 
 	dpa_cls_cdev_major = -1;
+
+	/* Clean up remaining events from the event queue: */
+	mutex_lock(&cls_table_event_queue.access);
+	list_for_each_entry_safe(event, tmp,
+				&cls_table_event_queue.data, node) {
+		list_del(&event->node);
+		atomic_dec(&cls_table_event_queue.count);
+		kfree(event);
+	}
+	mutex_unlock(&cls_table_event_queue.access);
 
 	return 0;
 }
@@ -279,7 +364,90 @@ ssize_t wrp_dpa_classif_read(
 			size_t		len,
 			loff_t		*offp)
 {
-	return 0;
+	static struct wrp_dpa_cls_table_event *event;
+	static u32 offs = 0;
+	size_t c = 0;
+
+	/*
+	 * Check if there is an already selected event in progress of
+	 * delivering:
+	 */
+	if (!event) {
+		/*
+		 * Dequeue first event by using a blocking call. This will
+		 * cause sleep if no events are in the queue.
+		 */
+		offs = 0;
+		event = wrp_dpa_classif_dequeue_event(&cls_table_event_queue,
+				0);
+	}
+
+	while (event) {
+		if (offs < sizeof(struct dpa_cls_tbl_event_info)) {
+			if (len - c < sizeof(struct dpa_cls_tbl_event_info))
+				/*
+				 * Not enough user buffer space to deliver
+				 * the event.
+				 */
+				return c;
+			if (copy_to_user(&buf[c], &event->event_info,
+				sizeof(struct dpa_cls_tbl_event_info)) ) {
+				log_err("Failed to deliver table event to user "
+					"space (td=%d)\n",
+					event->event_info.td);
+				return -EIO;
+			}
+			c += sizeof(struct dpa_cls_tbl_event_info);
+			offs += sizeof(struct dpa_cls_tbl_event_info);
+
+			/* Check whether there are lookup keys to deliver: */
+			if (!event->event_info.key_size)
+				goto dequeue_new_dpa_cls_event;
+		}
+
+		if (offs < sizeof(struct dpa_cls_tbl_event_info) +
+					event->event_info.key_size) {
+			if (len - c < event->event_info.key_size) {
+				/* No more buffer space for the keys. */
+				return c;
+			}
+			/* Deliver lookup key: */
+			if (copy_to_user(&buf[c], event->key.byte,
+							event->key.size)) {
+				log_err("Failed to deliver table event data "
+					"to user space (td=%d)\n",
+					event->event_info.td);
+				return -EIO;
+			}
+			c += event->key.size;
+			offs += event->key.size;
+
+			if (!event->key.mask)
+				goto dequeue_new_dpa_cls_event;
+		}
+
+		if (len - c < event->event_info.key_size) {
+			/* No more buffer space for the mask. */
+			return c;
+		}
+		/* Deliver the key mask: */
+		if (copy_to_user(&buf[c], event->key.mask,
+							event->key.size)) {
+			log_err("Failed to deliver table event data to user "
+				"space (td=%d)\n", event->event_info.td);
+			return -EIO;
+		}
+		c += event->key.size;
+
+dequeue_new_dpa_cls_event:
+		kfree(event);
+		offs = 0;
+		/* For subsequent events, don't block */
+		event = wrp_dpa_classif_dequeue_event(&cls_table_event_queue,
+							O_NONBLOCK);
+	}
+
+	return c;
 }
 
 
@@ -292,6 +460,135 @@ ssize_t wrp_dpa_classif_write(
 	return 0;
 }
 
+
+static int wrp_dpa_classif_enqueue_event(
+		struct wrp_dpa_cls_table_event_queue *event_queue,
+		struct wrp_dpa_cls_table_event *event)
+{
+	/* If the event queue is already full, abort: */
+	if (atomic_read(&event_queue->count) >= TABLE_EVENT_QUEUE_SIZE) {
+		log_err("Event enqueue failed, queue is full\n");
+		return -EBUSY;
+	}
+
+	/* Add the event to the event queue */
+	mutex_lock(&event_queue->access);
+	list_add_tail(&event->node, &event_queue->data);
+	atomic_inc(&event_queue->count);
+	mutex_unlock(&event_queue->access);
+
+	/* Wake up consumers */
+	wake_up_interruptible(&event_queue->wq);
+
+	return 0;
+}
+
+static struct wrp_dpa_cls_table_event *wrp_dpa_classif_dequeue_event(
+		struct wrp_dpa_cls_table_event_queue *event_queue,
+		unsigned int block)
+{
+	struct wrp_dpa_cls_table_event *event;
+
+	/*
+	 * If the event queue is empty we perform an interruptible sleep
+	 * until an event is inserted into the queue. We use the event queue
+	 * spinlock to protect ourselves from race conditions.
+	 */
+	mutex_lock(&event_queue->access);
+
+	while (list_empty(&event_queue->data)) {
+		mutex_unlock(&event_queue->access);
+
+		/* If a non blocking action was requested, return failure: */
+		if (block & O_NONBLOCK)
+			return NULL;
+
+		if (wait_event_interruptible(event_queue->wq,
+				!list_empty(&event_queue->data)))
+			/* Woken up by some signal... */
+			return NULL;
+
+		mutex_lock(&event_queue->access);
+	}
+
+	/* Consume one event */
+	event = list_entry(event_queue->data.next,
+					struct wrp_dpa_cls_table_event, node);
+	list_del(&event->node);
+	atomic_dec(&event_queue->count);
+	mutex_unlock(&event_queue->access);
+
+	return event;
+}
+
+/* DPA Classifier table event handling function: */
+int wrp_dpa_classif_table_event_func(int event_code,
+	const struct dpa_cls_tbl_event_data *event_data, void *user_context)
+{
+	struct wrp_dpa_cls_table_event *event;
+	struct wrp_dpa_cls_table_poll_ctrl *poll_control =
+			(struct wrp_dpa_cls_table_poll_ctrl*)user_context;
+	int err;
+
+	/* Allocate memory for the event: */
+	event = kzalloc(sizeof(struct wrp_dpa_cls_table_event), GFP_KERNEL);
+	if (!event) {
+		log_err("Cannot allocate memory for a new event\n");
+		return -ENOMEM;
+	}
+
+	INIT_LIST_HEAD(&event->node);
+	event->event_info.code		= event_code;
+	event->event_info.td		= event_data->td;
+	event->event_info.entry_id	= event_data->entry_id;
+	event->event_info.key_size	= event_data->key.size;
+	event->key.size			= event_data->key.size;
+	event->event_info.kcontext	= (uint64_t)user_context;
+	event->event_info.ucontext	= poll_control->ucontext;
+	if (event_data->key.mask)
+		event->event_info.mask_size = event_data->key.size;
+
+	/* Copy key and mask, if necessary */
+	if (event_data->key.size) {
+		u8 s = event_data->key.size;
+
+		if (event_data->key.mask)
+			s <<= 1;
+		event->key.byte = kzalloc(s, GFP_KERNEL);
+		if (!event->key.byte) {
+			log_err("No more memory for a new event\n");
+			return -ENOMEM;
+		}
+
+		memcpy(event->key.byte, event_data->key.byte,
+						event_data->key.size);
+		if (event_data->key.mask) {
+			event->key.mask = event->key.byte +
+							event_data->key.size;
+			memcpy(event->key.mask, event_data->key.mask,
+							event_data->key.size);
+		}
+	}
+
+	/* Enqueue this event */
+	if (wrp_dpa_classif_enqueue_event(&cls_table_event_queue, event) != 0) {
+		log_err("Cannot enqueue a new classifier table event\n");
+		kfree(event);
+		return -EBUSY;
+	}
+
+	/* Wait for the POLL_CONTINUE signal from user space: */
+	err = down_interruptible(&poll_control->wait_poll_continue);
+	if (err) {
+		log_err("Aggressively woken up while waiting for "
+			"POLL_CONTINUE. Aborting table poll (td=%d).\n",
+			event_data->td);
+		return err;
+	}
+
+	/* Propagate POLL_CONTINUE error code */
+	return poll_control->err;
+}
 
 #ifdef CONFIG_COMPAT
 long wrp_dpa_classif_compat_ioctl(
@@ -648,6 +945,80 @@ long wrp_dpa_classif_do_ioctl(
 		ret = -EINVAL;
 		return ret;
 #endif
+		break;
+	}
+	case DPA_CLS_IOC_TBL_POLL: {
+		struct ioc_dpa_cls_tbl_poll_params kparam;
+		struct dpa_cls_tbl_poll_data poll_params;
+		struct wrp_dpa_cls_table_poll_ctrl poll_control;
+
+		if (copy_from_user(&kparam, (void *) args, sizeof(kparam))) {
+			log_err("Could not copy parameters.\n");
+			return -EINVAL;
+		}
+
+		/* Initialize the control data structure for this table poll: */
+		sema_init(&poll_control.wait_poll_continue, 0);
+		poll_control.ucontext = kparam.user_context;
+
+		poll_params.event_func	= wrp_dpa_classif_table_event_func;
+		poll_params.reset_aging	= kparam.reset_aging;
+		poll_params.start_ref	= kparam.start_ref;
+
+		/* Call function */
+		ret = dpa_classif_table_poll(kparam.td, &poll_params,
+			&poll_control);
+		/*
+		 * In case of successful poll completion, send the END_POLL
+		 * event.
+		 */
+		if (!ret) {
+			struct wrp_dpa_cls_table_event *event;
+
+			event = kzalloc(sizeof(struct wrp_dpa_cls_table_event),
+								GFP_KERNEL);
+			if (!event) {
+				log_err("Out of memory while signalling table "
+					"END_POLL for td=%d\n", kparam.td);
+				return -ENOMEM;
+			}
+			INIT_LIST_HEAD(&event->node);
+
+			event->event_info.code = DPA_CLS_EVENT_END_POLL;
+			event->event_info.td = kparam.td;
+			event->event_info.entry_id = DPA_OFFLD_INVALID_OBJECT_ID;
+			event->event_info.ucontext = kparam.user_context;
+
+			/* Enqueue this event */
+			if (wrp_dpa_classif_enqueue_event(
+							&cls_table_event_queue,
+							event) != 0) {
+				log_err("Failed to deliver table END_POLL for "
+					"td=%u\n", kparam.td);
+				kfree(event);
+				return -EBUSY;
+			}
+		}
+
+		break;
+	}
+	case DPA_CLS_IOC_TBL_POLL_CONTINUE: {
+		struct ioc_dpa_cls_tbl_poll_cont_params kparam;
+		struct wrp_dpa_cls_table_poll_ctrl *poll_control;
+
+		if (copy_from_user(&kparam, (void *) args, sizeof(kparam))) {
+			log_err("Could not copy parameters.\n");
+			return -EINVAL;
+		}
+
+		/* Update table poll status */
+		poll_control = (struct wrp_dpa_cls_table_poll_ctrl*)
+							kparam.user_context;
+		poll_control->err = kparam.err;
+
+		/* Release the wait semaphore for this poll: */
+		up(&poll_control->wait_poll_continue);
+
 		break;
 	}
 	default:

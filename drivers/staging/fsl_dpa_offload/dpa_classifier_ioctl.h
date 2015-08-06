@@ -1,5 +1,4 @@
-
-/* Copyright 2008-2012 Freescale Semiconductor, Inc.
+/* Copyright 2011-2015 Freescale Semiconductor, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -41,9 +40,13 @@
 /* Other includes */
 #include "linux/ioctl.h"
 #include <linux/compat.h>
+#include "linux/fsl_dpa_classifier.h"
 
 
 #define DPA_CLS_IOC_MAGIC				0xbe
+
+/* Internal dpa_classifier table event codes: */
+#define DPA_CLS_EVENT_END_POLL				0xff
 
 
 struct ioc_dpa_cls_tbl_params {
@@ -188,6 +191,84 @@ struct ioc_dpa_cls_mcast_member_params {
 struct ioc_dpa_cls_mcast_remove_params {
 	int grpd;
 	int md;
+};
+
+/*
+ * Envelope encapsulating the "dpa_classif_table_poll" function call arguments
+ * during the ioctl call
+ */
+struct ioc_dpa_cls_tbl_poll_params {
+	/* Descriptor of the table to poll */
+	int td;
+
+	/*
+	 * User context information to be returned in the "ucontext" field of
+	 * the dpa_classifier table events propagated to user space
+	 */
+	uint64_t user_context;
+
+	/* Signal whether to reset aging markers for inspected entries or not */
+	bool reset_aging;
+
+	/*
+	 * The table entry ref to start the table poll from (i.e. in case a
+	 * previous table poll was interrupted)
+	 */
+	int start_ref;
+};
+
+/*
+ * Envelope encapsulating the parameters passed from user space to the kernel
+ * driver along with the POLL_CONTINUE ioctl command
+ */
+struct ioc_dpa_cls_tbl_poll_cont_params {
+	/*
+	 * The context information of the table poll to continue. This should
+	 * be the "kcontext" attribute of the last event received on this table
+	 * poll. The information is only meaningful to the kernel driver
+	 */
+	uint64_t user_context;
+
+	/*
+	 * The error code returned by the user application's table event
+	 * handling function
+	 */
+	int err;
+};
+
+/*
+ * The details of the table events signalled by the kernel driver to the user
+ * space driver
+ */
+struct dpa_cls_tbl_event_info {
+	/* The code of the event. Helps to identify it */
+	int code;
+
+	/* The descriptor of the table the event refers to */
+	int td;
+
+	/* The ref of the table entry the event refers to */
+	int entry_id;
+
+	/* The size (in bytes) of the entry key delivered with this event */
+	uint16_t key_size;
+
+	/* The size (in bytes) of the entry mask delivered with this event  */
+	uint16_t mask_size;
+
+	/*
+	 * The user space driver context information of the table poll. This
+	 * was received by the kernel driver with the "dpa_classif_table_poll"
+	 * function call. No meaning to the kernel
+	 */
+	uint64_t ucontext;
+
+	/*
+	 * The kernel driver context information of this event. This should be
+	 * passed back to the kernel driver with the POLL_CONTINUE command. No
+	 * meaning to the user space driver
+	 */
+	uint64_t kcontext;
 };
 
 
@@ -849,6 +930,12 @@ int dpa_cls_mcast_member_params_compatcpy(
 
 #define DPA_CLS_IOC_MCAST_FREE_GROUP				\
 	_IOWR(DPA_CLS_IOC_MAGIC, 34, int)
+
+#define DPA_CLS_IOC_TBL_POLL					\
+	_IOR(DPA_CLS_IOC_MAGIC, 35, struct ioc_dpa_cls_tbl_poll_params)
+
+#define DPA_CLS_IOC_TBL_POLL_CONTINUE				\
+	_IOR(DPA_CLS_IOC_MAGIC, 36, struct ioc_dpa_cls_tbl_poll_cont_params)
 
 
 #endif /* __DPA_CLASSIFIER_IOCTL_H */

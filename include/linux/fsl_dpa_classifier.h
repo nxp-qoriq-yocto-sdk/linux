@@ -1,5 +1,5 @@
 
-/* Copyright 2008-2012 Freescale Semiconductor, Inc.
+/* Copyright 2008-2015 Freescale Semiconductor, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -52,6 +52,9 @@
 #define DPA_CLS_HM_DSCP_TO_VLAN_TABLE_SIZE			32
 /* Number of entries in the DSCP-to-VPri mapping table */
 #define DPA_CLS_HM_DSCP_TO_VPRI_TABLE_SIZE			64
+
+/* List of dpa_classifier table events: */
+#define DPA_CLS_EVENT_ENTRY_EXPIRED				0x1
 
 
 /* API functions, definitions and enums */
@@ -351,6 +354,38 @@ struct dpa_cls_tbl_entry_stats {
 	uint32_t	bytes;
 };
 
+/* Data provided with DPA Classifier events: */
+struct dpa_cls_tbl_event_data {
+	/* Id of the table for which this event was issued */
+	int	td;
+
+	/* Lookup key of selected entry (if available) */
+	struct dpa_offload_lookup_key key;
+
+	/* Reference of the selected entry */
+	int	entry_id;
+};
+
+/* Prototype of DPA Classifier table event handling function: */
+typedef int (*dpa_classif_table_event_func)(int event_code,
+			const struct dpa_cls_tbl_event_data *event_data,
+			void *user_context);
+
+/* DPA Classifier table polling configuration */
+struct dpa_cls_tbl_poll_data {
+	/* User callback function to process events */
+	dpa_classif_table_event_func	event_func;
+
+	/* Reset aging mechanism for inspected entries */
+	bool				reset_aging;
+
+	/*
+	 * The ref of the entry to start polling from. Use
+	 * DPA_OFFLD_INVALID_OBJECT_ID to start from the head of the table
+	 */
+	int				start_ref;
+};
+
 
 /*
  * Creates and initializes a DPA Classifier table using a FMan
@@ -488,6 +523,11 @@ int dpa_classif_table_get_entry_stats_by_ref(int		td,
 
 /* Returns the parameters of a classifier table. */
 int dpa_classif_table_get_params(int td, struct dpa_cls_tbl_params *params);
+
+/* Polls a DPA Classifier table for available events. */
+int dpa_classif_table_poll(int					td,
+			const struct dpa_cls_tbl_poll_data	*poll_params,
+			void					*user_context);
 
 
 /* Header Manipulation API */
