@@ -3351,6 +3351,8 @@ static int get_new_sa(struct dpa_ipsec *dpa_ipsec,
 	sa = &dpa_ipsec->sa_mng.sa[sa_id_to_sa_index(id)];
 	sa->id = id;
 	sa->used_sa_index = i;
+	sa->dscp_copy = false;
+	sa->ecn_copy = false;
 	dpa_ipsec->used_sa_ids[sa->used_sa_index] = sa->id;
 	dpa_ipsec->num_used_sas++;
 
