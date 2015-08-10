@@ -3394,6 +3394,7 @@ int dpa_ipsec_create_sa(int dpa_ipsec_id,
 	sa->sa_rekeying_node.next = LIST_POISON1;
 	sa->sa_rekeying_node.prev = LIST_POISON2;
 	sa->read_seq_in_progress = false;
+	memset(sa->sec_desc, 0, sizeof(struct sec_descriptor));
 
 	/* Copy SA params into the internal SA structure */
 	if (sa_is_outbound(sa))
