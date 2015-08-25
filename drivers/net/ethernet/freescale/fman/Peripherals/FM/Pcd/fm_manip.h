@@ -442,7 +442,7 @@ typedef struct{
     bool                    frag;
     bool                    reassm;
     uint16_t                sizeForFragmentation;
-    uint8_t                 owner;
+    uint16_t                owner;
     uint32_t                updateParams;
     uint32_t                shadowUpdateParams;
     t_FragParams            fragParams;
