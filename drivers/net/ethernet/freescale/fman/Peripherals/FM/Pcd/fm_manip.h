@@ -136,6 +136,9 @@
 #define FM_PCD_MANIP_IPSEC_IP_HDR_LEN_MASK                  0x00FF0000
 #define FM_PCD_MANIP_IPSEC_IP_HDR_LEN_SHIFT                 16
 
+#define FM_PCD_MANIP_IPSEC_ARW_SIZE_MASK                    0xFFFF0000
+#define FM_PCD_MANIP_IPSEC_ARW_SIZE_SHIFT                   16
+
 #define e_FM_MANIP_IP_INDX                                  1
 
 #define HMCD_OPCODE_GENERIC_RMV                 0x01

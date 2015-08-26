@@ -5180,7 +5180,14 @@ t_Error FM_DumpRegs(t_Handle h_Fm)
 }
 #endif /* (defined(DEBUG_ERRORS) && ... */
 
+t_Handle FM_GetMuramHandle(t_Handle h_Fm)
+{
+    t_Fm        *p_Fm = (t_Fm*)h_Fm;
 
+    SANITY_CHECK_RETURN_VALUE(p_Fm, E_INVALID_HANDLE, NULL);
+
+    return (p_Fm->h_FmMuram);
+}
 
 /****************************************************/
 /*       Hidden-DEBUG Only API                      */

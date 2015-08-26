@@ -3233,6 +3233,7 @@ static t_Error IPSecManip(t_FmPcdManipParams    *p_ManipParams,
     t_FmPcdManipSpecialOffloadIPSecParams   *p_IPSecParams;
     t_Error                                 err = E_OK;
     uint32_t                                tmpReg32 = 0;
+    uint32_t power;
 
     SANITY_CHECK_RETURN_ERROR(p_Manip,E_INVALID_HANDLE);
     SANITY_CHECK_RETURN_ERROR(p_ManipParams,E_INVALID_HANDLE);
@@ -3245,6 +3246,13 @@ static t_Error IPSecManip(t_FmPcdManipParams    *p_ManipParams,
                               !p_IPSecParams->decryption, E_INVALID_VALUE);
     SANITY_CHECK_RETURN_ERROR(!p_IPSecParams->variableIpVersion ||
                               p_IPSecParams->outerIPHdrLen, E_INVALID_VALUE);
+    SANITY_CHECK_RETURN_ERROR(
+            !p_IPSecParams->arwSize || p_IPSecParams->arwAddr,
+            E_INVALID_VALUE);
+    SANITY_CHECK_RETURN_ERROR(
+            !p_IPSecParams->arwSize || p_IPSecParams->decryption,
+            E_INVALID_VALUE);
+    SANITY_CHECK_RETURN_ERROR((p_IPSecParams->arwSize % 16) == 0, E_INVALID_VALUE);
 
     p_Ad = (t_AdOfTypeContLookup *)p_Manip->h_Ad;
 
@@ -3254,18 +3262,28 @@ static t_Error IPSecManip(t_FmPcdManipParams    *p_ManipParams,
     tmpReg32 |= (p_IPSecParams->dscpCopy)?FM_PCD_MANIP_IPSEC_DSCP_EN:0;
     tmpReg32 |= (p_IPSecParams->variableIpHdrLen)?FM_PCD_MANIP_IPSEC_VIPL_EN:0;
     tmpReg32 |= (p_IPSecParams->variableIpVersion)?FM_PCD_MANIP_IPSEC_VIPV_EN:0;
+    if (p_IPSecParams->arwSize)
+        tmpReg32 |= (uint32_t)((XX_VirtToPhys(UINT_TO_PTR(p_IPSecParams->arwAddr))-FM_MM_MURAM)
+                & (FM_MURAM_SIZE-1));
     WRITE_UINT32(p_Ad->ccAdBase, tmpReg32);
+
+    tmpReg32 = 0;
+    if (p_IPSecParams->arwSize) {
+        NEXT_POWER_OF_2((p_IPSecParams->arwSize + 32), power);
+        LOG2(power, power);
+        tmpReg32 = (p_IPSecParams->arwSize | (power - 5)) << FM_PCD_MANIP_IPSEC_ARW_SIZE_SHIFT;
+    }
+
+    if (p_ManipParams->h_NextManip)
+        tmpReg32 |=
+                (uint32_t)(XX_VirtToPhys(((t_FmPcdManip *)p_ManipParams->h_NextManip)->h_Ad)-
+                        (((t_FmPcd *)p_Manip->h_FmPcd)->physicalMuramBase)) >> 4;
+    WRITE_UINT32(p_Ad->matchTblPtr, tmpReg32);
 
     tmpReg32 = HMAN_OC_IPSEC_MANIP;
     tmpReg32 |= p_IPSecParams->outerIPHdrLen << FM_PCD_MANIP_IPSEC_IP_HDR_LEN_SHIFT;
     if (p_ManipParams->h_NextManip)
-    {
-        WRITE_UINT32(p_Ad->matchTblPtr,
-                    (uint32_t)(XX_VirtToPhys(((t_FmPcdManip *)p_ManipParams->h_NextManip)->h_Ad)-
-                               (((t_FmPcd *)p_Manip->h_FmPcd)->physicalMuramBase)) >> 4);
-
         tmpReg32 |= FM_PCD_MANIP_IPSEC_NADEN;
-    }
     WRITE_UINT32(p_Ad->pcAndOffsets, tmpReg32);
 
     return err;

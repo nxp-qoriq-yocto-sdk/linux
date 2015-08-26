@@ -2296,6 +2296,11 @@ typedef struct t_FmPcdManipSpecialOffloadIPSecParams {
     uint8_t     outerIPHdrLen;                  /**< if 'variableIpVersion == TRUE' than this field must be set to non-zero value;
                                                      It is specifies the length of the outer IP header that was configured in the
                                                      corresponding SA. */
+    uint16_t    arwSize;                        /**< if <> '0' then will perform ARW check for this SA;
+                                                     The value must be a multiplication of 16 */
+    uintptr_t   arwAddr;                        /**< if arwSize <> '0' then this field must be set to non-zero value;
+                                                     MUST be allocated from FMAN's MURAM that the post-sec op-port belongs to;
+                                                     Must be 4B aligned. Required MURAM size is '(NEXT_POWER_OF_2(arwSize+32))/8+4' Bytes */
 } t_FmPcdManipSpecialOffloadIPSecParams;
 
 /**************************************************************************//**

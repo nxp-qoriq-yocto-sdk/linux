@@ -1654,6 +1654,21 @@ t_Error FM_ForceIntr (t_Handle h_Fm, e_FmExceptions exception);
 *//***************************************************************************/
 t_Error FM_SetPortsBandwidth(t_Handle h_Fm, t_FmPortsBandwidthParams *p_PortsBandwidth);
 
+/**************************************************************************//*
+ @Function      FM_GetMuramHandle
+
+ @Description   Gets the corresponding MURAM handle
+
+ @Param[in]     h_Fm                A handle to an FM Module.
+
+ @Return        MURAM handle; NULL otherwise.
+
+ @Cautions      Allowed only following FM_Init().
+                This routine should NOT be called from guest-partition
+                (i.e. guestId != NCSW_MASTER_ID)
+*//***************************************************************************/
+t_Handle FM_GetMuramHandle(t_Handle h_Fm);
+
 /** @} */ /* end of FM_runtime_control_grp group */
 /** @} */ /* end of FM_lib_grp group */
 /** @} */ /* end of FM_grp group */

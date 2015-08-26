@@ -1045,7 +1045,9 @@ void compat_fm_pcd_manip_set_node(
                 memcpy(&param->u.frag, &compat_param->u.frag, sizeof(param->u.frag));
                 break;
             case e_IOC_FM_PCD_MANIP_SPECIAL_OFFLOAD:
-                param->u.special_offload = compat_param->u.special_offload;
+                memcpy(&param->u.special_offload,
+                       &compat_param->u.special_offload,
+                       sizeof(param->u.special_offload));
                 break;
         }
 
