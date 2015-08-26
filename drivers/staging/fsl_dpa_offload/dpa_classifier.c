@@ -3566,12 +3566,6 @@ static int fwd_hm_check_params(const struct dpa_cls_hm_fwd_params *fwd_params)
 		return -ENOSYS;
 	}
 
-	if (fwd_params->ip_frag_params.mtu != 0) {
-		log_err("Forwarding HM: IP fragmentation is not supported "
-			"yet.\n");
-		return -ENOSYS;
-	}
-
 	return 0;
 }
 
@@ -5010,7 +5004,7 @@ static int fwd_hm_prepare_nodes(struct dpa_cls_hm *pfwd_hm,
 
 	pfwd_hm->hm_node[0] = hm_node;
 
-	if (pfwd_hm->update_params.ip_frag_params.mtu) {
+	if (pfwd_hm->fwd_params.ip_frag_params.mtu) {
 		/* IP fragmentation option is enabled */
 		/* Create a header manip node: */
 		hm_node = kzalloc(sizeof(*hm_node), GFP_KERNEL);
