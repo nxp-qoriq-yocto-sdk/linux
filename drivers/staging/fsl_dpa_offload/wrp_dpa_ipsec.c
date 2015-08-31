@@ -65,6 +65,7 @@ static struct device *ipsec_dev;
 
 static long wrp_dpa_ipsec_do_ioctl(struct file *filp, unsigned int cmd,
 				   unsigned long args);
+static void *translate_fm_handle(void *fm);
 
 #ifdef CONFIG_COMPAT
 static long wrp_dpa_ipsec_do_compat_ioctl(struct file *filp, unsigned int cmd,
@@ -1230,6 +1231,24 @@ long wrp_dpa_ipsec_do_ioctl(struct file *filp, unsigned int cmd,
 		break;
 	}
 
+	case DPA_IPSEC_IOC_SET_EXTENDED_ARW: {
+		struct ioc_dpa_ipsec_ext_arw_params kprm;
+
+		printk("cmc_debug: %s (%d)\n", __func__, __LINE__);
+		/* Copy parameters from user-space */
+		if (copy_from_user(&kprm, (void *)args, sizeof(kprm))) {
+			log_err("Could not access extended ARW parameters\n");
+			return -EINVAL;
+		}
+
+		kprm.params.post_dec_oh_fm =
+				translate_fm_handle(kprm.params.post_dec_oh_fm);
+
+		ret = dpa_ipsec_set_extended_arw(kprm.dpa_ipsec_id,
+								&kprm.params);
+		break;
+	}
+
 	case DPA_IPSEC_IOC_CREATE_SA: {
 		ret = do_create_sa_ioctl((void *)args);
 		break;
@@ -1501,6 +1520,27 @@ long wrp_dpa_ipsec_do_compat_ioctl(struct file *filp, unsigned int cmd,
 		break;
 	}
 
+	case DPA_IPSEC_IOC_SET_EXTENDED_ARW_COMPAT: {
+		struct ioc_compat_dpa_ipsec_ext_arw_params compat_prm;
+		struct dpa_ipsec_ext_arw_params kprm;
+
+		printk("cmc_debug: %s (%d)\n", __func__, __LINE__);
+		/* Copy parameters from user-space */
+		if (copy_from_user(&compat_prm,
+				(void *)args,
+				sizeof(compat_prm))) {
+			log_err("Could not access extended ARW parameters\n");
+			return -EINVAL;
+		}
+		kprm.post_dec_oh_fm =
+			translate_fm_handle(compat_ptr(compat_prm.params.post_dec_oh_fm));
+		kprm.max_arw_size = compat_prm.params.max_arw_size;
+
+		ret = dpa_ipsec_set_extended_arw(compat_prm.dpa_ipsec_id,
+								&kprm);
+		break;
+	}
+
 	case DPA_IPSEC_IOC_CREATE_SA_COMPAT: {
 		ret = do_create_sa_compat_ioctl((void *)args);
 		break;
@@ -1669,4 +1709,22 @@ int default_rekey_event_cb(int dpa_ipsec_id, int sa_id, int error)
 	pr_info("DPA IPSec Instance %d || new sa_id %d || error %d\n",
 		dpa_ipsec_id, sa_id, error);
 	return 0;
+}
+
+static void *translate_fm_handle(void *fm)
+{
+        struct file *fm_file;
+        t_LnxWrpFmDev *fm_wrapper_dev;
+
+        fm_file = fcheck((unsigned long)fm);
+        if (!fm_file) {
+                log_err("Could not translate FMan engine handle fm=0x%p.\n",
+                        fm);
+                return NULL;
+        }
+        fm_wrapper_dev = (t_LnxWrpFmDev *)fm_file->private_data;
+        BUG_ON(!fm_wrapper_dev);
+        BUG_ON(!fm_wrapper_dev->h_Dev);
+
+        return (void *)fm_wrapper_dev->h_Dev;
 }

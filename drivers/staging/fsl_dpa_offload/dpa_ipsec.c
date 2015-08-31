@@ -39,8 +39,8 @@
 #include "dpa_ipsec_desc.h"
 #include "dpa_classifier.h"
 
-#include "fm_common.h"
 #include "fm_pcd.h"
+#include "fm_muram_ext.h"
 
 /* DPA IPsec Mapping between API algorithm suites and SEC algorithm IDs */
 struct ipsec_alg_suite ipsec_algs[] = IPSEC_ALGS;
@@ -1286,6 +1286,19 @@ static void free_resources(int dpa_ipsec_id)
 
 	kfree(dpa_ipsec->used_sa_ids);
 
+	/* Free extended ARW support resources if it is the case */
+	if (dpa_ipsec->ext_arw) {
+		BUG_ON(dpa_ipsec->ext_arw->muram_offs_cq == NULL);
+		BUG_ON(cq_items_in_queue(dpa_ipsec->ext_arw->muram_offs_cq) !=
+						dpa_ipsec->config.max_sa_pairs);
+		BUG_ON(dpa_ipsec->ext_arw->fm_muram == NULL);
+		BUG_ON(dpa_ipsec->ext_arw->muram_base == NULL);
+		FM_MURAM_FreeMem(dpa_ipsec->ext_arw->fm_muram,
+					dpa_ipsec->ext_arw->muram_base);
+		cq_delete(dpa_ipsec->ext_arw->muram_offs_cq);
+		kfree(dpa_ipsec->ext_arw);
+	}
+
 	mutex_destroy(&dpa_ipsec->lock);
 	kfree(dpa_ipsec);
 
@@ -1556,7 +1569,8 @@ static int create_ipsec_manip(struct dpa_ipsec_sa *sa, int next_hmd, int *hmd)
 	BUG_ON(!hmd);
 
 	if (!sa->use_var_iphdr_len && !sa->dscp_copy && !sa->ecn_copy &&
-	    !(sa_is_outbound(sa) && sa->enable_dpovrd)) {
+			!(sa_is_outbound(sa) && sa->enable_dpovrd) &&
+			!sa->ext_arw) {
 		/* no need to create a new manipulation objects chain */
 		*hmd = next_hmd;
 		return 0;
@@ -1569,6 +1583,12 @@ static int create_ipsec_manip(struct dpa_ipsec_sa *sa, int next_hmd, int *hmd)
 	if (sa_is_inbound(sa)) {
 		offld_params->u.ipsec.decryption = true;
 		offld_params->u.ipsec.variableIpHdrLen = sa->use_var_iphdr_len;
+		if (sa->ext_arw) {
+			offld_params->u.ipsec.arwSize = sa->ext_arw->size;
+			offld_params->u.ipsec.arwAddr =
+				(uintptr_t)sa->dpa_ipsec->ext_arw->muram_base +
+				(uintptr_t)sa->ext_arw->muram_offset;
+		}
 	} else {
 		offld_params->u.ipsec.variableIpVersion = true;
 		offld_params->u.ipsec.outerIPHdrLen = (uint8_t)
@@ -1640,7 +1660,8 @@ static int update_ipsec_manip(struct dpa_ipsec_sa *sa, int next_hmd, int *hmd)
 	BUG_ON(!hmd);
 
 	if (!sa->use_var_iphdr_len && !sa->dscp_copy && !sa->ecn_copy &&
-	    !(sa_is_outbound(sa) && sa->enable_dpovrd)) {
+			!(sa_is_outbound(sa) && sa->enable_dpovrd) &&
+			!sa->ext_arw) {
 		/* no need to create a new manipulation objects chain */
 		*hmd = next_hmd;
 		return 0;
@@ -1653,6 +1674,12 @@ static int update_ipsec_manip(struct dpa_ipsec_sa *sa, int next_hmd, int *hmd)
 	if (sa_is_inbound(sa)) {
 		offld_params->u.ipsec.decryption = true;
 		offld_params->u.ipsec.variableIpHdrLen = sa->use_var_iphdr_len;
+                if (sa->ext_arw) {
+                        offld_params->u.ipsec.arwSize = sa->ext_arw->size;
+                        offld_params->u.ipsec.arwAddr =
+				(uintptr_t)sa->dpa_ipsec->ext_arw->muram_base +
+				(uintptr_t)sa->ext_arw->muram_offset;
+                }
 	} else {
 		offld_params->u.ipsec.variableIpVersion = true;
 		offld_params->u.ipsec.outerIPHdrLen = (uint8_t)
@@ -2508,7 +2535,7 @@ static int create_sa_fq_pair(struct dpa_ipsec_sa *sa,
 		sp_op = FM_SP_OP_IPSEC;
 		if (sa_is_outbound(sa) && sa->use_udp_encap)
 			sp_op |= FM_SP_OP_IPSEC_UPDATE_UDP_LEN;
-		if (sa->dscp_copy || sa->ecn_copy)
+		if (sa->dscp_copy || sa->ecn_copy || sa->ext_arw)
 			sp_op |= FM_SP_OP_IPSEC_MANIP | FM_SP_OP_RPD;
 
 		/* acquire fqid for 'FROM SEC' fq */
@@ -2831,6 +2858,41 @@ static int copy_sa_params_to_in_sa(struct dpa_ipsec_sa *sa,
 		break;
 	case DPA_IPSEC_ARS64:
 		sa->sec_desc->pdb_dec.options |= PDBOPTS_ESP_ARS64;
+		break;
+	case DPA_IPSEC_ARS128:
+	case DPA_IPSEC_ARS256:
+	case DPA_IPSEC_ARS512:
+	case DPA_IPSEC_ARS1024:
+		/* Check whether the extended ARW support was configured. */
+		if (!dpa_ipsec->ext_arw ||
+			(dpa_ipsec->ext_arw->max_arw_size <
+				sa_params->sa_in_params.arw)) {
+			log_err("Extended ARW size %d cannot be supported. Please check your \"dpa_ipsec_set_extended_arw\" params.\n",
+				0x80 << (sa_params->sa_in_params.arw -
+							DPA_IPSEC_ARS128));
+			return -EINVAL;
+		}
+
+		/*
+		 * Store the extended ARW size information into the SA to have
+		 * it available when creating the IPSec special header
+		 * manipulation.
+		 */
+		sa->ext_arw = kzalloc(sizeof(struct sa_extended_arw_info),
+								GFP_KERNEL);
+		if (!sa->ext_arw) {
+			log_err("No more memory for extended ARW parameters.\n");
+			return -ENOMEM;
+		}
+		sa->ext_arw->size = 0x80 << (sa_params->sa_in_params.arw -
+							DPA_IPSEC_ARS128);
+		if (cq_get_2bytes(dpa_ipsec->ext_arw->muram_offs_cq,
+					&sa->ext_arw->muram_offset) < 0) {
+			log_err("No more extended ARW SAs available.\n");
+			kfree(sa->ext_arw);
+			sa->ext_arw = NULL;
+			return -ENOMEM;
+		}
 		break;
 	default:
 		log_err("Invalid ARS mode specified\n");
@@ -3634,6 +3696,126 @@ int dpa_ipsec_init(const struct dpa_ipsec_params *params, int *dpa_ipsec_id)
 }
 EXPORT_SYMBOL(dpa_ipsec_init);
 
+int dpa_ipsec_set_extended_arw(int dpa_ipsec_id,
+			const struct dpa_ipsec_ext_arw_params *params)
+{
+	struct dpa_ipsec *dpa_ipsec;
+	unsigned muram_per_sa, muram_size;
+	uint16_t offs;
+	int err;
+
+	if (params->max_arw_size <= DPA_IPSEC_ARS64)
+		/* Nothing to do */
+		return 0;
+
+	dpa_ipsec = get_instance(dpa_ipsec_id);
+	err = check_instance(dpa_ipsec);
+	if (unlikely(err < 0))
+		return err;
+
+	/*
+	 * If this function was called before, check that the MURAM partition
+	 * is not in use before releasing.
+	 */
+	if (dpa_ipsec->ext_arw) {
+		if (cq_items_in_queue(dpa_ipsec->ext_arw->muram_offs_cq) !=
+					dpa_ipsec->config.max_sa_pairs) {
+			put_instance(dpa_ipsec);
+			/*
+			 * MURAM partition is in use and extended ARW params
+			 * cannot be updated at this time
+			 */
+			log_err("Unable to update extended ARW support params. There are still SAs that are using it.");
+			return -EINVAL;
+		}
+		/* Previous MURAM partition is not in use. Release it. */
+		BUG_ON(dpa_ipsec->ext_arw->muram_base == NULL);
+		BUG_ON(dpa_ipsec->ext_arw->fm_muram == NULL);
+		BUG_ON(dpa_ipsec->ext_arw->muram_base == NULL);
+		FM_MURAM_FreeMem(dpa_ipsec->ext_arw->fm_muram,
+					dpa_ipsec->ext_arw->muram_base);
+		cq_delete(dpa_ipsec->ext_arw->muram_offs_cq);
+	} else {
+		/* Allocate space for extended ARW support params */
+		dpa_ipsec->ext_arw = kzalloc(
+				sizeof(struct extended_arw_support_info),
+				GFP_KERNEL);
+		if (!dpa_ipsec->ext_arw) {
+			put_instance(dpa_ipsec);
+			log_err("No more memory for extended ARW params.");
+			return -ENOMEM;
+		}
+	}
+
+	dpa_ipsec->ext_arw->max_arw_size = params->max_arw_size;
+
+	/*
+	 * Calculate the size of the MURAM space necessary for the
+	 * implementation of the mentioned maximum ARW size for all supported
+	 * tunnels. This is already aligned to 4 bytes taking into account
+	 * the possible selections for max ARW size (128, 256, 512, 1024).
+	 */
+	muram_per_sa = (0x80 << ((unsigned)params->max_arw_size - 2 -
+		(unsigned)DPA_IPSEC_ARS128)) + 4;
+
+	muram_size = dpa_ipsec->config.max_sa_pairs * muram_per_sa;
+
+	/*
+	 * Get the MURAM handle from the FMan engine handle provided by the
+	 * user
+	 */
+	dpa_ipsec->ext_arw->fm_muram =
+			FM_GetMuramHandle((t_Handle) params->post_dec_oh_fm);
+	if (!dpa_ipsec->ext_arw->fm_muram) {
+		kfree(dpa_ipsec->ext_arw);
+		dpa_ipsec->ext_arw = NULL;
+		put_instance(dpa_ipsec);
+		return -EINVAL;
+	}
+
+	/* Allocate necessary MURAM space: */
+	dpa_ipsec->ext_arw->muram_base = FM_MURAM_AllocMem(
+				(t_Handle)dpa_ipsec->ext_arw->fm_muram,
+				muram_size,
+				4);
+	if (!dpa_ipsec->ext_arw->muram_base) {
+		kfree(dpa_ipsec->ext_arw);
+		dpa_ipsec->ext_arw = NULL;
+		put_instance(dpa_ipsec);
+		return -ENOMEM;
+	}
+
+	/* Populate the arw_muram_offset circular queue with the offsets of MURAM chunks: */
+	dpa_ipsec->ext_arw->muram_offs_cq = cq_new(
+						dpa_ipsec->config.max_sa_pairs,
+						2);
+	if (!dpa_ipsec->ext_arw->muram_offs_cq) {
+		FM_MURAM_FreeMem(dpa_ipsec->ext_arw->fm_muram,
+					dpa_ipsec->ext_arw->muram_base);
+		kfree(dpa_ipsec->ext_arw);
+		dpa_ipsec->ext_arw = NULL;
+		put_instance(dpa_ipsec);
+		log_err("Failed to allocate MURAM offsets queue for extended ARW support.");
+		return -ENOMEM;
+	}
+	offs = 0;
+	while (offs < muram_size) {
+		if (cq_put_2bytes(dpa_ipsec->ext_arw->muram_offs_cq,
+								offs) < 0) {
+			put_instance(dpa_ipsec);
+			log_err("Extended ARW support offsets queue init failed.");
+			return -EINVAL;
+		}
+		offs += muram_per_sa;
+	}
+
+	/* Release the DPA IPsec instance */
+	put_instance(dpa_ipsec);
+
+	return 0;
+}
+EXPORT_SYMBOL(dpa_ipsec_set_extended_arw);
+
 int dpa_ipsec_free(int dpa_ipsec_id)
 {
 	struct dpa_ipsec *instance;
@@ -3964,6 +4146,14 @@ static int remove_inbound_sa(struct dpa_ipsec_sa *sa)
 			return -EUCLEAN;
 		}
 
+		/* Release extended ARW resources if this feature was enabled */
+		if (sa->ext_arw) {
+			cq_put_2bytes(sa->dpa_ipsec->ext_arw->muram_offs_cq,
+					sa->ext_arw->muram_offset);
+			kfree(sa->ext_arw);
+			sa->ext_arw = NULL;
+		}
+
 		/* Recycle parent SA memory */
 		err = put_sa(sa);
 		if (unlikely(err < 0)) {
@@ -4026,6 +4216,14 @@ static int remove_inbound_sa(struct dpa_ipsec_sa *sa)
 	if (sa->def_sa_action.type == DPA_CLS_TBL_ACTION_ENQ &&
 	    sa->def_sa_action.enq_params.policer_params)
 		kfree(sa->def_sa_action.enq_params.policer_params);
+
+	/* Release extended ARW resources if this feature was enabled. */
+	if (sa->ext_arw) {
+		cq_put_2bytes(sa->dpa_ipsec->ext_arw->muram_offs_cq,
+				sa->ext_arw->muram_offset);
+		kfree(sa->ext_arw);
+		sa->ext_arw = NULL;
+	}
 
 	/* Mark SA as free */
 	err = put_sa(sa);

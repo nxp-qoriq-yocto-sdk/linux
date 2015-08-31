@@ -38,6 +38,7 @@ include $(srctree)/drivers/net/ethernet/freescale/fman/ncsw_config.mk
 
 EXTRA_CFLAGS += \
 	-Idrivers/crypto/caam \
+	-Idrivers/net/ethernet/freescale/fman/inc/Peripherals \
 	-Idrivers/net/ethernet/freescale/fman/src/wrapper \
 	-Idrivers/net/ethernet/freescale/fman/Peripherals/FM/Pcd \
 	-Idrivers/net/ethernet/freescale/fman/Peripherals/FM/inc

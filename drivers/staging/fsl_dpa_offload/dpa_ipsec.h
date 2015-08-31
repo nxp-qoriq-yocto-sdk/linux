@@ -219,6 +219,16 @@ struct auth_params {
 	uint32_t split_key_pad_len;/* Length in bytes of the padded split key */
 };
 
+/* IPSec tunnel extended Anti-replay Window Information */
+struct sa_extended_arw_info {
+	uint16_t size;		/* The ARW size (>64) */
+	uint16_t muram_offset;  /* The offset relative to the extended ARW
+				 * MURAM management segment base where the
+				 * ARW management segment for the current
+				 * tunnel resides.
+				 */
+};
+
 /*
  * DPA IPsec Security Association
  * This structure will represent a SA. All SA structures will be allocated
@@ -303,6 +313,8 @@ struct dpa_ipsec_sa {
 	uint8_t dscp_start; /* DSCP range start value */
 	uint8_t dscp_end; /* DSCP range end value */
 	struct mutex lock; /* Lock for this SA structure */
+	struct sa_extended_arw_info *ext_arw;	/* Tunnel's extended ARW
+						 * information */
 };
 
 /*
@@ -365,6 +377,24 @@ struct dpa_ipsec_sa_mng {
 	struct cq *fqid_cq; /* Circular queue with FQIDs for internal FQs     */
 };
 
+/* Global IPSec extended ARW Support Information */
+struct extended_arw_support_info {
+	/* Handle to the MURAM object */
+	void *fm_muram;
+
+	/* Maximum ARW size to be supported */
+	enum dpa_ipsec_arw max_arw_size;
+
+	/* Extended ARW MURAM management segment base address */
+	void *muram_base;
+
+	/*
+	 * Pool of the available predefined offsets in the extended ARW
+	 * MURAM management segment
+	 */
+	struct cq *muram_offs_cq;
+};
+
 /* DPA IPsec - Control Block */
 struct dpa_ipsec {
 	int id; /* the instance ID */
@@ -379,6 +409,9 @@ struct dpa_ipsec {
 	atomic_t ref;
 	atomic_t valid;
 	struct mutex lock; /* Lock for this dpa_ipsec instance */
+	struct extended_arw_support_info *ext_arw; /* Extended ARW support
+						    * information
+						    */
 };
 
 struct hmd_entry {

@@ -217,6 +217,37 @@ struct dpa_ipsec_params {
 /* Initialize a DPA-IPSec instance. */
 int dpa_ipsec_init(const struct dpa_ipsec_params *params, int *dpa_ipsec_id);
 
+/* DPA IPSEC Anti Replay Window Size */
+enum dpa_ipsec_arw {
+	DPA_IPSEC_ARSNONE = 0,	/* No Anti Replay Protection		      */
+	DPA_IPSEC_ARS32   = 1,	/* 32 packets Anti Replay Window	      */
+	DPA_IPSEC_ARS64   = 3,	/* 64 packets Anti Replay Window	      */
+	DPA_IPSEC_ARS128  = 4,	/* 128 packets EXTENDED Anti Replay Window    */
+	DPA_IPSEC_ARS256  = 5,	/* 256 packets EXTENDED Anti Replay Window    */
+	DPA_IPSEC_ARS512  = 6,	/* 512 packets EXTENDED Anti Replay Window    */
+	DPA_IPSEC_ARS1024 = 7	/* 1024 packets EXTENDED Anti Replay Window   */
+};
+
+/*
+ * Extended IPSEC Anti Replay Window Feature Parameters. Extended ARW refers
+ * to ARW sizes above DPA_IPSEC_ARS64. Enabling this feature is not necessary
+ * for ARW sizes <= DPA_IPSEC_ARS64.
+ */
+struct dpa_ipsec_ext_arw_params {
+	/*
+	 * Handle of the FMan engine that owns the post decryption offline
+	 * port
+	 */
+	void *post_dec_oh_fm;
+
+	/* The maximum size of ARW to support */
+	enum dpa_ipsec_arw max_arw_size;
+};
+
+/* Enable use of extended ARW sizes (larger than 64 packets). */
+int dpa_ipsec_set_extended_arw(int dpa_ipsec_id,
+				const struct dpa_ipsec_ext_arw_params *params);
+
 /* Free a DPA-IPSec instance */
 int dpa_ipsec_free(int dpa_ipsec_id);
 
@@ -265,13 +296,6 @@ enum dpa_ipsec_cipher_alg {
 struct dpa_ipsec_init_vector {
 	uint8_t *init_vector;	/* Pointer to the initialization vector	      */
 	uint8_t length;		/* Length in bytes. May be 8 or 16 bytes      */
-};
-
-/* DPA IPSEC Anti Replay Window Size */
-enum dpa_ipsec_arw {
-	DPA_IPSEC_ARSNONE = 0,	/* No Anti Replay Protection		      */
-	DPA_IPSEC_ARS32   = 1,	/* 32 bit Anti Replay Window size	      */
-	DPA_IPSEC_ARS64   = 3,	/* 64 bit Anti Replay Window size	      */
 };
 
 /* DPA-IPSec Security Association Cryptographic Parameters */

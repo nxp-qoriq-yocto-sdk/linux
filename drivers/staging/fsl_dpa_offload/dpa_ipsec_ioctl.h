@@ -68,6 +68,23 @@ struct ioc_compat_dpa_ipsec_params {
 };
 #endif
 
+struct ioc_dpa_ipsec_ext_arw_params {
+	int dpa_ipsec_id;
+	struct dpa_ipsec_ext_arw_params params;
+};
+
+#ifdef CONFIG_COMPAT
+struct ioc_compat_ext_arw_params {
+	compat_uptr_t post_dec_oh_fm;
+	enum dpa_ipsec_arw max_arw_size;
+};
+
+struct ioc_compat_dpa_ipsec_ext_arw_params {
+	int dpa_ipsec_id;
+	struct ioc_compat_ext_arw_params params;
+};
+#endif
+
 struct ioc_dpa_ipsec_sa_params {
 	int dpa_ipsec_id;
 	struct dpa_ipsec_sa_params sa_params;
@@ -330,5 +347,13 @@ struct ioc_dpa_ipsec_sa_get_out_path {
 
 #define DPA_IPSEC_IOC_SA_GET_OUT_PATH \
 	_IOWR(DPA_IPSEC_IOC_MAGIC, 16, struct ioc_dpa_ipsec_sa_get_out_path)
+
+
+#define DPA_IPSEC_IOC_SET_EXTENDED_ARW \
+	_IOW(DPA_IPSEC_IOC_MAGIC, 17, struct ioc_dpa_ipsec_ext_arw_params)
+#ifdef CONFIG_COMPAT
+#define DPA_IPSEC_IOC_SET_EXTENDED_ARW_COMPAT \
+	_IOW(DPA_IPSEC_IOC_MAGIC, 17, struct ioc_compat_dpa_ipsec_ext_arw_params)
+#endif
 
 #endif	/* __DPA_IPSEC_IOCTL_H */
