@@ -489,7 +489,7 @@ static void build_meta_data_desc_cmds(struct dpa_ipsec_sa *sa,
 	opt = LDST_CLASS_2_CCB | LDST_SRCDST_WORD_CLASS_CTX;
 	off = 0 << LDST_OFFSET_SHIFT;
 	len = move_size << LDST_LEN_SHIFT;
-	append_load(desc, DUMMY_PTR_VAL, len, opt | off);
+	append_load(desc, DUMMY_PTR_VAL | 0x50, len, opt | off);
 
 	/* wait for completion */
 	opt = JUMP_COND_CALM | (1 << JUMP_OFFSET_SHIFT);
@@ -499,7 +499,7 @@ static void build_meta_data_desc_cmds(struct dpa_ipsec_sa *sa,
 	opt = LDST_CLASS_2_CCB | LDST_SRCDST_WORD_CLASS_CTX;
 	off = 0 << LDST_OFFSET_SHIFT;
 	len = move_size << LDST_LEN_SHIFT;
-	append_store(desc, DUMMY_PTR_VAL, len, opt | off);
+	append_store(desc, DUMMY_PTR_VAL | 0x50, len, opt | off);
 
 	/* fix LIODN */
 	opt = LDST_IMM | LDST_CLASS_DECO | LDST_SRCDST_WORD_DECOCTRL;
@@ -559,6 +559,12 @@ int build_shared_descriptor(struct dpa_ipsec_sa *sa,
 		build_meta_data_desc_cmds(sa, sa->dpa_ipsec->sec_era, 64);
 	}
 
+	if ((sa->sa_dir == DPA_IPSEC_INBOUND) && sa->ext_arw) {
+		/* save location of ptr copy commands to update offset later */
+		copy_ptr_index = desc_len(desc);
+		build_meta_data_desc_cmds(sa, sa->dpa_ipsec->sec_era, 16);
+	}
+
 	if (bytes_to_copy == 0)
 		goto skip_byte_copy;
 
@@ -596,7 +602,8 @@ skip_byte_copy:
 	if (sa->enable_stats)
 		save_stats_in_external_mem(sa);
 
-	if (sa->dscp_copy || sa->ecn_copy)
+	if (sa->dscp_copy || sa->ecn_copy ||
+			((sa->sa_dir == DPA_IPSEC_INBOUND) && sa->ext_arw))
 		/* insert cmds to copy SEQ_IN/OUT_PTR - with updated offset */
 		insert_ptr_copy_cmds(desc, copy_ptr_index,
 				     desc_len(desc), false);
