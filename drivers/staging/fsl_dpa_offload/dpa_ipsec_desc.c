@@ -1357,7 +1357,7 @@ int build_extended_decap_shared_descriptor(struct dpa_ipsec_sa *sa,
 	opt = LDST_CLASS_2_CCB | LDST_SRCDST_WORD_CLASS_CTX;
 	off_b = 0 << LDST_OFFSET_SHIFT;
 	len = move_size << LDST_LEN_SHIFT;
-	append_load(desc, DUMMY_PTR_VAL, len, opt | off_b);
+	append_load(desc, DUMMY_PTR_VAL | 0x50, len, opt | off_b);
 
 	/* Wait to finish previous operation */
 	opt = JUMP_COND_CALM | (1 << JUMP_OFFSET_SHIFT);
@@ -1367,7 +1367,7 @@ int build_extended_decap_shared_descriptor(struct dpa_ipsec_sa *sa,
 	opt = LDST_CLASS_2_CCB | LDST_SRCDST_WORD_CLASS_CTX;
 	off_b = 0 << LDST_OFFSET_SHIFT;
 	len = move_size << LDST_LEN_SHIFT;
-	append_store(desc, DUMMY_PTR_VAL, len, opt | off_b);
+	append_store(desc, DUMMY_PTR_VAL | 0x50, len, opt | off_b);
 
 	/* Fix LIODN */
 	opt = LDST_IMM | LDST_CLASS_DECO | LDST_SRCDST_WORD_DECOCTRL;
@@ -1476,7 +1476,7 @@ build_extended_shared_desc:
 	/* Build the extended shared descriptor */
 	if (sa->sa_dir == DPA_IPSEC_INBOUND)
 		ret = build_extended_decap_shared_descriptor(sa, auth_key_dma,
-				crypto_key_dma, sa->l2_hdr_size, 64,
+				crypto_key_dma, sa->l2_hdr_size, 16,
 				sa->dpa_ipsec->sec_era);
 	else
 		ret = build_extended_encap_shared_descriptor(sa, auth_key_dma,
