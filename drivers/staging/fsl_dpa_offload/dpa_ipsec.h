@@ -221,7 +221,7 @@ struct auth_params {
 
 /* IPSec tunnel extended Anti-replay Window Information */
 struct sa_extended_arw_info {
-	uint16_t size;		/* The ARW size (>64) */
+	uint16_t arw_size;	/* The ARW size (>64) */
 	uint16_t muram_offset;  /* The offset relative to the extended ARW
 				 * MURAM management segment base where the
 				 * ARW management segment for the current
@@ -387,6 +387,12 @@ struct extended_arw_support_info {
 
 	/* Extended ARW MURAM management segment base address */
 	void *muram_base;
+
+	/*
+	 * The size in bytes of the extended ARW MURAM management segment
+	 * for each tunnel.
+	 */
+	uint32_t muram_per_sa;
 
 	/*
 	 * Pool of the available predefined offsets in the extended ARW

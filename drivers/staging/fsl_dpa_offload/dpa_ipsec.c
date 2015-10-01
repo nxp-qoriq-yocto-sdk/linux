@@ -1584,7 +1584,7 @@ static int create_ipsec_manip(struct dpa_ipsec_sa *sa, int next_hmd, int *hmd)
 		offld_params->u.ipsec.decryption = true;
 		offld_params->u.ipsec.variableIpHdrLen = sa->use_var_iphdr_len;
 		if (sa->ext_arw) {
-			offld_params->u.ipsec.arwSize = sa->ext_arw->size;
+			offld_params->u.ipsec.arwSize = sa->ext_arw->arw_size;
 			offld_params->u.ipsec.arwAddr =
 				(uintptr_t)sa->dpa_ipsec->ext_arw->muram_base +
 				(uintptr_t)sa->ext_arw->muram_offset;
@@ -1675,7 +1675,7 @@ static int update_ipsec_manip(struct dpa_ipsec_sa *sa, int next_hmd, int *hmd)
 		offld_params->u.ipsec.decryption = true;
 		offld_params->u.ipsec.variableIpHdrLen = sa->use_var_iphdr_len;
                 if (sa->ext_arw) {
-                        offld_params->u.ipsec.arwSize = sa->ext_arw->size;
+                        offld_params->u.ipsec.arwSize = sa->ext_arw->arw_size;
                         offld_params->u.ipsec.arwAddr =
 				(uintptr_t)sa->dpa_ipsec->ext_arw->muram_base +
 				(uintptr_t)sa->ext_arw->muram_offset;
@@ -2764,7 +2764,8 @@ static int copy_sa_params_to_in_sa(struct dpa_ipsec_sa *sa,
 				   bool rekeying)
 {
 	struct dpa_ipsec *dpa_ipsec;
-	int err;
+	int i, err;
+	unsigned *m;
 
 	BUG_ON(!sa);
 	BUG_ON(!sa_params);
@@ -2884,7 +2885,7 @@ static int copy_sa_params_to_in_sa(struct dpa_ipsec_sa *sa,
 			log_err("No more memory for extended ARW parameters.\n");
 			return -ENOMEM;
 		}
-		sa->ext_arw->size = 0x80 << (sa_params->sa_in_params.arw -
+		sa->ext_arw->arw_size = 0x80 << (sa_params->sa_in_params.arw -
 							DPA_IPSEC_ARS128);
 		if (cq_get_2bytes(dpa_ipsec->ext_arw->muram_offs_cq,
 					&sa->ext_arw->muram_offset) < 0) {
@@ -2893,6 +2894,13 @@ static int copy_sa_params_to_in_sa(struct dpa_ipsec_sa *sa,
 			sa->ext_arw = NULL;
 			return -ENOMEM;
 		}
+
+		/* Zero out the extended ARW MURAM management segment: */
+		m = dpa_ipsec->ext_arw->muram_base + sa->ext_arw->muram_offset;
+		i = 0;
+		while (i < (dpa_ipsec->ext_arw->muram_per_sa >> 2))
+			out_be32(&m[i++], 0);
+
 		break;
 	default:
 		log_err("Invalid ARS mode specified\n");
@@ -3700,7 +3708,7 @@ int dpa_ipsec_set_extended_arw(int dpa_ipsec_id,
 			const struct dpa_ipsec_ext_arw_params *params)
 {
 	struct dpa_ipsec *dpa_ipsec;
-	unsigned muram_per_sa, muram_size;
+	unsigned muram_size;
 	uint16_t offs;
 	int err;
 
@@ -3755,10 +3763,12 @@ int dpa_ipsec_set_extended_arw(int dpa_ipsec_id,
 	 * tunnels. This is already aligned to 4 bytes taking into account
 	 * the possible selections for max ARW size (128, 256, 512, 1024).
 	 */
-	muram_per_sa = (0x80 << ((unsigned)params->max_arw_size - 2 -
+	dpa_ipsec->ext_arw->muram_per_sa = (0x80 <<
+		((unsigned)params->max_arw_size - 2 -
 		(unsigned)DPA_IPSEC_ARS128)) + 4;
 
-	muram_size = dpa_ipsec->config.max_sa_pairs * muram_per_sa;
+	muram_size = dpa_ipsec->config.max_sa_pairs *
+					dpa_ipsec->ext_arw->muram_per_sa;
 
 	/*
 	 * Get the MURAM handle from the FMan engine handle provided by the
@@ -3806,7 +3816,7 @@ int dpa_ipsec_set_extended_arw(int dpa_ipsec_id,
 			log_err("Extended ARW support offsets queue init failed.");
 			return -EINVAL;
 		}
-		offs += muram_per_sa;
+		offs += dpa_ipsec->ext_arw->muram_per_sa;
 	}
 
 	/* Release the DPA IPsec instance */

@@ -1234,7 +1234,6 @@ long wrp_dpa_ipsec_do_ioctl(struct file *filp, unsigned int cmd,
 	case DPA_IPSEC_IOC_SET_EXTENDED_ARW: {
 		struct ioc_dpa_ipsec_ext_arw_params kprm;
 
-		printk("cmc_debug: %s (%d)\n", __func__, __LINE__);
 		/* Copy parameters from user-space */
 		if (copy_from_user(&kprm, (void *)args, sizeof(kprm))) {
 			log_err("Could not access extended ARW parameters\n");
@@ -1524,7 +1523,6 @@ long wrp_dpa_ipsec_do_compat_ioctl(struct file *filp, unsigned int cmd,
 		struct ioc_compat_dpa_ipsec_ext_arw_params compat_prm;
 		struct dpa_ipsec_ext_arw_params kprm;
 
-		printk("cmc_debug: %s (%d)\n", __func__, __LINE__);
 		/* Copy parameters from user-space */
 		if (copy_from_user(&compat_prm,
 				(void *)args,
