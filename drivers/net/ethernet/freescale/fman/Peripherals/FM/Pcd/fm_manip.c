@@ -3264,7 +3264,7 @@ static t_Error IPSecManip(t_FmPcdManipParams    *p_ManipParams,
     tmpReg32 |= (p_IPSecParams->variableIpVersion)?FM_PCD_MANIP_IPSEC_VIPV_EN:0;
     if (p_IPSecParams->arwSize)
         tmpReg32 |= (uint32_t)((XX_VirtToPhys(UINT_TO_PTR(p_IPSecParams->arwAddr))-FM_MM_MURAM)
-                & (FM_MURAM_SIZE-1));
+                & (FM_MAX_MURAM_SIZE-1));
     WRITE_UINT32(p_Ad->ccAdBase, tmpReg32);
 
     tmpReg32 = 0;

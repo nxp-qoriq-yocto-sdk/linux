@@ -385,6 +385,8 @@ static __inline__ bool TRY_LOCK(t_Handle h_Spinlock, volatile bool *p_Flag)
 
 #define FM_LIODN_OFFSET_MASK    0x3FF
 
+#define FM_MAX_MURAM_SIZE		FM_MM_BMI
+
 /**************************************************************************//**
   @Description       NIA Description
 *//***************************************************************************/
