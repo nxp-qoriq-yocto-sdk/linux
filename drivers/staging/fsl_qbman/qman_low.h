@@ -1139,7 +1139,7 @@ static inline int qm_shutdown_fq(struct qm_portal **portal, int portal_count,
 	struct qm_mc_command *mcc;
 	struct qm_mc_result *mcr;
 	u8 state;
-	int orl_empty, fq_empty, i, drain = 0;
+	int orl_empty, fq_empty, i, drain = 0, expired;
 	u32 result;
 	u32 channel, wq;
 
@@ -1264,6 +1264,7 @@ static inline int qm_shutdown_fq(struct qm_portal **portal, int portal_count,
 			   ERNs come in */
 			orl_empty = 1;
 		}
+
 		/* Retirement succeeded, check to see if FQ needs
 		   to be drained */
 		if (drain || mcr->alterfq.fqs & QM_MCR_FQS_NOTEMPTY) {
@@ -1273,30 +1274,34 @@ static inline int qm_shutdown_fq(struct qm_portal **portal, int portal_count,
 				const struct qm_dqrr_entry *dqrr = NULL;
 				u32 vdqcr = fqid | QM_VDQCR_NUMFRAMES_SET(3);
 				qm_dqrr_vdqcr_set(portal[0], vdqcr);
+				expired = 0;
 
-				/* Wait for a dequeue to occur */
-				while (dqrr == NULL) {
+				/* Process the dequeues, making sure to
+				   wait until the command has expired */
+				while (expired == 0) {
 					qm_dqrr_pvb_update(portal[0]);
 					dqrr = qm_dqrr_current(portal[0]);
-					if (!dqrr)
+					if (!dqrr) {
+						/* No dequeue - need to wait */
 						cpu_relax();
-				}
-				/* Process the dequeues, making sure to
-				   empty the ring completely */
-				while (dqrr) {
+						continue;
+					}
 					if (dqrr->fqid == fqid &&
 					    dqrr->stat & QM_DQRR_STAT_FQ_EMPTY)
 						fq_empty = 1;
+					if (dqrr->stat
+					    & QM_DQRR_STAT_DQCR_EXPIRED)
+						expired = 1;
 					qm_dqrr_cdc_consume_1ptr(portal[0],
 								 dqrr, 0);
-					qm_dqrr_pvb_update(portal[0]);
 					qm_dqrr_next(portal[0]);
-					dqrr = qm_dqrr_current(portal[0]);
-				}
+
+				}; /* expired loop */
 			} while (fq_empty == 0);
 		}
 		for (i = 0; i < portal_count; i++)
 			qm_dqrr_sdqcr_set(portal[i], 0);
+
 
 		/* Wait for the ORL to have been completely drained */
 		while (orl_empty == 0) {
