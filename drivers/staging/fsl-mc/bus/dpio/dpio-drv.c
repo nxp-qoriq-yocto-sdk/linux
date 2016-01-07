@@ -216,30 +216,25 @@ dpaa2_dpio_probe(struct fsl_mc_device *ls_dev)
 		resource_size(&ls_dev->regions[0]));
 	desc.regs_cinh = ioremap(ls_dev->regions[1].start,
 		resource_size(&ls_dev->regions[1]));
+	priv->io = dpaa_io_create(&desc);
+	if (!priv->io) {
+		dev_err(dev, "DPIO setup failed\n");
+		goto err_dpaa_io_create;
+	}
 
 	err = fsl_mc_allocate_irqs(ls_dev);
 	if (err) {
 		dev_err(dev, "DPIO fsl_mc_allocate_irqs failed\n");
-		desc.has_irq = 0;
-	} else {
-		irq_allocated = true;
-
-		snprintf(priv->irq_name, MAX_DPIO_IRQ_NAME, "FSL DPIO %d",
-			 desc.dpio_id);
-
-		err = register_dpio_irq_handlers(ls_dev, desc.cpu);
-		if (err)
-			desc.has_irq = 0;
+		goto poll_mode;
 	}
+	irq_allocated = true;
 
-	priv->io = dpaa2_io_create(&desc);
-	if (!priv->io) {
-		dev_err(dev, "DPIO setup failed\n");
-		goto err_dpaa2_io_create;
-	}
+	snprintf(priv->irq_name, MAX_DPIO_IRQ_NAME, "FSL DPIO %d",
+			desc.dpio_id);
 
-	/* If no irq then go to poll mode */
-	if (desc.has_irq == 0) {
+	err = register_dpio_irq_handlers(ls_dev, desc.cpu);
+poll_mode:
+	if (err) {
 		dev_info(dev, "Using polling mode for DPIO %d\n",
 			 desc.dpio_id);
 		/* goto err_register_dpio_irq; */
