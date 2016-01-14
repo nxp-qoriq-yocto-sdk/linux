@@ -2124,9 +2124,7 @@ static struct platform_driver arm_smmu_driver = {
 #ifdef CONFIG_KVM
 #include <linux/kvm_host.h>
 #include <linux/uaccess.h>
-
-/* Why on Earth isn't this in /include ? */
-#include "../../virt/kvm/iodev.h"
+#include <kvm/iodev.h>
 
 /*
  * We need both of these, as KVM_PHYS_MASK is in different places for arm
@@ -2462,7 +2460,7 @@ static void arm_vsmmu_sync(struct arm_vsmmu_device *vsmmu)
 	for_each_set_bit(vsid, vsmmu->vsid_map, ARM_SMMU_MAX_SMRS)
 		arm_vsmmu_sync_vsid(vsmmu, vsid);
 
-	arm_smmu_tlb_sync(vsmmu->smmu);
+	__arm_smmu_tlb_sync(vsmmu->smmu);
 }
 
 static int
@@ -2545,7 +2543,8 @@ arm_vsmmu_gr1_write(struct arm_vsmmu_device *vsmmu, u32 offset, u32 data)
 }
 
 static int
-arm_vsmmu_gr_read(struct kvm_io_device *this, gpa_t addr, int len, void *val)
+arm_vsmmu_gr_read(struct kvm_vcpu *vcpu, struct kvm_io_device *this,
+		  gpa_t addr, int len, void *val)
 {
 	struct arm_vsmmu_device *vsmmu
 		= container_of(&this->ops, struct arm_vsmmu_device,
@@ -2570,8 +2569,8 @@ arm_vsmmu_gr_read(struct kvm_io_device *this, gpa_t addr, int len, void *val)
 	return 0;
 }
 
-static int arm_vsmmu_gr_write(struct kvm_io_device *this, gpa_t addr, int len,
-			      const void *val)
+static int arm_vsmmu_gr_write(struct kvm_vcpu *vcpu, struct kvm_io_device *this,
+			      gpa_t addr, int len, const void *val)
 {
 	struct arm_vsmmu_device *vsmmu
 		= container_of(&this->ops, struct arm_vsmmu_device,
@@ -2625,7 +2624,8 @@ static struct kvm_io_device_ops arm_vsmmu_mmio_gr_ops = {
  *
  */
 static int
-arm_vsmmu_cb_read(struct kvm_io_device *this, gpa_t addr, int len, void *val)
+arm_vsmmu_cb_read(struct kvm_vcpu *vcpu, struct kvm_io_device *this,
+		  gpa_t addr, int len, void *val)
 {
 	struct arm_vsmmu_device *vsmmu
 		= container_of(&this->ops, struct arm_vsmmu_device,
@@ -2657,8 +2657,8 @@ arm_vsmmu_cb_read(struct kvm_io_device *this, gpa_t addr, int len, void *val)
 	return 0;
 }
 
-static int arm_vsmmu_cb_write(struct kvm_io_device *this, gpa_t addr, int len,
-			      const void *val)
+static int arm_vsmmu_cb_write(struct kvm_vcpu *vcpu, struct kvm_io_device *this,
+			      gpa_t addr, int len, const void *val)
 {
 	struct arm_vsmmu_device *vsmmu
 		= container_of(&this->ops, struct arm_vsmmu_device,
@@ -2887,14 +2887,14 @@ static int arm_vsmmu_get_s2_cbndx(struct device *dev)
 	if (!domain)
 		return ret;
 
-	smmu_domain = domain->priv;
+	smmu_domain = to_smmu_domain(domain);
 	if (!smmu_domain)
 		return ret;
 
-	spin_lock_irqsave(&smmu_domain->lock, flags);
+	spin_lock_irqsave(&smmu_domain->pgtbl_lock, flags);
 	if (smmu_domain->stage == ARM_SMMU_DOMAIN_NESTED)
 		ret = smmu_domain->cfg.cbndx;
-	spin_unlock_irqrestore(&smmu_domain->lock, flags);
+	spin_unlock_irqrestore(&smmu_domain->pgtbl_lock, flags);
 
 	return ret;
 }
