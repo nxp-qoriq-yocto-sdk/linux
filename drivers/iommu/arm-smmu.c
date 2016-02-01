@@ -3106,6 +3106,9 @@ static int arm_vsmmu_vfio_set(struct kvm_device *dev, u64 attr, u64 addr)
 	struct arm_smmu_v2_vfio_group_sid group_sid;
 	struct arm_vsmmu_device *vsmmu = dev->private;
 	void __user *uaddr = (void __user *)(unsigned long)addr;
+#ifdef CONFIG_FSL_MC_BUS
+	struct arm_smmu_master_cfg *cfg;
+#endif
 
 	switch (attr) {
 	case KVM_DEV_ARM_SMMU_V2_VFIO_GROUP_ADD:
@@ -3131,6 +3134,12 @@ static int arm_vsmmu_vfio_set(struct kvm_device *dev, u64 attr, u64 addr)
 
 	switch (attr) {
 	case KVM_DEV_ARM_SMMU_V2_VFIO_GROUP_ADD:
+#ifdef CONFIG_FSL_MC_BUS
+		/* In case of FSL MC bus we are using stream ID's as
+		* VSID's, till MC portals are not emulated */
+		cfg = iommu_group_get_iommudata(iommu_group);
+		group_sid.sid = cfg->streamids[0];
+#endif
 		ret = arm_vsmmu_iommu_group_add(vsmmu, iommu_group,
 						group_sid.sid);
 		break;
