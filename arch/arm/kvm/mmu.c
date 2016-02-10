@@ -31,6 +31,8 @@
 
 #include "trace.h"
 
+#define NR_SWP 0x32
+
 extern char  __hyp_idmap_text_start[], __hyp_idmap_text_end[];
 
 static pgd_t *boot_hyp_pgd;
@@ -42,6 +44,15 @@ static unsigned long hyp_idmap_start;
 static unsigned long hyp_idmap_end;
 static phys_addr_t hyp_idmap_vector;
 
+typedef struct {
+    phys_addr_t pa;
+    struct kvm *kvm;
+    phys_addr_t gpa;
+    unsigned long size;
+} qbcena_slot;
+
+static qbcena_slot qbcena[NR_SWP];
+
 #define hyp_pgd_order get_order(PTRS_PER_PGD * sizeof(pgd_t))
 
 #define kvm_pmd_huge(_x)	(pmd_huge(_x) || pmd_trans_huge(_x))
@@ -49,6 +60,36 @@ static phys_addr_t hyp_idmap_vector;
 
 #define KVM_S2PTE_FLAG_IS_IOMAP		(1UL << 0)
 #define KVM_S2_FLAG_LOGGING_ACTIVE	(1UL << 1)
+
+#define INVALID_CENA ~0ULL
+
+static phys_addr_t get_qbman_cena_addr(struct kvm* kvm, phys_addr_t gaddr)
+{
+	int i;
+	for (i = 0; i < NR_SWP; i++)
+		if ((kvm == NULL || kvm == qbcena[i].kvm) &&
+		   (qbcena[i].gpa  <= gaddr && gaddr < qbcena[i].gpa + qbcena[i].size))
+			return qbcena[i].pa + gaddr - qbcena[i].gpa;
+
+	return INVALID_CENA;
+}
+
+static bool is_qbman_cena(struct kvm* kvm, phys_addr_t gaddr)
+{
+	return (get_qbman_cena_addr(kvm, gaddr) != INVALID_CENA);
+}
+
+static bool flush_qbman_cena(struct kvm* kvm, phys_addr_t gaddr)
+{
+	phys_addr_t addr = get_qbman_cena_addr(kvm, gaddr);
+
+	if (addr != INVALID_CENA) {
+		__flush_dcache_area(&addr, PAGE_SIZE);
+		return true;
+	}
+
+	return false;
+}
 
 static bool memslot_is_logging(struct kvm_memory_slot *memslot)
 {
@@ -213,8 +254,10 @@ static void unmap_ptes(struct kvm *kvm, pmd_t *pmd,
 			kvm_tlb_flush_vmid_ipa(kvm, addr);
 
 			/* No need to invalidate the cache for device mappings */
-			if ((pte_val(old_pte) & PAGE_S2_DEVICE) != PAGE_S2_DEVICE)
-				kvm_flush_dcache_pte(old_pte);
+			if (!flush_qbman_cena(kvm, addr))
+				if ((pte_val(old_pte) & PAGE_S2_DEVICE) !=
+				     PAGE_S2_DEVICE)
+					kvm_flush_dcache_pte(old_pte);
 
 			put_page(virt_to_page(pte));
 		}
@@ -290,6 +333,7 @@ static void unmap_range(struct kvm *kvm, pgd_t *pgdp,
 	phys_addr_t addr = start, end = start + size;
 	phys_addr_t next;
 
+
 	pgd = pgdp + kvm_pgd_index(addr);
 	do {
 		next = kvm_pgd_addr_end(addr, end);
@@ -305,9 +349,10 @@ static void stage2_flush_ptes(struct kvm *kvm, pmd_t *pmd,
 
 	pte = pte_offset_kernel(pmd, addr);
 	do {
-		if (!pte_none(*pte) &&
-		    (pte_val(*pte) & PAGE_S2_DEVICE) != PAGE_S2_DEVICE)
-			kvm_flush_dcache_pte(*pte);
+		if (!flush_qbman_cena(kvm, addr))
+			if (!pte_none(*pte) &&
+			   (pte_val(*pte) & PAGE_S2_DEVICE) != PAGE_S2_DEVICE)
+				kvm_flush_dcache_pte(*pte);
 	} while (pte++, addr += PAGE_SIZE, addr != end);
 }
 
@@ -964,7 +1009,12 @@ int kvm_phys_addr_ioremap(struct kvm *kvm, phys_addr_t guest_ipa,
 	pfn = __phys_to_pfn(pa);
 
 	for (addr = guest_ipa; addr < end; addr += PAGE_SIZE) {
-		pte_t pte = pfn_pte(pfn, PAGE_S2_DEVICE);
+
+		pte_t pte;
+		if (is_qbman_cena(kvm, addr))
+			pte = pfn_pte(pfn, PAGE_S2_NS);
+		else
+			pte = pfn_pte(pfn, PAGE_S2_DEVICE);
 
 		if (writable)
 			kvm_set_s2pte_writable(&pte);
@@ -1280,7 +1330,10 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
 	if (is_error_pfn(pfn))
 		return -EFAULT;
 
-	if (kvm_is_device_pfn(pfn)) {
+	if (is_qbman_cena(kvm, fault_ipa)) {
+		mem_type = PAGE_S2_NS;
+		flags |= KVM_S2PTE_FLAG_IS_IOMAP;
+	} else if (kvm_is_device_pfn(pfn)) {
 		mem_type = PAGE_S2_DEVICE;
 		flags |= KVM_S2PTE_FLAG_IS_IOMAP;
 	} else if (logging_active) {
@@ -1792,6 +1845,19 @@ int kvm_arch_prepare_memory_region(struct kvm *kvm,
 				    (vm_start - mem->userspace_addr);
 			phys_addr_t pa = (vma->vm_pgoff << PAGE_SHIFT) +
 					 vm_start - vma->vm_start;
+
+#define QBMAN_SWP_CENA_BASE 0x818000000ULL
+			if ((pa & 0xFFF000000) == QBMAN_SWP_CENA_BASE) {
+				int index = (pa >> 16) & 0x3FF;
+
+				BUG_ON(index >= NR_SWP);
+				qbcena[index].kvm = kvm;
+				qbcena[index].pa = pa;
+				qbcena[index].gpa = gpa;
+				qbcena[index].size = vm_end - vm_start;
+
+				pr_debug("qbcena[%d]: vm=%p gpa=0x%lx pa=0x%lx size=0x%lx\n", index, kvm, (unsigned long)gpa, (unsigned long)pa, vm_end - vm_start);
+			}
 
 			/* IO region dirty page logging not allowed */
 			if (memslot->flags & KVM_MEM_LOG_DIRTY_PAGES)
