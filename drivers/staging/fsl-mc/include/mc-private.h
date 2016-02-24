@@ -39,6 +39,15 @@
 #define FSL_MC_IRQ_POOL_MAX_EXTRA_IRQS	64
 
 /**
+ * struct fsl_mc_line_irq
+ *
+ */
+struct fsl_mc_line_irq {
+	int irq;
+	int hwirq;
+};
+
+/**
  * struct fsl_mc - Private data of a "fsl,qoriq-mc" platform device
  * @root_mc_bus_dev: MC object device representing the root DPRC
  * @irq_domain: IRQ domain for the fsl-mc bus type
@@ -51,6 +60,9 @@ struct fsl_mc {
 	struct fsl_mc_device *root_mc_bus_dev;
 	struct irq_domain *irq_domain;
 	bool gic_supported;
+	bool gic_line_irq_supported;
+	int num_line_irqs;
+	struct fsl_mc_line_irq *line_irqs;
 	uint8_t num_translation_ranges;
 	struct fsl_mc_addr_translation_range *translation_ranges;
 };

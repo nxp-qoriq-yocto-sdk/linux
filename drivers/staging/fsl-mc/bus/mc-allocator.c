@@ -504,10 +504,15 @@ int __must_check fsl_mc_allocate_irqs(struct fsl_mc_device *mc_dev)
 	struct fsl_mc_device_irq **irqs = NULL;
 	struct fsl_mc_bus *mc_bus;
 	struct fsl_mc_resource_pool *res_pool;
-	struct fsl_mc *mc = dev_get_drvdata(fsl_mc_bus_type.dev_root->parent);
 
-	if (!mc->gic_supported)
+	/* Check for MSI or line interrupt support */
+	if (!fsl_mc_msi_irqs_supported() &&
+	    !fsl_mc_line_irqs_supported(mc_dev))
 		return -ENOTSUPP;
+
+	/* Line irqs are allocated during device probe */
+	if (fsl_mc_line_irqs_supported(mc_dev))
+		return 0;
 
 	if (WARN_ON(mc_dev->irqs))
 		goto error;
@@ -581,6 +586,10 @@ void fsl_mc_free_irqs(struct fsl_mc_device *mc_dev)
 	int irq_count;
 	struct fsl_mc_bus *mc_bus;
 	struct fsl_mc_device_irq **irqs = mc_dev->irqs;
+
+	/* Line irqs are allocated/free during device probe/remove */
+	if (fsl_mc_line_irqs_supported(mc_dev))
+		return;
 
 	if (WARN_ON(!irqs))
 		return;

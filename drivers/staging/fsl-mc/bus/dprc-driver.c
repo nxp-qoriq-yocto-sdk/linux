@@ -953,6 +953,11 @@ static int dprc_probe(struct fsl_mc_device *mc_dev)
 		error = dprc_setup_irqs(mc_dev);
 		if (error < 0)
 			goto error_cleanup_atomic_dprc_handle;
+
+	} else if (fsl_mc_line_irqs_supported(mc_dev)) {
+		error = dprc_setup_irqs(mc_dev);
+		if (error < 0)
+			dev_warn(&mc_dev->dev, "dprc_setup_irqs failed");
 	}
 
 	dev_info(&mc_dev->dev, "DPRC device bound to driver");

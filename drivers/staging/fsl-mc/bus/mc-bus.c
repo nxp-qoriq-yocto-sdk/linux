@@ -18,6 +18,7 @@
 #include <linux/irqchip/arm-gic-v3.h>
 #include <linux/irq.h>
 #include <linux/irqdomain.h>
+#include <linux/of_irq.h>
 #include <linux/limits.h>
 #include <linux/bitops.h>
 #include "../include/dpmng.h"
@@ -350,6 +351,24 @@ bool fsl_mc_msi_irqs_supported(void)
 }
 EXPORT_SYMBOL_GPL(fsl_mc_msi_irqs_supported);
 
+bool fsl_mc_line_irqs_supported(struct fsl_mc_device *mc_dev)
+{
+	struct fsl_mc *mc;
+	struct device *parent_dev;
+	struct platform_device *pdev;
+
+	/* Get platform dev of root DPRC container after root container probed */
+	if (fsl_mc_bus_type.dev_root)
+		parent_dev = fsl_mc_bus_type.dev_root->parent;
+	else /* This is root container which is is not yet probed */
+		parent_dev = mc_dev->dev.parent;
+
+	pdev = to_platform_device(parent_dev);
+	mc = platform_get_drvdata(pdev);
+	return mc->gic_line_irq_supported;
+}
+EXPORT_SYMBOL_GPL(fsl_mc_line_irqs_supported);
+
 static int get_dprc_attr(struct fsl_mc_io *mc_io,
 			 int container_id, struct dprc_attributes *attr)
 {
@@ -374,6 +393,133 @@ static int get_dprc_attr(struct fsl_mc_io *mc_io,
 common_cleanup:
 	(void)dprc_close(mc_io, 0, dprc_handle);
 	return error;
+}
+
+/**
+ * get_object_irq_num
+ *    return the irq_num field for an object
+ */
+static int get_object_irq_num(struct fsl_mc_device *mc_dev, int index)
+{
+	struct fsl_mc_device *mc_bus_dev;
+	struct device *parent_dev;
+	int error = 0;
+	struct dprc_irq_cfg irq_cfg;
+	int type;
+
+	parent_dev = mc_dev->dev.parent;
+
+	memset(&irq_cfg, 0, sizeof(irq_cfg));
+
+	if (parent_dev->bus == &fsl_mc_bus_type) {
+		/* it's a child device */
+		mc_bus_dev = to_fsl_mc_device(mc_dev->dev.parent);
+		error = dprc_get_obj_irq(mc_bus_dev->mc_io, 0, mc_bus_dev->mc_handle,
+					 mc_dev->obj_desc.type, mc_dev->obj_desc.id,
+					 index, &type, &irq_cfg);
+	} else {
+		/* it's a root/parent dprc */
+		uint16_t dprc_handle;
+		mc_bus_dev = mc_dev;
+
+		error = dprc_open(mc_bus_dev->mc_io, 0, mc_dev->obj_desc.id, &dprc_handle);
+		if (error < 0) {
+			pr_err("dprc_open() failed: %d\n", error);
+			return error;
+		}
+
+		error = dprc_get_irq(mc_bus_dev->mc_io, 0, dprc_handle,
+					 index, &type, &irq_cfg);
+
+		(void)dprc_close(mc_bus_dev->mc_io, 0, dprc_handle);
+	}
+
+	if (error < 0)
+		return error;
+
+	return irq_cfg.irq_num;
+}
+
+/**
+ * xlate_irq_num_to_irq
+ *    for an irq_num/SPI# return the linux irq
+ */
+static int xlate_irq_num_to_irq(struct fsl_mc_device *mc_dev, int irq_num)
+{
+	struct device *parent_dev;
+	struct platform_device *pdev;
+	struct fsl_mc *mc;
+	int i;
+
+	parent_dev = mc_dev->dev.parent;
+
+	/* Get the platform dev (fsl-mc node) */
+	if (parent_dev->bus == &fsl_mc_bus_type)
+		pdev = to_platform_device(parent_dev->parent);
+	else
+		pdev = to_platform_device(parent_dev);
+
+	mc = platform_get_drvdata(pdev);
+
+	for (i = 0; i < mc->num_line_irqs; i++) {
+		if (mc->line_irqs[i].hwirq == irq_num)
+			return mc->line_irqs[i].irq;
+	}
+
+	return -EINVAL;
+}
+
+/**
+ * fsl_mc_setup_line_irqs
+ *   The struct fsl_mc_device for each object has a pointer to an array of
+ *   the object's irqs.  Each irq is reprented in struct fsl_mc_device_irq.
+ *   This function sets up the fsl_mc_device_irq struct.
+ */
+static int fsl_mc_setup_line_irqs(struct fsl_mc_device *mc_dev)
+{
+	struct fsl_mc_device_irq **irqs = NULL;
+	struct fsl_mc_device_irq *mc_irq = NULL;
+	int irq_count = mc_dev->obj_desc.irq_count;
+	int irq_num;
+	int irq;
+	int ret, i;
+
+	irqs = kmalloc(irq_count * sizeof(irqs[0]), GFP_KERNEL);
+	if (!irqs) {
+		dev_err(&mc_dev->dev, "No memory to allocate irqs[]\n");
+		return -ENOMEM;
+	}
+
+	for (i = 0; i < irq_count; i++) {
+		mc_irq = kmalloc(sizeof(*mc_irq), GFP_KERNEL);
+		if (!mc_irq) {
+			dev_err(&mc_dev->dev, "No memory to allocate mc irq\n");
+			ret = -ENOMEM;
+			goto error;
+		}
+		irqs[i] = mc_irq;
+
+		irq_num = get_object_irq_num(mc_dev, i);
+		irq = xlate_irq_num_to_irq(mc_dev, irq_num);
+		if (irq <= 0) {
+			dev_err(&mc_dev->dev, "xlate irq_num error, %d\n", i);
+			ret = -ENODEV;
+			goto error;
+		}
+
+		irqs[i]->irq_number = irq;
+		irqs[i]->mc_dev = mc_dev;
+		irqs[i]->dev_irq_index = i;
+	}
+
+	mc_dev->irqs = irqs;
+	return 0;
+error:
+	for(i--; i >= 0; i--)
+		kfree(irqs[i]);
+
+	kfree(irqs);
+	return ret;
 }
 
 static int get_dprc_icid(struct fsl_mc_io *mc_io,
@@ -618,6 +764,15 @@ int fsl_mc_device_add(struct dprc_obj_desc *obj_desc,
 						       parent_mc_dev);
 		if (error < 0)
 			goto error_cleanup_dev;
+	}
+
+	/*
+	 * Set up line IRQs for child objects if needed
+	 */
+	if (fsl_mc_line_irqs_supported(mc_dev)) {
+		error = fsl_mc_setup_line_irqs(mc_dev);
+		if (error < 0)
+			dev_err(parent_dev, "line irq setup failed\n");
 	}
 
 	/*
@@ -1131,6 +1286,73 @@ static int get_mc_addr_translation_ranges(struct device *dev,
 	return 0;
 }
 
+static int get_hwirq(struct platform_device *pdev, int index)
+{
+	struct of_phandle_args oirq;
+	int rc;
+
+	rc = of_irq_parse_one(pdev->dev.of_node, index, &oirq);
+	if (!rc)
+		return oirq.args[1];  /* SPI interrupt number from interrupts property */
+	else
+		return -ENOMEM;
+}
+
+/**
+ * fsl_mc_alloc_line_irqs
+ *    Look for an interrupts property in the fsl-mc node in the device tree
+ *    and allocate linux irqs for each hardware (SPI) irq found.
+ *    The hwirq number will be used to associate a linux irq with an object.
+ *
+ */
+static int fsl_mc_alloc_line_irqs(struct platform_device *pdev, struct fsl_mc *mc)
+{
+	struct resource *irqres;
+	struct device *dev = &pdev->dev;
+	int num_irqs;
+	int hwirq;
+	int i;
+
+	/* count number of line IRQs */
+	num_irqs = 0;
+	while ((irqres = platform_get_resource(pdev, IORESOURCE_IRQ, num_irqs))) {
+		num_irqs++;
+	}
+
+	if (!num_irqs) {
+		return 0;   // no irqs
+	}
+
+	mc->line_irqs = devm_kzalloc(dev, sizeof(*mc->line_irqs) * num_irqs, GFP_KERNEL);
+	if (!mc->line_irqs) {
+		dev_err(dev, "failed to allocate %d irqs\n", num_irqs);
+		return -ENOMEM;
+	}
+
+	for (i = 0; i < num_irqs; ++i) {
+		/* linux irq number */
+		int irq = platform_get_irq(pdev, i);
+		if (irq < 0) {
+			dev_err(dev, "failed to get irq index %d\n", i);
+			return -ENODEV;
+		}
+		mc->line_irqs[i].irq = irq;
+
+		/* get hwirq (SPI) number from device tree */
+		hwirq = get_hwirq(pdev, i);
+		if (!hwirq) {
+			dev_err(dev, "failed to get hwirq, index=%d\n", i);
+			return -ENODEV;
+		}
+		mc->line_irqs[i].hwirq = hwirq;
+
+	}
+
+	mc->num_line_irqs = num_irqs;
+
+	return num_irqs;
+}
+
 /**
  * fsl_mc_bus_probe - callback invoked when the root MC bus is being
  * added
@@ -1147,6 +1369,7 @@ static int fsl_mc_bus_probe(struct platform_device *pdev)
 	uint32_t mc_portal_size;
 	struct mc_version mc_version;
 	struct resource res;
+	int num_irqs;
 
 	dev_info(&pdev->dev, "Root MC bus device probed");
 
@@ -1155,13 +1378,20 @@ static int fsl_mc_bus_probe(struct platform_device *pdev)
 		return -ENOMEM;
 
 	platform_set_drvdata(pdev, mc);
+
+	/* create MSI domain */
 	error = create_mc_irq_domain(pdev, &mc->irq_domain);
 	if (error < 0) {
+		/* no MSIs, see if there are line interrupts */
+		num_irqs = fsl_mc_alloc_line_irqs(pdev, mc);
+		if (num_irqs)
+			mc->gic_line_irq_supported = true;
+	} else
+		mc->gic_supported = true;
+
+	if (!mc->gic_supported && !mc->gic_line_irq_supported)
 		dev_warn(&pdev->dev,
 			 "WARNING: MC bus driver will run without interrupt support\n");
-	} else {
-		mc->gic_supported = true;
-	}
 
 	/*
 	 * Get physical address of MC portal for the root DPRC:
