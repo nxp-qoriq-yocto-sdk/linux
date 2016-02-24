@@ -39,5 +39,5 @@ int vfio_fsl_mc_unconfigure_irqs(struct vfio_fsl_mc_device *vdev);
 
 int vfio_fsl_mc_set_irqs_ioctl(struct vfio_fsl_mc_device *vdev,
 			       uint32_t flags, unsigned index, unsigned start,
-			       unsigned count, void *data);
+			       unsigned count, void *data, uint32_t irq_num);
 #endif /* VFIO_PCI_PRIVATE_H */

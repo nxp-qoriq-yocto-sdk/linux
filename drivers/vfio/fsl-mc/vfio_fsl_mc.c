@@ -206,7 +206,8 @@ static long vfio_fsl_mc_ioctl(void *device_data,
 
 		ret = vfio_fsl_mc_set_irqs_ioctl(vdev, hdr.flags,
 						 hdr.index, hdr.start,
-						 hdr.count, data);
+						 hdr.count, data,
+						 hdr.irq_num);
 		return ret;
 	}
 	case VFIO_DEVICE_RESET:

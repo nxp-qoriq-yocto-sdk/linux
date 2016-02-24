@@ -28,6 +28,83 @@
 
 #include "vfio_fsl_mc_private.h"
 
+static int vfio_fsl_mc_get_irq(struct fsl_mc_device *mc_dev,
+			       uint8_t irq_index, struct dprc_irq_cfg *irq_cfg)
+{
+	struct device *dev = &mc_dev->dev;
+	struct fsl_mc_device *mc_bus_dev;
+	struct dprc_irq_cfg cfg;
+	char buf[20];
+	char *device_type;
+	char *str = buf;
+	int ret, type;
+
+	strcpy(str, dev_name(dev));
+	device_type = strsep(&str, ".");
+	if (!device_type)
+		return -EINVAL;
+
+	if (strncmp(device_type, "dprc", 4) == 0) {
+		ret = dprc_get_irq(mc_dev->mc_io, 0, mc_dev->mc_handle,
+				   irq_index, &type, &cfg);
+		if (ret)
+			return ret;
+
+		irq_cfg->paddr = cfg.paddr;
+		irq_cfg->val = cfg.val;
+		irq_cfg->irq_num = cfg.irq_num;
+		return 0;
+	} else {
+		mc_bus_dev = to_fsl_mc_device(mc_dev->dev.parent);
+		ret = dprc_get_obj_irq(mc_bus_dev->mc_io, 0,
+				       mc_bus_dev->mc_handle,
+				       mc_dev->obj_desc.type,
+				       mc_dev->obj_desc.id,
+				       irq_index, &type, &cfg);
+		if (ret)
+			return ret;
+
+		irq_cfg->paddr = cfg.paddr;
+		irq_cfg->val = cfg.val;
+		irq_cfg->irq_num = cfg.irq_num;
+		return 0;
+	}
+}
+
+static int vfio_fsl_mc_set_irq(struct fsl_mc_device *mc_dev,
+			       uint8_t irq_index, struct dprc_irq_cfg *irq_cfg)
+{
+	struct device *dev = &mc_dev->dev;
+	struct fsl_mc_device *mc_bus_dev;
+	struct dprc_irq_cfg cfg;
+	char buf[20];
+	char *device_type;
+	char *str = buf;
+
+	strcpy(str, dev_name(dev));
+	device_type = strsep(&str, ".");
+	if (!device_type)
+		return -EINVAL;
+
+	if (strncmp(device_type, "dprc", 4) == 0) {
+		cfg.paddr = irq_cfg->paddr;
+		cfg.val = irq_cfg->val;
+		cfg.irq_num = irq_cfg->irq_num;
+		return dprc_set_irq(mc_dev->mc_io, 0, mc_dev->mc_handle,
+				    irq_index, &cfg);
+	} else {
+		mc_bus_dev = to_fsl_mc_device(mc_dev->dev.parent);
+		cfg.paddr = irq_cfg->paddr;
+		cfg.val = irq_cfg->val;
+		cfg.irq_num = irq_cfg->irq_num;
+		return dprc_set_obj_irq(mc_bus_dev->mc_io, 0,
+					mc_bus_dev->mc_handle,
+					mc_dev->obj_desc.type,
+					mc_dev->obj_desc.id,
+					irq_index, &cfg);
+	}
+}
+
 static irqreturn_t vfio_fsl_mc_irq_handler(int irq_num, void *arg)
 {
 	struct vfio_fsl_mc_irq *mc_irq = (struct vfio_fsl_mc_irq *)arg;
@@ -79,6 +156,45 @@ static void vfio_fsl_mc_unconfigure_irq(struct vfio_fsl_mc_device *vdev,
 	free_irq(irq->irq_number, mc_irq);
 	kfree(vdev->mc_irqs[irq_index].name);
 	vdev->mc_irqs[irq_index].irq_configured = false;
+}
+
+static int vfio_fsl_mc_update_irq_num(struct vfio_fsl_mc_device *vdev,
+				      int irq_index, uint32_t irq_num)
+{
+	struct fsl_mc_device *mc_dev = vdev->mc_dev;
+	struct dprc_irq_cfg irq_cfg;
+	struct vfio_fsl_mc_irq *mc_irq = &vdev->mc_irqs[irq_index];
+	int ret;
+	int hwirq;
+
+	if (WARN_ON(!mc_irq->irq_initialized))
+		return -EOPNOTSUPP;
+
+	/* Disable interrupt during configuration */
+	hwirq = mc_dev->irqs[irq_index]->irq_number;
+	disable_irq_nosync(hwirq);
+
+	/* Get IRQ info */
+	ret = vfio_fsl_mc_get_irq(mc_dev, irq_index, &irq_cfg);
+	if (ret) {
+		dev_err(&mc_dev->dev, "Failed to get_irq(): %d\n", ret);
+		return ret;
+	}
+
+	/* Set user irq id */
+	irq_cfg.irq_num = irq_num;
+
+	/* configure IRQ in device with updated user-irq-id */
+	ret = vfio_fsl_mc_set_irq(mc_dev, irq_index, &irq_cfg);
+	if (ret) {
+		dev_err(&mc_dev->dev, "Failed to setup MSI: %d\n", ret);
+		return ret;
+	}
+
+	/* Finally enable the interrupt again */
+	enable_irq(hwirq);
+
+	return 0;
 }
 
 static int vfio_fsl_mc_setup_irqs(struct fsl_mc_device *mc_dev)
@@ -187,7 +303,8 @@ static int vfio_fsl_mc_irq_mask(struct vfio_fsl_mc_device *vdev,
 }
 
 static int vfio_fsl_mc_config_irq_signal(struct vfio_fsl_mc_device *vdev,
-					 int irq_index, int32_t fd)
+					 int irq_index, int32_t fd,
+					 uint32_t irq_num)
 {
 	struct eventfd_ctx *trigger;
 	struct vfio_fsl_mc_irq *mc_irq = &vdev->mc_irqs[irq_index];
@@ -214,13 +331,22 @@ static int vfio_fsl_mc_config_irq_signal(struct vfio_fsl_mc_device *vdev,
 		}
 	}
 
+	ret = vfio_fsl_mc_update_irq_num(vdev, irq_index,
+					     irq_num);
+	if (ret) {
+		vfio_fsl_mc_unconfigure_irq(vdev, irq_index);
+		eventfd_ctx_put(trigger);
+		return ret;
+	}
+
 	vdev->mc_irqs[irq_index].trigger = trigger;
 	return 0;
 }
 
 static int vfio_fsl_mc_set_irq_trigger(struct vfio_fsl_mc_device *vdev,
-				    unsigned index, unsigned start,
-				    unsigned count, uint32_t flags, void *data)
+				       unsigned index, unsigned start,
+				       unsigned count, uint32_t flags,
+				       void *data, uint32_t irq_num)
 {
 	struct fsl_mc_device *mc_dev = vdev->mc_dev;
 	int32_t fd;
@@ -243,12 +369,12 @@ static int vfio_fsl_mc_set_irq_trigger(struct vfio_fsl_mc_device *vdev,
 	if (start != 0 || count != 1)
 		return -EINVAL;
 
-	return vfio_fsl_mc_config_irq_signal(vdev, index, fd);
+	return vfio_fsl_mc_config_irq_signal(vdev, index, fd, irq_num);
 }
 
 int vfio_fsl_mc_set_irqs_ioctl(struct vfio_fsl_mc_device *vdev,
 			       uint32_t flags, unsigned index, unsigned start,
-			       unsigned count, void *data)
+			       unsigned count, void *data, uint32_t irq_num)
 {
 	int ret = -ENOTTY;
 
@@ -265,7 +391,8 @@ int vfio_fsl_mc_set_irqs_ioctl(struct vfio_fsl_mc_device *vdev,
 		break;
 	case VFIO_IRQ_SET_ACTION_TRIGGER:
 		ret = vfio_fsl_mc_set_irq_trigger(vdev, index, start,
-						  count, flags, data);
+						  count, flags, data,
+						  irq_num);
 		break;
 	}
 
