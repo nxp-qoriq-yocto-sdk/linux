@@ -1631,7 +1631,6 @@ static int gfar_suspend(struct device *dev)
 	} else if (wol & GFAR_WOL_FILER_UCAST) {
 		gfar_filer_config_wol(priv);
 		gfar_start_wol_filer(priv);
-
 	} else {
 		phy_stop(priv->phydev);
 	}
