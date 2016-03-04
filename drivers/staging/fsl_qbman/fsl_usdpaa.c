@@ -34,6 +34,10 @@ static unsigned long pfn_size;
  * isn't atomic_t). */
 static DEFINE_SPINLOCK(mem_lock);
 
+/* Mutex to prevent a new process from starting
+   while cleanup is still occurring */
+static DEFINE_MUTEX(cleanup_mutex);
+
 /* The range of TLB1 indices */
 static unsigned int first_tlb;
 static unsigned int num_tlb;
@@ -344,6 +348,9 @@ static int usdpaa_open(struct inode *inode, struct file *filp)
 	struct ctx *ctx = kmalloc(sizeof(struct ctx), GFP_KERNEL);
 	if (!ctx)
 		return -ENOMEM;
+
+	/* If cleanup is going on wait until it is completed */
+	mutex_lock(&cleanup_mutex);
 	filp->private_data = ctx;
 
 	while (backend->id_type != usdpaa_id_max) {
@@ -356,7 +363,7 @@ static int usdpaa_open(struct inode *inode, struct file *filp)
 	spin_lock_init(&ctx->lock);
 
 	filp->f_mapping->backing_dev_info = &directly_mappable_cdev_bdi;
-
+	mutex_unlock(&cleanup_mutex);
 	return 0;
 }
 
@@ -462,8 +469,11 @@ static int qm_check_and_destroy_fqs(struct qm_portal *portal, void *ctx,
 			/* Already OOS, no need to do anymore checks */
 			goto next;
 
-		if (check_channel(ctx, channel))
+		if (check_channel(ctx, channel)) {
 			qm_shutdown_fq(&portal, 1, fq_id);
+			pr_info("Shutdown FQ 0x%x for PID 0x%x\n",
+				fq_id, current->pid);
+		}
  next:
 		++fq_id;
 	}
@@ -529,6 +539,8 @@ static int usdpaa_release(struct inode *inode, struct file *filp)
 	   CPU as CPU specific variables may be needed during cleanup */
 	migrate_disable();
 
+	mutex_lock(&cleanup_mutex);
+
 	/* The following logic is used to recover resources that were not
 	   correctly released by the process that is closing the FD.
 	   Step 1: syncronize the HW with the qm_portal/bm_portal structures
@@ -564,12 +576,14 @@ static int usdpaa_release(struct inode *inode, struct file *filp)
 		qm_alloced_portal = qm_get_unused_portal();
 		if (!qm_alloced_portal) {
 			pr_crit("No QMan portal avalaible for cleanup\n");
+			mutex_unlock(&cleanup_mutex);
 			migrate_enable();
 			return -1;
 		}
 		qm_cleanup_portal = kmalloc(sizeof(struct qm_portal),
 					    GFP_KERNEL);
 		if (!qm_cleanup_portal) {
+			mutex_unlock(&cleanup_mutex);
 			migrate_enable();
 			return -ENOMEM;
 		}
@@ -581,12 +595,14 @@ static int usdpaa_release(struct inode *inode, struct file *filp)
 		bm_alloced_portal = bm_get_unused_portal();
 		if (!bm_alloced_portal) {
 			pr_crit("No BMan portal avalaible for cleanup\n");
+			mutex_unlock(&cleanup_mutex);
 			migrate_enable();
 			return -1;
 		}
 		bm_cleanup_portal = kmalloc(sizeof(struct bm_portal),
 					    GFP_KERNEL);
 		if (!bm_cleanup_portal) {
+			mutex_unlock(&cleanup_mutex);
 			migrate_enable();
 			return -ENOMEM;
 		}
@@ -607,6 +623,9 @@ static int usdpaa_release(struct inode *inode, struct file *filp)
 					qm_shutdown_fq(portal_array,
 						       portal_count,
 						       res->id + i);
+					pr_info("Shutdown FQ 0x%x for PID 0x%x\n",
+						res->id + i, current->pid);
+
 				}
 			}
 			leaks += res->num;
@@ -665,6 +684,7 @@ static int usdpaa_release(struct inode *inode, struct file *filp)
 	}
 
 	kfree(ctx);
+	mutex_unlock(&cleanup_mutex);
 	migrate_enable();
 	return 0;
 }
