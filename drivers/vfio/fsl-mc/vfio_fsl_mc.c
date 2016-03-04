@@ -31,6 +31,25 @@ struct fsl_mc_io *vfio_atomic_mc_io = NULL;
 
 static DEFINE_MUTEX(driver_lock);
 
+/* Address and size of all FSl-MC device regions are alligned to 64K.
+ * MC firmware reports size less than 64KB but the size userspace
+ * must map should be atleast page-size alligned.
+ */
+static size_t get_alligned_region_size(struct fsl_mc_device *mc_dev, int index)
+{
+	size_t size;
+	uint32_t pages;
+
+	size = mc_dev->regions[index].end - mc_dev->regions[index].start + 1;
+
+	pages = size / PAGE_SIZE;
+
+	if (size % PAGE_SIZE)
+		pages++;
+
+	return pages << PAGE_SHIFT;
+}
+
 /* Validate that requested address range falls in one of container's
  * device region.
  */
@@ -52,8 +71,7 @@ static bool vfio_validate_mmap_addr(struct vfio_fsl_mc_device *vdev,
 
 	for (idx = 0; idx < mc_dev->obj_desc.region_count; idx++) {
 		region_addr = mc_dev->regions[idx].start;
-		region_size = mc_dev->regions[idx].end -
-				       mc_dev->regions[idx].start + 1;
+		region_size = get_alligned_region_size(mc_dev, idx);
 
 		/*
 		 * Align search to minimum mappable size of PAGE_SIZE.
@@ -120,8 +138,7 @@ static long vfio_fsl_mc_ioctl(void *device_data,
 			return -EINVAL;
 
 		info.offset = mc_dev->regions[info.index].start;
-		info.size = mc_dev->regions[info.index].end -
-				mc_dev->regions[info.index].start + 1;
+		info.size = get_alligned_region_size(mc_dev, info.index);
 		info.flags = VFIO_REGION_INFO_FLAG_READ |
 			      VFIO_REGION_INFO_FLAG_WRITE |
 			      VFIO_REGION_INFO_FLAG_MMAP;
