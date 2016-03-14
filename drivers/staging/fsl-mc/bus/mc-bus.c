@@ -351,19 +351,25 @@ bool fsl_mc_msi_irqs_supported(void)
 }
 EXPORT_SYMBOL_GPL(fsl_mc_msi_irqs_supported);
 
-bool fsl_mc_line_irqs_supported(struct fsl_mc_device *mc_dev)
+/* Get platform dev of root DPRC container after root container probed */
+static struct platform_device *fsl_mc_get_pdev(struct fsl_mc_device *mc_dev)
 {
-	struct fsl_mc *mc;
 	struct device *parent_dev;
-	struct platform_device *pdev;
 
-	/* Get platform dev of root DPRC container after root container probed */
 	if (fsl_mc_bus_type.dev_root)
 		parent_dev = fsl_mc_bus_type.dev_root->parent;
 	else /* This is root container which is is not yet probed */
 		parent_dev = mc_dev->dev.parent;
 
-	pdev = to_platform_device(parent_dev);
+	return to_platform_device(parent_dev);
+}
+
+bool fsl_mc_line_irqs_supported(struct fsl_mc_device *mc_dev)
+{
+	struct fsl_mc *mc;
+	struct platform_device *pdev;
+
+	pdev = fsl_mc_get_pdev(mc_dev);
 	mc = platform_get_drvdata(pdev);
 	return mc->gic_line_irq_supported;
 }
@@ -446,19 +452,11 @@ static int get_object_irq_num(struct fsl_mc_device *mc_dev, int index)
  */
 static int xlate_irq_num_to_irq(struct fsl_mc_device *mc_dev, int irq_num)
 {
-	struct device *parent_dev;
 	struct platform_device *pdev;
 	struct fsl_mc *mc;
 	int i;
 
-	parent_dev = mc_dev->dev.parent;
-
-	/* Get the platform dev (fsl-mc node) */
-	if (parent_dev->bus == &fsl_mc_bus_type)
-		pdev = to_platform_device(parent_dev->parent);
-	else
-		pdev = to_platform_device(parent_dev);
-
+	pdev = fsl_mc_get_pdev(mc_dev);
 	mc = platform_get_drvdata(pdev);
 
 	for (i = 0; i < mc->num_line_irqs; i++) {
