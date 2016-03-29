@@ -2355,9 +2355,15 @@ arm_vsmmu_sync_s2crs_get_vcbndx(struct arm_vsmmu_device *vsmmu, int vsid)
 	s2cr = vsmmu->gr0.s2cr[vsid];
 	switch (s2cr & (S2CR_TYPE_MASK << S2CR_TYPE_SHIFT)) {
 	case S2CR_TYPE_TRANS:
+	/* Currently we support S2 only translations. So configure
+	 * s1_bypass as true (in next switch case).
+	 * This will be revisited when we support nested (S1+S2) translations.
+	 */
+#if 0
 		/* Follow the breadcrumbs */
 		vcbndx = (s2cr >> S2CR_CBNDX_SHIFT) & S2CR_CBNDX_MASK;
 		break;
+#endif
 	case S2CR_TYPE_BYPASS:
 		s1_bypass = true;
 		break;
