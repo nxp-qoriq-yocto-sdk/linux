@@ -438,12 +438,6 @@ dpa_generic_rx_dqrr(struct qman_portal *portal,
 	skb_put(skb, dpa_fd_length(fd) + data_start);
 	skb_pull(skb, data_start);
 	skb->protocol = eth_type_trans(skb, netdev);
-	if (unlikely(dpa_check_rx_mtu(skb, netdev->mtu))) {
-		percpu_priv->stats.rx_dropped++;
-		dev_kfree_skb(skb);
-		goto qman_consume;
-	}
-
 	skb_len = skb->len;
 
 	if (fd->status & FM_FD_STAT_L4CV)
