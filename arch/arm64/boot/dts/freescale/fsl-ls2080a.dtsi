@@ -518,6 +518,7 @@
 		interrupts = <0 80 0x4>; /* Level high type */
 		dr_mode = "host";
 		configure-gfladj;
+		snps,dis_rxdet_inp3_quirk;
 	};
 
 	usb1: usb3@3110000 {
@@ -526,6 +527,7 @@
 		interrupts = <0 81 0x4>; /* Level high type */
 		dr_mode = "host";
 		configure-gfladj;
+		snps,dis_rxdet_inp3_quirk;
 	};
 
 	smmu: iommu@5000000 {
@@ -619,6 +621,7 @@
 			     <1 14 0x1>, /* Physical Non-Secure PPI, edge triggered */
 			     <1 11 0x1>, /* Virtual PPI, edge triggered */
 			     <1 10 0x1>; /* Hypervisor PPI, edge triggered */
+		arm,reread-timer;
 	};
 
 	fsl_mc: fsl-mc@80c000000 {

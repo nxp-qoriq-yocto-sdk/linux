@@ -366,6 +366,7 @@ static inline void compat_copy_fm_pcd_cc_next_engine(
                 break;
 #endif /* DPAA_VERSION >= 11 */
             case e_IOC_FM_PCD_CC:
+                param->manip_id = compat_pcd_id2ptr(compat_param->manip_id);
                 compat_copy_fm_pcd_cc_next_cc(&compat_param->params.cc_params, &param->params.cc_params, compat);
                 break;
             case e_IOC_FM_PCD_KG:
@@ -392,6 +393,7 @@ static inline void compat_copy_fm_pcd_cc_next_engine(
                 break;
 #endif /* DPAA_VERSION >= 11 */
             case e_IOC_FM_PCD_CC:
+                compat_param->manip_id = compat_pcd_ptr2id(param->manip_id);
                 compat_copy_fm_pcd_cc_next_cc(&compat_param->params.cc_params, &param->params.cc_params, compat);
                 break;
             case e_IOC_FM_PCD_KG:
@@ -1199,17 +1201,14 @@ void compat_copy_fm_vsp_params(
 
     if (compat == COMPAT_US_TO_K)
     {
-        param->p_fm = compat_pcd_id2ptr(compat_param->p_fm);
         memcpy(&param->ext_buf_pools, &compat_param->ext_buf_pools, sizeof(ioc_fm_ext_pools));
         param->liodn_offset = compat_param->liodn_offset;
         param->port_params.port_id = compat_param->port_params.port_id;
         param->port_params.port_type = compat_param->port_params.port_type;
         param->relative_profile_id = compat_param->relative_profile_id;
-        param->id = compat_pcd_id2ptr(compat_param->id);
     }
     else
     {
-        compat_param->p_fm = compat_pcd_ptr2id(param->p_fm);
         memcpy(&compat_param->ext_buf_pools, &param->ext_buf_pools, sizeof(ioc_fm_ext_pools));
         compat_param->liodn_offset = param->liodn_offset;
         compat_param->port_params.port_id = param->port_params.port_id;

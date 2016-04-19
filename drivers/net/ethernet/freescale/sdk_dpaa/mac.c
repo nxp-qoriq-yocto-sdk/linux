@@ -76,7 +76,7 @@ static const char phy_str[][11] = {
 	[PHY_INTERFACE_MODE_RGMII_TXID]	= "rgmii-txid",
 	[PHY_INTERFACE_MODE_RTBI]	= "rtbi",
 	[PHY_INTERFACE_MODE_XGMII]	= "xgmii",
-	[PHY_INTERFACE_MODE_QSGMII]	= "sgmii-2500"
+	[PHY_INTERFACE_MODE_SGMII_2500] = "sgmii-2500",
 };
 
 static phy_interface_t __pure __attribute__((nonnull)) str2phy(const char *str)
@@ -103,7 +103,7 @@ static const uint16_t phy2speed[] = {
 	[PHY_INTERFACE_MODE_RGMII_TXID]	= SPEED_1000,
 	[PHY_INTERFACE_MODE_RTBI]	= SPEED_1000,
 	[PHY_INTERFACE_MODE_XGMII]	= SPEED_10000,
-	[PHY_INTERFACE_MODE_QSGMII]	= SPEED_2500
+	[PHY_INTERFACE_MODE_SGMII_2500] = SPEED_2500,
 };
 
 static struct mac_device * __cold
@@ -339,16 +339,14 @@ static int __cold mac_probe(struct platform_device *_of_dev)
 	mac_dev->max_speed	= mac_dev->speed;
 	mac_dev->if_support = DTSEC_SUPPORTED;
 	/* We don't support half-duplex in SGMII mode */
-	if (strstr(char_prop, "sgmii") || strstr(char_prop, "qsgmii"))
-		mac_dev->if_support &= ~(SUPPORTED_10baseT_Half |
-					SUPPORTED_100baseT_Half);
-
-	if (strstr(char_prop, "sgmii-2500"))
+	if (strstr(char_prop, "sgmii") || strstr(char_prop, "qsgmii") ||
+	    strstr(char_prop, "sgmii-2500"))
 		mac_dev->if_support &= ~(SUPPORTED_10baseT_Half |
 					SUPPORTED_100baseT_Half);
 
 	/* Gigabit support (no half-duplex) */
-	if (mac_dev->max_speed == 1000)
+	if (mac_dev->max_speed == SPEED_1000 ||
+	    mac_dev->max_speed == SPEED_2500)
 		mac_dev->if_support |= SUPPORTED_1000baseT_Full;
 
 	/* The 10G interface only supports one mode */

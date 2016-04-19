@@ -53,11 +53,7 @@
 #include "mac.h"
 
 /* DPAA platforms benefit from hardware-assisted queue management */
-#ifdef CONFIG_AS_FASTPATH
-#define DPA_NETIF_FEATURES	(NETIF_F_HW_QDISC | NETIF_F_HW_ACCEL_MQ)
-#else
 #define DPA_NETIF_FEATURES	NETIF_F_HW_ACCEL_MQ
-#endif
 
 /* Size in bytes of the FQ taildrop threshold */
 #define DPA_FQ_TD		0x200000
@@ -1739,3 +1735,19 @@ return_error:
 	return retval;
 }
 EXPORT_SYMBOL(dpa_enable_tx_csum);
+
+#ifdef CONFIG_FSL_DPAA_CEETM
+void dpa_enable_ceetm(struct net_device *dev)
+{
+	struct dpa_priv_s *priv = netdev_priv(dev);
+	priv->ceetm_en = true;
+}
+EXPORT_SYMBOL(dpa_enable_ceetm);
+
+void dpa_disable_ceetm(struct net_device *dev)
+{
+	struct dpa_priv_s *priv = netdev_priv(dev);
+	priv->ceetm_en = false;
+}
+EXPORT_SYMBOL(dpa_disable_ceetm);
+#endif

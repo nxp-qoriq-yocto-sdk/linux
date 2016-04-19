@@ -501,23 +501,6 @@ static int caam_rng_init(struct device *dev)
 	return 0;
 }
 
-#ifdef CONFIG_DEBUG_FS
-static int caam_debugfs_u64_get(void *data, u64 *val)
-{
-	*val = caam64_to_cpu(*(u64 *)data);
-	return 0;
-}
-
-static int caam_debugfs_u32_get(void *data, u64 *val)
-{
-	*val = caam32_to_cpu(*(u32 *)data);
-	return 0;
-}
-
-DEFINE_SIMPLE_ATTRIBUTE(caam_fops_u32_ro, caam_debugfs_u32_get, NULL, "%llu\n");
-DEFINE_SIMPLE_ATTRIBUTE(caam_fops_u64_ro, caam_debugfs_u64_get, NULL, "%llu\n");
-#endif
-
 /* Probe routine for CAAM top (controller) level */
 static int caam_probe(struct platform_device *pdev)
 {
@@ -701,6 +684,17 @@ static int caam_probe(struct platform_device *pdev)
 		goto iounmap_ctrl;
 	}
 
+#ifdef CONFIG_DEBUG_FS
+	/*
+	 * FIXME: needs better naming distinction, as some amalgamation of
+	 * "caam" and nprop->full_name. The OF name isn't distinctive,
+	 * but does separate instances
+	 */
+	perfmon = (struct caam_perfmon __force *)&ctrl->perfmon;
+
+	ctrlpriv->dfs_root = debugfs_create_dir(dev_name(dev), NULL);
+	ctrlpriv->ctl = debugfs_create_dir("ctl", ctrlpriv->dfs_root);
+#endif
 	ring = 0;
 	ctrlpriv->total_jobrs = 0;
 	for_each_available_child_of_node(nprop, np)
@@ -758,6 +752,8 @@ static int caam_probe(struct platform_device *pdev)
 	caam_id_ms = rd_reg32(&ctrl->perfmon.caam_id_ms);
 	if (caam_id_ms == SEC_ID_MS_T1040)
 		ctrlpriv->errata |= SEC_ERRATUM_A_006899;
+	else if (caam_id_ms == SEC_ID_MS_P5040)
+		ctrlpriv->errata |= SEC_ERRATUM_A_005454;
 
 	caam_id = (u64)caam_id_ms << 32 |
 		  (u64)rd_reg32(&ctrl->perfmon.caam_id_ls);
@@ -769,17 +765,6 @@ static int caam_probe(struct platform_device *pdev)
 		 ctrlpriv->total_jobrs, ctrlpriv->qi_present);
 
 #ifdef CONFIG_DEBUG_FS
-	/*
-	 * FIXME: needs better naming distinction, as some amalgamation of
-	 * "caam" and nprop->full_name. The OF name isn't distinctive,
-	 * but does separate instances
-	 */
-	perfmon = (struct caam_perfmon __force *)&ctrl->perfmon;
-
-	ctrlpriv->dfs_root = debugfs_create_dir(dev_name(dev), NULL);
-	ctrlpriv->ctl = debugfs_create_dir("ctl", ctrlpriv->dfs_root);
-
-	/* Controller-level - performance monitor counters */
 
 	ctrlpriv->ctl_rq_dequeued =
 		debugfs_create_file("rq_dequeued",
@@ -862,6 +847,9 @@ static int caam_probe(struct platform_device *pdev)
 	return 0;
 
 caam_remove:
+#ifdef CONFIG_DEBUG_FS
+	debugfs_remove_recursive(ctrlpriv->dfs_root);
+#endif
 	caam_remove(pdev);
 iounmap_ctrl:
 	iounmap(ctrl);

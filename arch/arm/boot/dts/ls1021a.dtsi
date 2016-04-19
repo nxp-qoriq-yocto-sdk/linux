@@ -181,7 +181,7 @@
 
 		scfg: scfg@1570000 {
 			compatible = "fsl,ls1021a-scfg", "syscon";
-			reg = <0x0 0x1570000 0x0 0x10000>;
+			reg = <0x0 0x1570000 0x0 0xd04>;
 			big-endian;
 		};
 
@@ -460,6 +460,7 @@
 			#gpio-cells = <2>;
 			interrupt-controller;
 			#interrupt-cells = <2>;
+			rcpm-wakeup = <&rcpm 0x00000040 0x0>;
 		};
 
 		gpio1: gpio@2310000 {
@@ -562,6 +563,7 @@
 			interrupts = <GIC_SPI 80 IRQ_TYPE_LEVEL_HIGH>;
 			clocks = <&sysclk>;
 			clock-names = "ipg";
+			rcpm-wakeup = <&rcpm 0x0 0x40000000>;
 			status = "disabled";
 		};
 
@@ -681,6 +683,8 @@
 			interrupt-names = "qdma-error", "qdma-queue";
 			channels = <8>;
 			queues = <2>;
+			status-sizes = <64>;
+			queue-sizes = <64 64>;
 			big-endian;
 		};
 
@@ -723,6 +727,7 @@
 			interrupt-parent = <&gic>;
 			model = "eTSEC";
 			fsl,magic-packet;
+			rcpm-wakeup = <&rcpm 0x80000000 0x0>;
 			ranges;
 			dma-coherent;
 
@@ -803,6 +808,42 @@
 			};
 		};
 
+		can0: can@2a70000 {
+			compatible = "fsl,ls1021ar2-flexcan";
+			reg = <0x0 0x2a70000 0x0 0x1000>;
+			interrupts = <GIC_SPI 126 IRQ_TYPE_LEVEL_HIGH>;
+			clocks = <&platform_clk 1>, <&platform_clk 1>;
+			clock-names = "ipg", "per";
+			little-endian;
+		};
+
+		can1: can@2a80000 {
+			compatible = "fsl,ls1021ar2-flexcan";
+			reg = <0x0 0x2a80000 0x0 0x1000>;
+			interrupts = <GIC_SPI 127 IRQ_TYPE_LEVEL_HIGH>;
+			clocks = <&platform_clk 1>, <&platform_clk 1>;
+			clock-names = "ipg", "per";
+			little-endian;
+		};
+
+		can2: can@2a90000 {
+			compatible = "fsl,ls1021ar2-flexcan";
+			reg = <0x0 0x2a90000 0x0 0x1000>;
+			interrupts = <GIC_SPI 128 IRQ_TYPE_LEVEL_HIGH>;
+			clocks = <&platform_clk 1>, <&platform_clk 1>;
+			clock-names = "ipg", "per";
+			little-endian;
+		};
+
+		can3: can@2aa0000 {
+			compatible = "fsl,ls1021ar2-flexcan";
+			reg = <0x0 0x2aa0000 0x0 0x1000>;
+			interrupts = <GIC_SPI 129 IRQ_TYPE_LEVEL_HIGH>;
+			clocks = <&platform_clk 1>, <&platform_clk 1>;
+			clock-names = "ipg", "per";
+			little-endian;
+		};
+
 		usb@8600000 {
 			compatible = "fsl-usb2-dr-v2.5", "fsl-usb2-dr";
 			reg = <0x0 0x8600000 0x0 0x1000>;
@@ -818,6 +859,7 @@
 			dr_mode = "host";
 			configure-gfladj;
 			dma-coherent;
+			snps,dis_rxdet_inp3_quirk;
 		};
 
 		pcie@3400000 {

@@ -56,6 +56,7 @@
 #include <linux/of_platform.h>
 #include <linux/of_address.h>
 #include <linux/of_irq.h>
+#include <linux/clk.h>
 #include <asm/uaccess.h>
 #include <asm/errno.h>
 #include <linux/fsl/qe.h>        /* For struct qe_firmware */
@@ -504,6 +505,8 @@ static t_LnxWrpFmDev * ReadFmDevTreeNode (struct platform_device *of_dev)
     struct device_node  *fm_node, *dev_node;
     struct of_device_id name;
     struct resource     res;
+    struct clk *clk;
+    u32 clk_rate;
     const uint32_t      *uint32_prop;
     int                 _errno=0, lenp;
     uint32_t            tmp_prop;
@@ -559,16 +562,23 @@ static t_LnxWrpFmDev * ReadFmDevTreeNode (struct platform_device *of_dev)
     p_LnxWrpFmDev->fmPhysBaseAddr = res.start;
     p_LnxWrpFmDev->fmMemSize = res.end + 1 - res.start;
 
-    uint32_prop = (uint32_t *)of_get_property(fm_node, "clock-frequency", &lenp);
-    if (unlikely(uint32_prop == NULL)) {
-        REPORT_ERROR(MAJOR, E_INVALID_VALUE, ("of_get_property(%s, clock-frequency) failed", fm_node->full_name));
+    clk = of_clk_get(fm_node, 0);
+    if (IS_ERR(clk)) {
+        dev_err(&of_dev->dev, "%s: Failed to get FM clock structure\n",
+                __func__);
+        of_node_put(fm_node);
+	return NULL;
+    }
+
+    clk_rate = clk_get_rate(clk);
+    if (!clk_rate) {
+        dev_err(&of_dev->dev, "%s: Failed to determine FM clock rate\n",
+                __func__);
+        of_node_put(fm_node);
         return NULL;
     }
-    tmp_prop = be32_to_cpu(*uint32_prop);
 
-    if (WARN_ON(lenp != sizeof(uint32_t)))
-        return NULL;
-    p_LnxWrpFmDev->fmDevSettings.param.fmClkFreq = (tmp_prop + 500000)/1000000; /* In MHz, rounded */
+    p_LnxWrpFmDev->fmDevSettings.param.fmClkFreq = DIV_ROUND_UP(clk_rate, 1000000); /* In MHz, rounded */
     /* Get the MURAM base address and size */
     memset(&name, 0, sizeof(struct of_device_id));
     if (WARN_ON(strlen("muram") >= sizeof(name.name)))
@@ -833,9 +843,11 @@ static t_Error ConfigureFmDev(t_LnxWrpFmDev  *p_LnxWrpFmDev)
     if (unlikely(_errno < 0))
         RETURN_ERROR(MAJOR, E_INVALID_STATE, ("can_request_irq() = %d", _errno));
 #endif
-    _errno = devm_request_irq(p_LnxWrpFmDev->dev, p_LnxWrpFmDev->irq, fm_irq, IRQF_NO_SUSPEND, "fman", p_LnxWrpFmDev);
+    _errno = devm_request_irq(p_LnxWrpFmDev->dev, p_LnxWrpFmDev->irq, fm_irq, 0, "fman", p_LnxWrpFmDev);
     if (unlikely(_errno < 0))
         RETURN_ERROR(MAJOR, E_INVALID_STATE, ("request_irq(%d) = %d", p_LnxWrpFmDev->irq, _errno));
+
+    enable_irq_wake(p_LnxWrpFmDev->irq);
 
     if (p_LnxWrpFmDev->err_irq != 0) {
 #ifndef MODULE
@@ -843,9 +855,11 @@ static t_Error ConfigureFmDev(t_LnxWrpFmDev  *p_LnxWrpFmDev)
         if (unlikely(_errno < 0))
             RETURN_ERROR(MAJOR, E_INVALID_STATE, ("can_request_irq() = %d", _errno));
 #endif
-        _errno = devm_request_irq(p_LnxWrpFmDev->dev, p_LnxWrpFmDev->err_irq, fm_err_irq, IRQF_SHARED | IRQF_NO_SUSPEND, "fman-err", p_LnxWrpFmDev);
+        _errno = devm_request_irq(p_LnxWrpFmDev->dev, p_LnxWrpFmDev->err_irq, fm_err_irq, IRQF_SHARED, "fman-err", p_LnxWrpFmDev);
         if (unlikely(_errno < 0))
             RETURN_ERROR(MAJOR, E_INVALID_STATE, ("request_irq(%d) = %d", p_LnxWrpFmDev->err_irq, _errno));
+
+	enable_irq_wake(p_LnxWrpFmDev->err_irq);
     }
 
     p_LnxWrpFmDev->res = devm_request_mem_region(p_LnxWrpFmDev->dev, p_LnxWrpFmDev->fmPhysBaseAddr, p_LnxWrpFmDev->fmMemSize, "fman");

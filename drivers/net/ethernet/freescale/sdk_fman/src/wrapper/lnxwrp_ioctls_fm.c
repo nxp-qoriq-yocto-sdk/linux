@@ -413,9 +413,7 @@ void LnxWrpPCDIOCTLTypeChecking(void)
     /*ioc_fm_pcd_cc_node_modify_key_params_t : private */
     /*ioc_fm_manip_hdr_info_t : private */
     /*ioc_fm_pcd_hash_table_set_t : private */
-#ifdef CONFIG_FMAN_ARM
-#warning "ls1043 temporary remove size validation"
-#else
+
     ASSERT_COND(sizeof(ioc_fm_pcd_manip_frag_ip_params_t) == sizeof(t_FmPcdManipFragIpParams));
     ASSERT_COND(sizeof(ioc_fm_pcd_manip_reassem_ip_params_t) == sizeof(t_FmPcdManipReassemIpParams));
     ASSERT_COND(sizeof(ioc_fm_pcd_manip_special_offload_ipsec_params_t) == sizeof(t_FmPcdManipSpecialOffloadIPSecParams));
@@ -446,7 +444,7 @@ void LnxWrpPCDIOCTLTypeChecking(void)
     ASSERT_COND(sizeof(ioc_fm_pcd_kg_scheme_select_t) == sizeof(t_FmPcdKgSchemeSelect));
     ASSERT_COND(sizeof(ioc_fm_pcd_port_schemes_params_t) == sizeof(t_FmPcdPortSchemesParams));
     ASSERT_COND(sizeof(ioc_fm_pcd_prs_start_t) == sizeof(t_FmPcdPrsStart));
-#endif
+
     return;
 }
 
@@ -3200,10 +3198,10 @@ invalid_port_id:
                 RETURN_ERROR(MINOR, E_WRITE_FAILED, NO_MSG);
         {
             uint8_t portId = param.port_params.port_id;
-            param.p_fm = p_LnxWrpFmDev->h_Dev;
             param.liodn_offset =
                 p_LnxWrpFmDev->rxPorts[portId].settings.param.specificParams.rxParams.liodnOffset;
         }
+        param.p_fm = p_LnxWrpFmDev->h_Dev;
         param.id = FM_VSP_Config((t_FmVspParams *)&param);
 
 #if defined(CONFIG_COMPAT)
@@ -4615,7 +4613,6 @@ t_Error LnxwrpFmPortIOCTL(t_LnxWrpFmPortDev *p_LnxWrpFmPortDev, unsigned int cmd
             t_LnxWrpFmDev *p_LnxWrpFmDev =
                     (t_LnxWrpFmDev *)p_LnxWrpFmPortDev->h_LnxWrpFmDev;
             ioc_fm_port_bmi_stats_t param;
-            int port_id = p_LnxWrpFmPortDev->id;
 
             if (!p_LnxWrpFmDev)
                 RETURN_ERROR(MINOR, E_NOT_AVAILABLE, ("Port not initialized or other error!"));

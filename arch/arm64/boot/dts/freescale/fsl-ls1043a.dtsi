@@ -121,6 +121,7 @@
 			     <1 14 0x1>, /* Physical Non-Secure PPI */
 			     <1 11 0x1>, /* Virtual PPI */
 			     <1 10 0x1>; /* Hypervisor PPI */
+		arm,reread-timer;
 	};
 
 	pmu {
@@ -251,9 +252,9 @@
 			compatible = "fsl,fman", "simple-bus";
 			ranges = <0x0 0x00 0x1a00000 0x100000>;
 			reg = <0x00 0x1a00000 0x0 0x100000>;
-			clock-frequency = <0>;
-			interrupts = <0 44 0x4>,
-				     <0 45 0x4>;
+			interrupts = <0 44 0x4>, <0 45 0x4>;
+			clocks = <&clockgen 3 0>;
+			clock-names = "fmanclk";
 
 			cc {
 				compatible = "fsl,fman-cc";
@@ -938,6 +939,7 @@
 			interrupts = <0 60 0x4>;
 			dr_mode = "host";
 			configure-gfladj;
+			snps,dis_rxdet_inp3_quirk;
 		};
 
 		usb1: usb3@3000000 {
@@ -946,6 +948,7 @@
 			interrupts = <0 61 0x4>;
 			dr_mode = "host";
 			configure-gfladj;
+			snps,dis_rxdet_inp3_quirk;
 		};
 
 		usb2: usb3@3100000 {
@@ -954,6 +957,7 @@
 			interrupts = <0 63 0x4>;
 			dr_mode = "host";
 			configure-gfladj;
+			snps,dis_rxdet_inp3_quirk;
 		};
 
 		sata: sata@3200000 {
@@ -972,6 +976,8 @@
 			interrupt-names = "qdma-error", "qdma-queue";
 			channels = <8>;
 			queues = <2>;
+			status-sizes = <64>;
+			queue-sizes = <64 64>;
 			big-endian;
 		};
 
