@@ -133,7 +133,6 @@ extern struct cpu_cache_fns cpu_cache;
 #define __cpuc_coherent_kern_range	cpu_cache.coherent_kern_range
 #define __cpuc_coherent_user_range	cpu_cache.coherent_user_range
 #define __cpuc_flush_dcache_area	cpu_cache.flush_kern_dcache_area
-
 /*
  * These are private to the dma-mapping API.  Do not use directly.
  * Their sole purpose is to ensure that data held in the cache
@@ -154,6 +153,7 @@ extern void __cpuc_flush_user_range(unsigned long, unsigned long, unsigned int);
 extern void __cpuc_coherent_kern_range(unsigned long, unsigned long);
 extern int  __cpuc_coherent_user_range(unsigned long, unsigned long);
 extern void __cpuc_flush_dcache_area(void *, size_t);
+#define __flush_dcache_area            __cpuc_flush_dcache_area
 
 /*
  * These are private to the dma-mapping API.  Do not use directly.

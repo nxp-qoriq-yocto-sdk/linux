@@ -28,7 +28,7 @@
 #include <asm/kvm_mmio.h>
 #include <asm/kvm_asm.h>
 #include <asm/kvm_emulate.h>
-
+#include <asm/cacheflush.h>
 #include "trace.h"
 
 #define NR_SWP 0x32
