@@ -483,11 +483,8 @@ static int qm_check_and_destroy_fqs(struct qm_portal *portal, void *ctx,
 			/* Already OOS, no need to do anymore checks */
 			goto next;
 
-		if (check_channel(ctx, channel)) {
+		if (check_channel(ctx, channel))
 			qm_shutdown_fq(&portal, 1, fq_id);
-			pr_info("Shutdown FQ 0x%x for PID 0x%x\n",
-				fq_id, current->pid);
-		}
  next:
 		++fq_id;
 	}
@@ -632,15 +629,11 @@ static int usdpaa_release(struct inode *inode, struct file *filp)
 				    list) {
 			if (backend->id_type == usdpaa_id_fqid) {
 				int i = 0;
-				for (; i < res->num; i++) {
+				for (; i < res->num; i++)
 					/* Clean FQs with the cleanup portal */
 					qm_shutdown_fq(portal_array,
 						       portal_count,
 						       res->id + i);
-					pr_info("Shutdown FQ 0x%x for PID 0x%x\n",
-						res->id + i, current->pid);
-
-				}
 			}
 			leaks += res->num;
 			backend->release(res->id, res->num);
