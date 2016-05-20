@@ -396,7 +396,7 @@ static int dprc_scan_container(struct fsl_mc_device *mc_bus_dev)
 	if (error < 0)
 		goto error;
 
-	if (fsl_mc_interrupts_supported() && !mc_bus->irq_resources) {
+	if (fsl_mc_msi_irqs_supported() && !mc_bus->irq_resources) {
 		irq_count += FSL_MC_IRQ_POOL_MAX_EXTRA_IRQS;
 		error = fsl_mc_populate_irq_pool(mc_bus, irq_count);
 		if (error < 0)
@@ -880,7 +880,7 @@ static int dprc_probe(struct fsl_mc_device *mc_dev)
 		goto error_cleanup_open;
 	}
 
-	if (fsl_mc_interrupts_supported()) {
+	if (fsl_mc_msi_irqs_supported()) {
 		/*
 		 * Create DPMCP for the DPRC's built-in portal:
 		 */
@@ -898,7 +898,7 @@ static int dprc_probe(struct fsl_mc_device *mc_dev)
 	if (error < 0)
 		goto error_destroy_dpmcp;
 
-	if (fsl_mc_interrupts_supported()) {
+	if (fsl_mc_msi_irqs_supported()) {
 		/*
 		 * The fsl_mc_device object associated with the DPMCP object
 		 * created above was created as part of the
@@ -968,7 +968,7 @@ error_cleanup_dprc_scan:
 	fsl_mc_io_unset_dpmcp(mc_dev->mc_io);
 	device_for_each_child(&mc_dev->dev, NULL, __fsl_mc_device_remove);
 	dprc_cleanup_all_resource_pools(mc_dev);
-	if (fsl_mc_interrupts_supported())
+	if (fsl_mc_msi_irqs_supported())
 		fsl_mc_cleanup_irq_pool(mc_bus);
 
 error_destroy_dpmcp:
@@ -1022,7 +1022,7 @@ static int dprc_remove(struct fsl_mc_device *mc_dev)
 	if (WARN_ON(!mc_bus->irq_resources))
 		return -EINVAL;
 
-	if (fsl_mc_interrupts_supported()) {
+	if (fsl_mc_msi_irqs_supported()) {
 		dprc_teardown_irqs(mc_dev);
 		error = dprc_close(mc_bus->atomic_mc_io, 0,
 				   mc_bus->atomic_dprc_handle);
@@ -1042,7 +1042,7 @@ static int dprc_remove(struct fsl_mc_device *mc_dev)
 	if (error < 0)
 		dev_err(&mc_dev->dev, "dprc_close() failed: %d\n", error);
 
-	if (fsl_mc_interrupts_supported())
+	if (fsl_mc_msi_irqs_supported())
 		fsl_mc_cleanup_irq_pool(mc_bus);
 
 	fsl_destroy_mc_io(mc_dev->mc_io);

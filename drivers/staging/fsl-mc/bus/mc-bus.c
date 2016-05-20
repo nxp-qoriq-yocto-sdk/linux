@@ -342,13 +342,13 @@ void fsl_mc_driver_unregister(struct fsl_mc_driver *mc_driver)
 }
 EXPORT_SYMBOL_GPL(fsl_mc_driver_unregister);
 
-bool fsl_mc_interrupts_supported(void)
+bool fsl_mc_msi_irqs_supported(void)
 {
 	struct fsl_mc *mc = dev_get_drvdata(fsl_mc_bus_type.dev_root->parent);
 
 	return mc->gic_supported;
 }
-EXPORT_SYMBOL_GPL(fsl_mc_interrupts_supported);
+EXPORT_SYMBOL_GPL(fsl_mc_msi_irqs_supported);
 
 static int get_dprc_attr(struct fsl_mc_io *mc_io,
 			 int container_id, struct dprc_attributes *attr)

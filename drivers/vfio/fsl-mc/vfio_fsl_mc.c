@@ -421,7 +421,7 @@ static int vfio_fsl_mc_probe(struct fsl_mc_device *mc_dev)
 			goto clean_resource_pool;
 		}
 
-		if (fsl_mc_interrupts_supported() && !mc_bus->irq_resources) {
+		if (fsl_mc_msi_irqs_supported() && !mc_bus->irq_resources) {
 			irq_count = FSL_MC_IRQ_POOL_MAX_EXTRA_IRQS;
 			ret = fsl_mc_populate_irq_pool(mc_bus, irq_count);
 			if (ret < 0) {
@@ -521,7 +521,7 @@ static int vfio_fsl_mc_remove(struct fsl_mc_device *mc_dev)
 		dprc_cleanup_all_resource_pools(mc_dev);
 		mc_bus = to_fsl_mc_bus(mc_dev);
 
-		if (fsl_mc_interrupts_supported())
+		if (fsl_mc_msi_irqs_supported())
 			fsl_mc_cleanup_irq_pool(mc_bus);
 
 		ret = dprc_close(mc_dev->mc_io, 0, mc_dev->mc_handle);
