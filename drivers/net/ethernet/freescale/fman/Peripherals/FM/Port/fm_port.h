@@ -222,7 +222,7 @@ typedef uint32_t fmPcdEngines_t; /**< options as defined below: */
 #else
 #define IPR_SW_PATCH_IPv4_LABEL             0x2B0
 #define IPR_SW_PATCH_IPv6_LABEL             0x2F6
-#define IPF_SW_PATCH_IPv6_LABEL				0x365
+#define IPF_SW_PATCH_IPv6_LABEL				0x371
 #endif /* (DPAA_VERSION == 10) */
 
 #ifdef FM_CAPWAP_SUPPORT
