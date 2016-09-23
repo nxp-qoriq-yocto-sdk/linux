@@ -120,7 +120,13 @@ static irqreturn_t ls1_msi_handler(int irq, void *arg)
 	while ((pos = find_next_bit(&val, 32, pos)) != 32) {
 		virq = irq_find_mapping(msi_data->parent, 31 - pos);
 		if (virq != NO_IRQ) {
+#if defined(CONFIG_PREEMPT_RT_FULL) || defined(CONFIG_PREEMPT_RTB)
+			local_irq_disable();
+#endif
 			generic_handle_irq(virq);
+#if defined(CONFIG_PREEMPT_RT_FULL) || defined(CONFIG_PREEMPT_RTB)
+			local_irq_enable();
+#endif
 			ret = IRQ_HANDLED;
 		}
 		pos++;
